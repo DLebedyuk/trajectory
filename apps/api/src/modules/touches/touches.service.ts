@@ -59,6 +59,19 @@ export class TouchesService {
       .from(directions)
       .where(and(eq(directions.userId, userId), eq(directions.id, input.directionId)));
     if (!dir) throw ApiException.notFound('Направление');
+
+    if (input.projectId) {
+      const [project] = await this.db
+        .select({ directionId: projects.directionId })
+        .from(projects)
+        .where(and(eq(projects.userId, userId), eq(projects.id, input.projectId)));
+      if (!project) throw ApiException.notFound('Проект');
+      // касание принадлежит направлению, поэтому проект обязан быть из него же
+      if (project.directionId !== input.directionId) {
+        throw ApiException.validation('Проект относится к другому направлению');
+      }
+    }
+
     const [row] = await this.db
       .insert(touches)
       .values({

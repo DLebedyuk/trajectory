@@ -131,10 +131,17 @@ export class TasksService {
 
   async create(userId: string, input: CreateTaskInput): Promise<Task> {
     const [project] = await this.db
-      .select({ id: projects.id })
+      .select({ id: projects.id, status: projects.status })
       .from(projects)
       .where(and(eq(projects.userId, userId), eq(projects.id, input.projectId)));
     if (!project) throw ApiException.notFound('Проект');
+    // завершённый проект закрыт: иначе задача попадает в архив и там теряется
+    if (project.status === 'archived') {
+      throw ApiException.conflict(
+        'project_archived',
+        'Проект завершён. Верните его из архива или выберите другой.',
+      );
+    }
 
     const [{ value } = { value: 0 }] = await this.db
       .select({ value: sql<number>`coalesce(max(${tasks.sortOrder}), -1) + 1` })

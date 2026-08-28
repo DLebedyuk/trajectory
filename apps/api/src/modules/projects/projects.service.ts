@@ -85,12 +85,17 @@ export class ProjectsService {
     return toProject(row);
   }
 
-  async create(userId: string, input: CreateProjectInput): Promise<Project> {
+  /** Направление существует и принадлежит этому пользователю. */
+  private async assertOwnDirection(userId: string, directionId: string): Promise<void> {
     const [dir] = await this.db
       .select({ id: directions.id })
       .from(directions)
-      .where(and(eq(directions.userId, userId), eq(directions.id, input.directionId)));
+      .where(and(eq(directions.userId, userId), eq(directions.id, directionId)));
     if (!dir) throw ApiException.notFound('Направление');
+  }
+
+  async create(userId: string, input: CreateProjectInput): Promise<Project> {
+    await this.assertOwnDirection(userId, input.directionId);
 
     const [{ value } = { value: 0 }] = await this.db
       .select({ value: sql<number>`coalesce(max(${projects.sortOrder}), -1) + 1` })
@@ -115,6 +120,8 @@ export class ProjectsService {
 
   async update(userId: string, id: string, input: UpdateProjectInput): Promise<Project> {
     await this.get(userId, id);
+    // перенос в чужое направление недопустим: направление проверяем так же, как при создании
+    if (input.directionId !== undefined) await this.assertOwnDirection(userId, input.directionId);
     const [row] = await this.db
       .update(projects)
       .set({

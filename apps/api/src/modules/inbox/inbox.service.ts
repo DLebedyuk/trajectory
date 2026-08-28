@@ -135,6 +135,18 @@ export class InboxService {
               skipped.push({ inboxItemId: p.inboxItemId, reason: 'Не выбран проект' });
               continue;
             }
+            const [project] = await this.db
+              .select({ id: projects.id, status: projects.status })
+              .from(projects)
+              .where(and(eq(projects.userId, userId), eq(projects.id, p.projectId)));
+            if (!project) {
+              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Проект не найден' });
+              continue;
+            }
+            if (project.status === 'archived') {
+              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Проект завершён' });
+              continue;
+            }
             const [{ value } = { value: 0 }] = await this.db
               .select({ value: sql<number>`coalesce(max(${tasks.sortOrder}), -1) + 1` })
               .from(tasks)
