@@ -1,0 +1,207 @@
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button, EmptyState, FormField, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
+import { api } from '../api/client.js';
+import { useMenu } from '../api/queries.js';
+import { ErrorBox, Loading } from '../components/Loading.js';
+
+const ENERGY = { low: 'мало', medium: 'средне', high: 'много' } as const;
+const TIME = { quick: '15 минут', hour: 'около часа', hours: 'несколько часов' } as const;
+const COST = { free: 'бесплатно', cheap: 'недорого', budget: 'нужен бюджет' } as const;
+const PLACE = { home: 'дома', out: 'вне дома' } as const;
+const COMPANY = { alone: 'одной', withSomeone: 'с кем-то', any: 'всё равно' } as const;
+
+export function MenuPage() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [filter, setFilter] = useState<Record<string, string | undefined>>({});
+  const menu = useMenu(filter);
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('другое');
+  const [energy, setEnergy] = useState<'low' | 'medium' | 'high'>('medium');
+  const [time, setTime] = useState<'quick' | 'hour' | 'hours'>('hour');
+
+  const create = useMutation({
+    mutationFn: () =>
+      api.menu.create({
+        title,
+        category,
+        energy,
+        estimatedTime: time,
+        cost: 'cheap',
+        place: 'out',
+        company: 'any',
+        tried: false,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['menu'] });
+      toast.show('Сохранено. Срока у этого нет.');
+      setTitle('');
+      setOpen(false);
+    },
+  });
+  const toggleTried = useMutation({
+    mutationFn: (vars: { id: string; tried: boolean }) =>
+      api.menu.update(vars.id, { tried: !vars.tried }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['menu'] }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.menu.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['menu'] });
+      toast.show('Удалено из меню');
+    },
+  });
+
+  if (menu.isLoading) return <Loading what="Загружаю меню" />;
+  if (menu.isError) return <ErrorBox error={menu.error} />;
+
+  const setF = (key: string, value: string) =>
+    setFilter((prev) => ({ ...prev, [key]: prev[key] === value ? undefined : value }));
+
+  const group = (key: string, options: Record<string, string>) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <span className="lbl">
+        {key === 'energy'
+          ? 'Энергия'
+          : key === 'estimatedTime'
+            ? 'Время'
+            : key === 'cost'
+              ? 'Стоимость'
+              : key === 'place'
+                ? 'Место'
+                : 'Компания'}
+      </span>
+      <div className="chips">
+        {Object.entries(options).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className="chip"
+            data-on={filter[key] === value}
+            onClick={() => setF(key, value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <PageHeader
+        title="Меню возможностей"
+        subtitle="Приятное и необязательное. Идеи по направлениям становятся обычными задачами своих проектов."
+        actions={
+          <Button onClick={() => setOpen(true)}>
+            <IconPlus />
+            Добавить
+          </Button>
+        }
+      />
+
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+        {group('energy', ENERGY)}
+        {group('estimatedTime', TIME)}
+        {group('cost', COST)}
+        {group('place', PLACE)}
+        {group('company', COMPANY)}
+      </div>
+
+      {menu.data?.length === 0 ? (
+        <EmptyState
+          title="В меню пока пусто"
+          description="Сюда попадает всё, что просто хочется. Без сроков и без обязательств."
+          action={<Button onClick={() => setOpen(true)}>Добавить возможность</Button>}
+        />
+      ) : (
+        <div className="grid">
+          {(menu.data ?? []).map((m) => (
+            <div className="mcard" key={m.id}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <h4 style={{ fontSize: 15, lineHeight: 1.3 }}>{m.title}</h4>
+                {m.tried ? <span className="tag">пробовала</span> : null}
+              </div>
+              {m.comment ? <p className="hint">{m.comment}</p> : null}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto' }}>
+                <span className="tag">{m.category}</span>
+                <span className="tag">{ENERGY[m.energy]}</span>
+                <span className="tag">{TIME[m.estimatedTime]}</span>
+                <span className="tag">{COST[m.cost]}</span>
+                <span className="tag">{PLACE[m.place]}</span>
+                <span className="tag">{COMPANY[m.company]}</span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  marginTop: 9,
+                  paddingTop: 10,
+                  borderTop: '1px solid var(--line)',
+                }}
+              >
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => toggleTried.mutate({ id: m.id, tried: m.tried })}
+                >
+                  {m.tried ? 'Убрать отметку' : 'Попробовала'}
+                </Button>
+                <Button size="sm" variant="ghost" danger onClick={() => remove.mutate(m.id)}>
+                  Удалить
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal
+        open={open}
+        onOpenChange={setOpen}
+        title="Новая возможность"
+        description="У неё не будет дедлайна, приоритета и уведомления."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Отмена
+            </Button>
+            <Button variant="primary" disabled={!title.trim()} onClick={() => create.mutate()}>
+              Сохранить
+            </Button>
+          </>
+        }
+      >
+        <FormField label="Что хочется">
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </FormField>
+        <FormField label="Категория">
+          <input type="text" value={category} onChange={(e) => setCategory(e.target.value)} />
+        </FormField>
+        <div className="cols2">
+          <FormField label="Энергия">
+            <select value={energy} onChange={(e) => setEnergy(e.target.value as typeof energy)}>
+              {Object.entries(ENERGY).map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Время">
+            <select value={time} onChange={(e) => setTime(e.target.value as typeof time)}>
+              {Object.entries(TIME).map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      </Modal>
+    </>
+  );
+}

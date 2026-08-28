@@ -1,0 +1,16 @@
+{
+  "name": "@planner/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "echo \"Сборка десктопа: pnpm --filter @planner/desktop tauri:build (нужен Rust)\"",
+    "tauri": "tauri",
+    "tauri:build": "tauri build",
+    "typecheck": "echo \"нет TypeScript-кода: интерфейс берётся из apps/web\"",
+    "test": "echo \"нет тестов\""
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0"
+  }
+}

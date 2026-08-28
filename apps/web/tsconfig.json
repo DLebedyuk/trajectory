@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "paths": {
+      "@planner/contracts": ["../../packages/contracts/src/index.ts"],
+      "@planner/shared": ["../../packages/shared/src/index.ts"],
+      "@planner/ui": ["../../packages/ui/src/index.ts"],
+      "@planner/ui/styles.css": ["../../packages/ui/src/styles.css"]
+    },
+    "baseUrl": "."
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "vitest.config.ts"]
+}

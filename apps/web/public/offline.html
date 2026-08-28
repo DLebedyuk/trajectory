@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Нет сети — Траектория</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f1f0f4;
+        color: #211f2a;
+        display: grid;
+        place-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #131218;
+          color: #efedf4;
+        }
+      }
+      div {
+        max-width: 34ch;
+        text-align: center;
+        padding: 24px;
+      }
+      p {
+        color: #8b8599;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>Нет соединения</h1>
+      <p>
+        Оболочка приложения загрузилась из кеша, но данные приходят с сервера. Как только сеть
+        вернётся, страница обновится сама.
+      </p>
+    </div>
+  </body>
+</html>
