@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Checkbox, IconBell, IconCalendar } from '@planner/ui';
 import { plural } from '@planner/shared';
@@ -7,6 +8,8 @@ import type { CalendarEventView } from '../api/client.js';
 export interface TodayBlockProps {
   events: CalendarEventView[];
   tasks: TaskWithContext[];
+  /** Задачи, чей срок прошёл. Показываются свёрнутыми и по желанию. */
+  overdue: TaskWithContext[];
   reminders: Reminder[];
   onCompleteTask: (id: string) => void;
   onCompleteReminder: (id: string) => void;
@@ -16,6 +19,7 @@ export interface TodayBlockProps {
 export function TodayBlock({
   events,
   tasks,
+  overdue,
   reminders,
   onCompleteTask,
   onCompleteReminder,
@@ -25,6 +29,7 @@ export function TodayBlock({
     .filter((r) => r.scheduledTime)
     .sort((a, b) => ((a.scheduledTime ?? '') < (b.scheduledTime ?? '') ? -1 : 1));
   const soft = reminders.filter((r) => !r.scheduledTime);
+  const [overdueOpen, setOverdueOpen] = useState(false);
   const total = events.length + tasks.length + reminders.length;
 
   return (
@@ -107,6 +112,36 @@ export function TodayBlock({
           </Link>
         </div>
       ))}
+
+      {overdue.length > 0 ? (
+        <div className="tgroup">
+          <button
+            type="button"
+            className="quiet-link"
+            aria-expanded={overdueOpen}
+            onClick={() => setOverdueOpen((v) => !v)}
+          >
+            Просрочено: {overdue.length} {overdueOpen ? '· свернуть' : '· посмотреть'}
+          </button>
+          {overdueOpen
+            ? overdue.map((t) => (
+                <div className="tg-item" key={t.id}>
+                  <Checkbox
+                    checked={false}
+                    onChange={() => onCompleteTask(t.id)}
+                    label={`Выполнить: ${t.title}`}
+                  />
+                  <Link className="tmain" to={`/tasks/${t.id}`} style={{ flex: 1, fontSize: 13.5 }}>
+                    {t.title}
+                    <span className="tmeta">
+                      {t.projectTitle} · срок {t.deadline}
+                    </span>
+                  </Link>
+                </div>
+              ))
+            : null}
+        </div>
+      ) : null}
 
       {soft.length > 0 ? (
         <div className="tgroup">

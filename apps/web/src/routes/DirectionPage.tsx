@@ -14,7 +14,6 @@ import {
 import { formatLongDate, humanDate, plural, todayInTimezone } from '@planner/shared';
 import { api } from '../api/client.js';
 import {
-  invalidateFocusScope,
   qk,
   useDashboard,
   useDirection,
@@ -25,6 +24,8 @@ import {
 import { Glyph } from '../components/Glyph.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 import { TouchModal } from '../features/TouchModal.js';
+import { useFocusDirection } from '../features/useFocusDirection.js';
+import { DirectionSettingsModal } from '../features/DirectionSettingsModal.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 
 /** Страница направления. Задачи здесь не показываются — только проекты. */
@@ -47,6 +48,7 @@ export function DirectionPage() {
   const [outcome, setOutcome] = useState('');
   const [showPaused, setShowPaused] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -68,13 +70,9 @@ export function DirectionPage() {
     },
   });
 
-  const setFocus = useMutation({
-    mutationFn: () => api.focus.setDirection(directionId, 'clearTask'),
-    onSuccess: () => {
-      invalidateFocusScope(qc);
-      toast.show('Направление в фокусе');
-    },
-  });
+  // 'ask' — сервер вернёт 409, если активна задача из другого направления,
+  // и пользователь сам решит, что делать. Молча снимать задачу нельзя.
+  const { setDirection, conflictModal } = useFocusDirection();
 
   if (direction.isLoading) return <Loading what="Загружаю направление" />;
   if (direction.isError) return <ErrorBox error={direction.error} />;
@@ -141,7 +139,13 @@ export function DirectionPage() {
         subtitle={d.showMotto && d.motto ? <em>«{d.motto}»</em> : d.description}
         actions={
           <>
-            <Button size="sm" onClick={() => setFocus.mutate()}>
+            <Button size="sm" onClick={() => setSettingsOpen(true)}>
+              Настройки
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setDirection.mutate({ directionId, onConflict: 'ask' })}
+            >
               Поставить в фокус
             </Button>
             <Button size="sm" variant="primary" onClick={() => setTouchOpen(true)}>
@@ -282,6 +286,15 @@ export function DirectionPage() {
         today={today}
       />
       <DayTouchesModal date={day} directionId={directionId} onClose={() => setDay(null)} />
+
+      <DirectionSettingsModal
+        direction={d}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onArchived={() => navigate('/directions')}
+      />
+
+      {conflictModal}
 
       <Modal
         open={projectOpen}

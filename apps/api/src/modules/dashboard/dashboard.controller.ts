@@ -34,13 +34,16 @@ export class DashboardController {
     const timezone = user?.timezone ?? 'UTC';
     const today = todayInTimezone(timezone);
 
-    const [focus, dueTasks, todayReminders, pinnedMedia, heatmap] = await Promise.all([
-      this.focus.get(userId),
-      this.tasks.listDue(userId, today),
-      this.reminders.listToday(userId),
-      this.media.listPinned(userId),
-      this.touches.heatmap(userId, 26),
-    ]);
+    const [focus, dueTasks, overdueTasks, todayReminders, pinnedMedia, heatmap] = await Promise.all(
+      [
+        this.focus.get(userId),
+        this.tasks.listDue(userId, today),
+        this.tasks.listOverdue(userId, today),
+        this.reminders.listToday(userId),
+        this.media.listPinned(userId),
+        this.touches.heatmap(userId, 26),
+      ],
+    );
 
     const pinnedTasks = (await this.tasks.listPinned(userId)).filter(
       (t) => t.id !== focus.activeTaskId,
@@ -73,6 +76,7 @@ export class DashboardController {
       focus,
       events,
       dueTasks,
+      overdueTasks,
       todayReminders,
       pinnedTasks,
       pinnedMedia,

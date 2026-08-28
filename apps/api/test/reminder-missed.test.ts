@@ -23,9 +23,8 @@ afterAll(async () => {
 });
 
 async function collect(now: Date): Promise<string[]> {
-  const { ReminderSchedulerService } = await import(
-    '../src/modules/reminders/reminder-scheduler.service.js'
-  );
+  const { ReminderSchedulerService } =
+    await import('../src/modules/reminders/reminder-scheduler.service.js');
   const sent: string[] = [];
   const provider = {
     channel: 'test',

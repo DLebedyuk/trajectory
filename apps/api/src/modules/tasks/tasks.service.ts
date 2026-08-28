@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
 import type {
   CreateTaskInput,
   Task,
@@ -107,8 +107,20 @@ export class TasksService {
     return result;
   }
 
-  /** Задачи с дедлайном сегодня и раньше — для блока «Сегодня». */
-  async listDue(userId: string, date: string): Promise<TaskWithContext[]> {
+  /** Задачи с дедлайном ровно на этот день — для блока «Сегодня». */
+  listDue(userId: string, date: string): Promise<TaskWithContext[]> {
+    return this.byDeadline(userId, sql`${tasks.deadline} = ${date}`);
+  }
+
+  /**
+   * Просроченное отдельным списком. Главная не должна начинаться с хвоста
+   * несделанного: приложение считает пройденное, а не оставшееся.
+   */
+  listOverdue(userId: string, date: string): Promise<TaskWithContext[]> {
+    return this.byDeadline(userId, sql`${tasks.deadline} < ${date}`);
+  }
+
+  private async byDeadline(userId: string, condition: SQL): Promise<TaskWithContext[]> {
     const rows = await this.db
       .select({ id: tasks.id })
       .from(tasks)
@@ -117,7 +129,7 @@ export class TasksService {
           eq(tasks.userId, userId),
           eq(tasks.status, 'open'),
           isNotNull(tasks.deadline),
-          sql`${tasks.deadline} <= ${date}`,
+          condition,
         ),
       )
       .orderBy(asc(tasks.exactTime), asc(tasks.deadline));

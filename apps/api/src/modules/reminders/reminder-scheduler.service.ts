@@ -143,12 +143,21 @@ export class ReminderSchedulerService {
       if (date > today) continue;
 
       if (date < today) {
-        const target = this.planMissed(
-          (r.missedBehavior as MissedBehavior) ?? 'evening',
-          { timezone, today, now, digestTime },
-        );
+        const target = this.planMissed((r.missedBehavior as MissedBehavior) ?? 'evening', {
+          timezone,
+          today,
+          now,
+          digestTime,
+        });
         if (target) {
-          bucketFor(target.kind === 'digest' ? digest : evening, target.kind, r.userId, today, target.at, r.text);
+          bucketFor(
+            target.kind === 'digest' ? digest : evening,
+            target.kind,
+            r.userId,
+            today,
+            target.at,
+            r.text,
+          );
         }
         continue;
       }
@@ -197,12 +206,21 @@ export class ReminderSchedulerService {
 
       const line = `${t.title} — задача`;
       if (date < today) {
-        const target = this.planMissed(
-          (t.missedDefault as MissedBehavior) ?? 'evening',
-          { timezone, today, now, digestTime },
-        );
+        const target = this.planMissed((t.missedDefault as MissedBehavior) ?? 'evening', {
+          timezone,
+          today,
+          now,
+          digestTime,
+        });
         if (target) {
-          bucketFor(target.kind === 'digest' ? digest : evening, target.kind, t.userId, today, target.at, line);
+          bucketFor(
+            target.kind === 'digest' ? digest : evening,
+            target.kind,
+            t.userId,
+            today,
+            target.at,
+            line,
+          );
         }
         continue;
       }

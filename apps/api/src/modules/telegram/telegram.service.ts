@@ -156,12 +156,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
    * Разбор входящего текста. Вынесен из grammY, чтобы диалог можно было
    * проверить тестом без запуска бота.
    */
-  async handleText(
-    userId: string,
-    chatId: string,
-    raw: string,
-    today: string,
-  ): Promise<BotReply> {
+  async handleText(userId: string, chatId: string, raw: string, today: string): Promise<BotReply> {
     // ответ на вопрос «когда напомнить?»
     const pending = this.pending.get(chatId);
     if (pending) {
@@ -244,7 +239,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       if (action === 'done') await this.reminders.complete(userId, value);
       else if (action === 'delete') await this.reminders.remove(userId, value);
       else if (action === 'hour') await this.reminders.snooze(userId, value, { mode: 'hour' });
-      else if (action === 'evening') await this.reminders.snooze(userId, value, { mode: 'evening' });
+      else if (action === 'evening')
+        await this.reminders.snooze(userId, value, { mode: 'evening' });
       else if (action === 'tomorrow')
         await this.reminders.snooze(userId, value, { mode: 'tomorrow' });
       else return { text: 'Не понял кнопку.' };

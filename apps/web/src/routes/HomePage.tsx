@@ -12,7 +12,7 @@ import {
   useToast,
 } from '@planner/ui';
 import { DURATION_LABEL, formatLongDate, humanDate, plural } from '@planner/shared';
-import { api, ApiError } from '../api/client.js';
+import { api } from '../api/client.js';
 import {
   invalidateFocusScope,
   qk,
@@ -24,7 +24,7 @@ import {
 import { TodayBlock } from '../features/TodayBlock.js';
 import { FocusCard } from '../features/FocusCard.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
-import { FocusConflictModal, type FocusConflictInfo } from '../features/FocusConflictModal.js';
+import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 import { TouchModal } from '../features/TouchModal.js';
 import { ReminderModal } from '../features/ReminderModal.js';
@@ -42,7 +42,6 @@ export function HomePage() {
   const [pickOpen, setPickOpen] = useState(false);
   const [pickMode, setPickMode] = useState<'active' | 'pin'>('active');
   const [dirOpen, setDirOpen] = useState(false);
-  const [conflict, setConflict] = useState<FocusConflictInfo | null>(null);
   const [day, setDay] = useState<string | null>(null);
   const [touchOpen, setTouchOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
@@ -70,24 +69,8 @@ export function HomePage() {
       toast.show('Активной задачи нет');
     },
   });
-  const setDirection = useMutation({
-    mutationFn: (vars: {
-      directionId: string | null;
-      onConflict: 'ask' | 'keepTask' | 'clearTask';
-    }) => api.focus.setDirection(vars.directionId, vars.onConflict),
-    onSuccess: () => {
-      invalidateFocusScope(qc);
-      setConflict(null);
-      setDirOpen(false);
-    },
-    onError: (e) => {
-      if (e instanceof ApiError && e.isFocusConflict) {
-        setConflict(e.details as FocusConflictInfo);
-        setDirOpen(false);
-      } else {
-        toast.show('Не удалось сменить направление');
-      }
-    },
+  const { setDirection, conflictModal } = useFocusDirection({
+    onSettled: () => setDirOpen(false),
   });
   const completeReminder = useMutation({
     mutationFn: (id: string) => api.reminders.complete(id),
@@ -148,6 +131,7 @@ export function HomePage() {
         <TodayBlock
           events={data.events}
           tasks={data.dueTasks}
+          overdue={data.overdueTasks}
           reminders={data.todayReminders}
           onCompleteTask={(id) => completeTask.mutate(id)}
           onCompleteReminder={(id) => completeReminder.mutate(id)}
@@ -361,24 +345,7 @@ export function HomePage() {
         </div>
       </Modal>
 
-      <FocusConflictModal
-        conflict={conflict}
-        onClose={() => setConflict(null)}
-        onKeepTask={() =>
-          conflict &&
-          setDirection.mutate({
-            directionId: conflict.requestedDirectionId,
-            onConflict: 'keepTask',
-          })
-        }
-        onClearTask={() =>
-          conflict &&
-          setDirection.mutate({
-            directionId: conflict.requestedDirectionId,
-            onConflict: 'clearTask',
-          })
-        }
-      />
+      {conflictModal}
 
       <DayTouchesModal date={day} onClose={() => setDay(null)} />
       <TouchModal open={touchOpen} onOpenChange={setTouchOpen} today={data.today} />

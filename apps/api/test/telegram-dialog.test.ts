@@ -16,7 +16,10 @@ const CHAT_ID = '555';
 const TODAY = '2026-09-14'; // понедельник
 
 const create = vi.fn(
-  async (_userId: string, input: { text: string; scheduledDate: string; scheduledTime?: unknown }) => ({
+  async (
+    _userId: string,
+    input: { text: string; scheduledDate: string; scheduledTime?: unknown },
+  ) => ({
     id: 'reminder-1',
     text: input.text,
     scheduledDate: input.scheduledDate,
@@ -26,7 +29,13 @@ const create = vi.fn(
 const inboxCreate = vi.fn(async () => ({ id: 'inbox-1' }));
 
 function makeService() {
-  const reminders = { create, lastCreated: async () => null, remove: vi.fn(), complete: vi.fn(), snooze: vi.fn() };
+  const reminders = {
+    create,
+    lastCreated: async () => null,
+    remove: vi.fn(),
+    complete: vi.fn(),
+    snooze: vi.fn(),
+  };
   const inbox = { create: inboxCreate };
   const router = { register: vi.fn() };
   return new TelegramService({} as never, reminders as never, inbox as never, router as never);
@@ -44,7 +53,12 @@ describe('телеграм: подтверждение неоднозначно�
 
   it('на «напомни в субботу» сначала спрашивает и ничего не создаёт', async () => {
     const service = makeService();
-    const reply = await service.handleText(USER_ID, CHAT_ID, 'напомни в субботу позвонить в театр', TODAY);
+    const reply = await service.handleText(
+      USER_ID,
+      CHAT_ID,
+      'напомни в субботу позвонить в театр',
+      TODAY,
+    );
 
     expect(create).not.toHaveBeenCalled();
     expect(reply.text).toContain('субботу');
@@ -83,7 +97,12 @@ describe('телеграм: подтверждение неоднозначно�
 
   it('обычную мысль кладёт во входящие', async () => {
     const service = makeService();
-    const reply = await service.handleText(USER_ID, CHAT_ID, 'посмотреть спектакль в Практике', TODAY);
+    const reply = await service.handleText(
+      USER_ID,
+      CHAT_ID,
+      'посмотреть спектакль в Практике',
+      TODAY,
+    );
 
     expect(inboxCreate).toHaveBeenCalledTimes(1);
     expect(create).not.toHaveBeenCalled();

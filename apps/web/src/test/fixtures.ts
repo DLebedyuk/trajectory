@@ -54,6 +54,7 @@ export const makeDashboard = (over: Partial<DashboardData> = {}): DashboardData 
   focus: makeFocus(),
   events: [],
   dueTasks: [],
+  overdueTasks: [],
   todayReminders: [],
   pinnedTasks: [
     makeTask({

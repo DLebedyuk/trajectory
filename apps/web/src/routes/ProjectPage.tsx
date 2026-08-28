@@ -23,12 +23,14 @@ import {
   useCompleteTask,
   useDashboard,
   useDirection,
+  useDirections,
   useProject,
   useTasks,
   useTogglePin,
 } from '../api/queries.js';
 import { TaskLine } from '../features/TaskLine.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
+import { ProjectSettingsModal } from '../features/ProjectSettingsModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 import { useUiStore } from '../store/ui.js';
 
@@ -40,6 +42,7 @@ export function ProjectPage() {
   const project = useProject(projectId);
   const dashboard = useDashboard();
   const direction = useDirection(project.data?.directionId ?? '');
+  const allDirections = useDirections();
   const filterState = useUiStore((s) => s.taskFilter);
   const setFilter = useUiStore((s) => s.setTaskFilter);
 
@@ -58,6 +61,7 @@ export function ProjectPage() {
   const [pickOpen, setPickOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [title, setTitle] = useState('');
   const [deadline, setDeadline] = useState('');
@@ -172,6 +176,9 @@ export function ProjectPage() {
         }
         actions={
           <>
+            <Button size="sm" onClick={() => setSettingsOpen(true)}>
+              Настройки
+            </Button>
             {p.status === 'active' ? (
               <Button size="sm" onClick={() => changeStatus.mutate('pause')}>
                 <IconPause />
@@ -382,6 +389,13 @@ export function ProjectPage() {
           ) : null}
         </div>
       </div>
+
+      <ProjectSettingsModal
+        project={p}
+        directions={allDirections.data ?? []}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
 
       <PickTaskModal
         open={pickOpen}

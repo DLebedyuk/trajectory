@@ -127,6 +127,8 @@ export interface DashboardData {
   focus: Focus;
   events: CalendarEventView[];
   dueTasks: TaskWithContext[];
+  /** Просроченное — отдельным списком, чтобы не открывать день хвостом. */
+  overdueTasks: TaskWithContext[];
   todayReminders: Reminder[];
   pinnedTasks: TaskWithContext[];
   pinnedMedia: MediaItem[];
