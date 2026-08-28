@@ -40,6 +40,17 @@ import type {
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
+/**
+ * DEVELOPMENT-ONLY. Позволяет ходить в API от имени конкретного пользователя,
+ * пока настоящей авторизации нет. Сервер принимает этот заголовок только при
+ * включённом DEV_AUTH; в production он игнорируется и запрос получит 401.
+ */
+const DEV_USER_ID = import.meta.env.VITE_DEV_USER_ID as string | undefined;
+
+function authHeaders(): Record<string, string> {
+  return DEV_USER_ID ? { 'x-user-id': DEV_USER_ID } : {};
+}
+
 /** Типизированная ошибка API — единый формат { error: { code, message } }. */
 export class ApiError extends Error {
   constructor(
@@ -74,7 +85,10 @@ function withQuery(path: string, query?: Query): string {
 async function call<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
   const res = await fetch(`${BASE}${withQuery(path, query)}`, {
     method,
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    headers: {
+      ...authHeaders(),
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (res.status === 204) return undefined as T;
