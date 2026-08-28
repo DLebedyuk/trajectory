@@ -1,20 +1,30 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { and, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import { todayInTimezone, zonedDateTimeToUtc } from '@planner/shared';
 import { DB, type Database } from '../../db/db.module.js';
-import { reminderDeliveries, reminders, userSettings, users } from '../../db/schema.js';
+import { reminderDeliveries, reminders, tasks, userSettings, users } from '../../db/schema.js';
 import { NOTIFICATION_PROVIDER } from './notification.token.js';
 import type { NotificationProvider } from './providers/notification.provider.js';
+import { EVENING_TIME } from './reminders.service.js';
 
 const MAX_ATTEMPTS = 3;
 
+type MissedBehavior = 'none' | 'evening' | 'nextDigest';
+
 interface PlannedDelivery {
-  reminderIds: string[];
   userId: string;
+  /** Доставка относится либо к напоминанию, либо к задаче, либо ни к чему (сводка). */
+  reminderId: string | null;
+  taskId: string | null;
   scheduledFor: Date;
   idempotencyKey: string;
   text: string;
+}
+
+interface Bucket {
+  delivery: PlannedDelivery;
+  lines: string[];
 }
 
 /**
@@ -75,34 +85,81 @@ export class ReminderSchedulerService {
     return sent;
   }
 
-  /** Собирает список того, что уже пора отправить: отдельные алерты и дневные сводки. */
+  /**
+   * Собирает список того, что уже пора отправить: точечные алерты, утренние
+   * сводки, вечернее догоняние пропущенного и напоминания по задачам.
+   */
   private async plan(now: Date): Promise<PlannedDelivery[]> {
-    const rows = await this.db
+    const alerts: PlannedDelivery[] = [];
+    const digest = new Map<string, Bucket>();
+    const evening = new Map<string, Bucket>();
+
+    const bucketFor = (
+      store: Map<string, Bucket>,
+      kind: 'digest' | 'evening',
+      userId: string,
+      today: string,
+      at: Date,
+      line: string,
+    ): void => {
+      const key = `${kind}:${userId}:${today}`;
+      const existing = store.get(key);
+      if (existing) {
+        existing.lines.push(line);
+        return;
+      }
+      store.set(key, {
+        delivery: {
+          userId,
+          reminderId: null,
+          taskId: null,
+          scheduledFor: at,
+          idempotencyKey: key,
+          text: '',
+        },
+        lines: [line],
+      });
+    };
+
+    const reminderRows = await this.db
       .select({
         reminder: reminders,
         timezone: users.timezone,
         digestTime: userSettings.digestTime,
+        missedDefault: userSettings.missedReminderBehavior,
       })
       .from(reminders)
       .innerJoin(users, eq(users.id, reminders.userId))
       .leftJoin(userSettings, eq(userSettings.userId, reminders.userId))
       .where(eq(reminders.status, 'active'));
 
-    const alerts: PlannedDelivery[] = [];
-    const digestBuckets = new Map<string, PlannedDelivery>();
-
-    for (const row of rows) {
+    for (const row of reminderRows) {
       const r = row.reminder;
       const timezone = r.timezone || row.timezone || 'UTC';
+      const today = todayInTimezone(timezone, now);
       const date = String(r.scheduledDate).slice(0, 10);
       const digestTime = row.digestTime ?? '08:30';
+
+      if (date > today) continue;
+
+      if (date < today) {
+        const target = this.planMissed(
+          (r.missedBehavior as MissedBehavior) ?? 'evening',
+          { timezone, today, now, digestTime },
+        );
+        if (target) {
+          bucketFor(target.kind === 'digest' ? digest : evening, target.kind, r.userId, today, target.at, r.text);
+        }
+        continue;
+      }
 
       if (r.deliveryMode === 'alert' && r.scheduledTime) {
         const at = zonedDateTimeToUtc(date, r.scheduledTime, timezone);
         if (at <= now) {
           alerts.push({
-            reminderIds: [r.id],
             userId: r.userId,
+            reminderId: r.id,
+            taskId: null,
             scheduledFor: at,
             idempotencyKey: `alert:${r.id}:${date}:${r.scheduledTime}`,
             text: `Напоминание: ${r.text}`,
@@ -113,27 +170,80 @@ export class ReminderSchedulerService {
 
       const at = zonedDateTimeToUtc(date, digestTime, timezone);
       if (at > now) continue;
+      bucketFor(digest, 'digest', r.userId, today, at, r.text);
+    }
+
+    const taskRows = await this.db
+      .select({
+        id: tasks.id,
+        userId: tasks.userId,
+        title: tasks.title,
+        remindAt: tasks.remindAt,
+        timezone: users.timezone,
+        digestTime: userSettings.digestTime,
+        missedDefault: userSettings.missedReminderBehavior,
+      })
+      .from(tasks)
+      .innerJoin(users, eq(users.id, tasks.userId))
+      .leftJoin(userSettings, eq(userSettings.userId, tasks.userId))
+      .where(and(eq(tasks.status, 'open'), isNotNull(tasks.remindAt)));
+
+    for (const t of taskRows) {
+      const timezone = t.timezone || 'UTC';
       const today = todayInTimezone(timezone, now);
-      const key = `digest:${r.userId}:${today}`;
-      const bucket = digestBuckets.get(key) ?? {
-        reminderIds: [],
-        userId: r.userId,
-        scheduledFor: at,
-        idempotencyKey: key,
-        text: '',
-      };
-      bucket.reminderIds.push(r.id);
-      digestBuckets.set(key, bucket);
+      const date = String(t.remindAt).slice(0, 10);
+      const digestTime = t.digestTime ?? '08:30';
+      if (date > today) continue;
+
+      const line = `${t.title} — задача`;
+      if (date < today) {
+        const target = this.planMissed(
+          (t.missedDefault as MissedBehavior) ?? 'evening',
+          { timezone, today, now, digestTime },
+        );
+        if (target) {
+          bucketFor(target.kind === 'digest' ? digest : evening, target.kind, t.userId, today, target.at, line);
+        }
+        continue;
+      }
+
+      const at = zonedDateTimeToUtc(date, digestTime, timezone);
+      if (at > now) continue;
+      bucketFor(digest, 'digest', t.userId, today, at, line);
     }
 
-    for (const bucket of digestBuckets.values()) {
-      const texts = rows
-        .filter((row) => bucket.reminderIds.includes(row.reminder.id))
-        .map((row) => `— ${row.reminder.text}`);
-      bucket.text = `Доброе утро. Ты хотела сегодня:\n${texts.join('\n')}`;
+    for (const bucket of digest.values()) {
+      bucket.delivery.text = `Доброе утро. Ты хотела сегодня:\n${bucket.lines
+        .map((l) => `— ${l}`)
+        .join('\n')}`;
+    }
+    for (const bucket of evening.values()) {
+      bucket.delivery.text = `Ты просила напомнить ещё раз:\n${bucket.lines
+        .map((l) => `— ${l}`)
+        .join('\n')}`;
     }
 
-    return [...alerts, ...digestBuckets.values()];
+    return [
+      ...alerts,
+      ...[...digest.values()].map((b) => b.delivery),
+      ...[...evening.values()].map((b) => b.delivery),
+    ];
+  }
+
+  /**
+   * Что делать с тем, чей день уже прошёл. Решение принимает пользователь
+   * через missedBehavior, а не планировщик: «none» действительно значит «забыть».
+   * Возвращает null, если догонять не нужно или момент ещё не наступил.
+   */
+  private planMissed(
+    behavior: MissedBehavior,
+    ctx: { timezone: string; today: string; now: Date; digestTime: string },
+  ): { kind: 'digest' | 'evening'; at: Date } | null {
+    if (behavior === 'none') return null;
+    const kind = behavior === 'nextDigest' ? 'digest' : 'evening';
+    const time = kind === 'digest' ? ctx.digestTime : EVENING_TIME;
+    const at = zonedDateTimeToUtc(ctx.today, time, ctx.timezone);
+    return at > ctx.now ? null : { kind, at };
   }
 
   /**
@@ -141,12 +251,12 @@ export class ReminderSchedulerService {
    * единственную запись на ключ, условный UPDATE — единственного исполнителя.
    */
   private async claim(item: PlannedDelivery): Promise<{ id: string; attemptCount: number } | null> {
-    const primary = item.reminderIds[0];
-    if (!primary) return null;
     await this.db
       .insert(reminderDeliveries)
       .values({
-        reminderId: primary,
+        userId: item.userId,
+        reminderId: item.reminderId,
+        taskId: item.taskId,
         scheduledFor: item.scheduledFor,
         channel: this.provider.channel,
         status: 'pending',

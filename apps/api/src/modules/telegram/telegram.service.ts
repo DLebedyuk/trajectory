@@ -5,13 +5,13 @@ import {
   type OnModuleInit,
   type OnModuleDestroy,
 } from '@nestjs/common';
-import { Bot, InlineKeyboard } from 'grammy';
+import { Bot, type Context, InlineKeyboard } from 'grammy';
 import { eq } from 'drizzle-orm';
 import { parseRelativePhrase, formatLongDate, todayInTimezone } from '@planner/shared';
 import { DB, type Database } from '../../db/db.module.js';
 import { telegramAccounts, users } from '../../db/schema.js';
 import { env } from '../../config/env.js';
-import { RemindersService } from '../reminders/reminders.service.js';
+import { EVENING_TIME, RemindersService } from '../reminders/reminders.service.js';
 import { InboxService } from '../inbox/inbox.service.js';
 import { NotificationRouter } from '../reminders/providers/notification.router.js';
 import type {
@@ -23,6 +23,29 @@ interface PendingPhrase {
   text: string;
   time: string | null;
 }
+
+/** Неоднозначная дата ждёт подтверждения и до него никуда не записывается. */
+interface PendingConfirmation {
+  text: string;
+  date: string;
+  time: string | null;
+}
+
+/** Ответ бота, не зависящий от grammY: так его можно проверить тестом. */
+export interface BotReply {
+  text: string;
+  actions?: { label: string; data: string }[];
+  /** всплывающий ответ на нажатие кнопки */
+  toast?: string;
+}
+
+const reminderActions = (reminderId: string): { label: string; data: string }[] => [
+  { label: 'Готово', data: `done:${reminderId}` },
+  { label: 'Через час', data: `hour:${reminderId}` },
+  { label: 'Вечером', data: `evening:${reminderId}` },
+  { label: 'Завтра', data: `tomorrow:${reminderId}` },
+  { label: 'Удалить', data: `delete:${reminderId}` },
+];
 
 /**
  * Telegram-бот на grammY. Разбор фраз детерминированный (@planner/shared),
@@ -36,6 +59,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
   private bot: Bot | null = null;
   /** Незавершённые диалоги «когда напомнить?» — по chatId. */
   private readonly pending = new Map<string, PendingPhrase>();
+  /** Ожидающие подтверждения даты — по chatId. */
+  private readonly pendingConfirm = new Map<string, PendingConfirmation>();
 
   constructor(
     @Inject(DB) private readonly db: Database,
@@ -119,17 +144,162 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
   }
 
   private actionKeyboard(reminderId: string): InlineKeyboard {
-    return new InlineKeyboard()
-      .text('Готово', `done:${reminderId}`)
-      .text('Через час', `hour:${reminderId}`)
-      .row()
-      .text('Вечером', `evening:${reminderId}`)
-      .text('Завтра', `tomorrow:${reminderId}`)
-      .row()
-      .text('Удалить', `delete:${reminderId}`);
+    const keyboard = new InlineKeyboard();
+    reminderActions(reminderId).forEach((a, i) => {
+      keyboard.text(a.label, a.data);
+      if (i % 2 === 1) keyboard.row();
+    });
+    return keyboard;
+  }
+
+  /**
+   * Разбор входящего текста. Вынесен из grammY, чтобы диалог можно было
+   * проверить тестом без запуска бота.
+   */
+  async handleText(
+    userId: string,
+    chatId: string,
+    raw: string,
+    today: string,
+  ): Promise<BotReply> {
+    // ответ на вопрос «когда напомнить?»
+    const pending = this.pending.get(chatId);
+    if (pending) {
+      const answer = parseRelativePhrase(`напомни ${raw}`, today);
+      if (answer.date) {
+        this.pending.delete(chatId);
+        return this.createAndConfirm(userId, {
+          text: pending.text,
+          date: answer.date,
+          time: answer.time ?? pending.time,
+        });
+      }
+    }
+
+    const parsed = parseRelativePhrase(raw, today);
+
+    if (!parsed.isReminder) {
+      await this.inbox.create(userId, { originalText: raw, source: 'telegram' });
+      return { text: 'Сохранил во входящие. Ничего делать не надо.' };
+    }
+
+    if (!parsed.date) {
+      return this.askWhen(chatId, parsed.text, parsed.time);
+    }
+
+    // «в субботу» неоднозначно: это ближайшая суббота или следующая?
+    // Пока пользователь не подтвердил, ничего не записываем.
+    if (parsed.ambiguousWeekday) {
+      this.pendingConfirm.set(chatId, {
+        text: parsed.text,
+        date: parsed.date,
+        time: parsed.time,
+      });
+      return {
+        text: `Ты имеешь в виду ${parsed.ambiguousWeekday}, ${formatLongDate(parsed.date)}?`,
+        actions: [
+          { label: `Да, ${formatLongDate(parsed.date)}`, data: 'confirm:yes' },
+          { label: 'Другой день', data: 'confirm:no' },
+        ],
+      };
+    }
+
+    return this.createAndConfirm(userId, {
+      text: parsed.text,
+      date: parsed.date,
+      time: parsed.time,
+    });
+  }
+
+  /** Обработка нажатия кнопки. Формат данных — «действие:значение». */
+  async handleAction(
+    userId: string,
+    chatId: string,
+    data: string,
+    today: string,
+  ): Promise<BotReply> {
+    const [action, value] = data.split(':');
+    if (!action || !value) return { text: 'Не понял кнопку.' };
+
+    if (action === 'confirm') {
+      const waiting = this.pendingConfirm.get(chatId);
+      if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
+      this.pendingConfirm.delete(chatId);
+      if (value === 'yes') {
+        return this.createAndConfirm(userId, waiting);
+      }
+      return this.askWhen(chatId, waiting.text, waiting.time);
+    }
+
+    if (action === 'setdate') {
+      const waiting = this.pending.get(chatId);
+      if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
+      this.pending.delete(chatId);
+      const date = value === 'today' ? today : this.plusDay(today);
+      const time = value === 'today' ? EVENING_TIME : waiting.time;
+      return this.createAndConfirm(userId, { text: waiting.text, date, time });
+    }
+
+    try {
+      if (action === 'done') await this.reminders.complete(userId, value);
+      else if (action === 'delete') await this.reminders.remove(userId, value);
+      else if (action === 'hour') await this.reminders.snooze(userId, value, { mode: 'hour' });
+      else if (action === 'evening') await this.reminders.snooze(userId, value, { mode: 'evening' });
+      else if (action === 'tomorrow')
+        await this.reminders.snooze(userId, value, { mode: 'tomorrow' });
+      else return { text: 'Не понял кнопку.' };
+    } catch {
+      return { text: 'Напоминание уже недоступно.', toast: 'Напоминание уже недоступно' };
+    }
+
+    const labels: Record<string, string> = {
+      done: 'Отметил.',
+      delete: 'Удалил.',
+      hour: 'Вернусь через час.',
+      evening: 'Вернусь вечером.',
+      tomorrow: 'Перенёс на завтра.',
+    };
+    return { text: labels[action] ?? 'Готово.' };
+  }
+
+  private askWhen(chatId: string, text: string, time: string | null): BotReply {
+    this.pending.set(chatId, { text, time });
+    return {
+      text: `Когда напомнить: «${text}»?`,
+      actions: [
+        { label: 'Сегодня вечером', data: 'setdate:today' },
+        { label: 'Завтра', data: 'setdate:tomorrow' },
+      ],
+    };
+  }
+
+  private async createAndConfirm(
+    userId: string,
+    input: { text: string; date: string; time: string | null },
+  ): Promise<BotReply> {
+    const reminder = await this.reminders.create(userId, {
+      text: input.text,
+      scheduledDate: input.date,
+      scheduledTime: input.time,
+      source: 'telegram',
+    });
+    const when = reminder.scheduledTime ? ` в ${reminder.scheduledTime}` : ' в утренней сводке';
+    return {
+      text: `Напомню ${formatLongDate(input.date)}${when}: «${reminder.text}».`,
+      actions: reminderActions(reminder.id),
+    };
   }
 
   private registerHandlers(bot: Bot): void {
+    const reply = async (ctx: Context, r: BotReply): Promise<void> => {
+      const keyboard = new InlineKeyboard();
+      (r.actions ?? []).forEach((a, i) => {
+        keyboard.text(a.label, a.data);
+        if (i % 2 === 1) keyboard.row();
+      });
+      await ctx.reply(r.text, r.actions?.length ? { reply_markup: keyboard } : undefined);
+    };
+
     bot.command('start', async (ctx) => {
       const userId = await this.resolveUser(String(ctx.from?.id), String(ctx.chat.id));
       await ctx.reply(
@@ -152,60 +322,13 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     });
 
     bot.on('callback_query:data', async (ctx) => {
-      const userId = await this.resolveUser(String(ctx.from.id), String(ctx.chat?.id ?? ''));
+      const chatId = String(ctx.chat?.id ?? '');
+      const userId = await this.resolveUser(String(ctx.from.id), chatId);
       if (!userId) return;
-      const [action, id] = (ctx.callbackQuery.data ?? '').split(':');
-      if (!action || !id) return;
-
-      if (action === 'setdate') {
-        const pending = this.pending.get(String(ctx.chat?.id));
-        if (!pending) {
-          await ctx.answerCallbackQuery('Уже неактуально');
-          return;
-        }
-        const timezone = await this.timezoneOf(userId);
-        const today = todayInTimezone(timezone);
-        const date = id === 'today' ? today : this.plusDay(today);
-        const time = id === 'today' ? '20:00' : pending.time;
-        const reminder = await this.reminders.create(userId, {
-          text: pending.text,
-          scheduledDate: date,
-          scheduledTime: time,
-          source: 'telegram',
-        });
-        this.pending.delete(String(ctx.chat?.id));
-        await ctx.answerCallbackQuery();
-        await ctx.reply(
-          `Напомню ${formatLongDate(date)}${time ? ` в ${time}` : ' в утренней сводке'}: «${reminder.text}».`,
-          { reply_markup: this.actionKeyboard(reminder.id) },
-        );
-        return;
-      }
-
-      if (action === 'confirm') {
-        await ctx.answerCallbackQuery('Подтверждено');
-        return;
-      }
-
-      try {
-        if (action === 'done') await this.reminders.complete(userId, id);
-        else if (action === 'delete') await this.reminders.remove(userId, id);
-        else if (action === 'hour') await this.reminders.snooze(userId, id, { mode: 'hour' });
-        else if (action === 'evening') await this.reminders.snooze(userId, id, { mode: 'evening' });
-        else if (action === 'tomorrow')
-          await this.reminders.snooze(userId, id, { mode: 'tomorrow' });
-        const labels: Record<string, string> = {
-          done: 'Отметил.',
-          delete: 'Удалил.',
-          hour: 'Вернусь через час.',
-          evening: 'Вернусь вечером.',
-          tomorrow: 'Перенёс на завтра.',
-        };
-        await ctx.answerCallbackQuery();
-        await ctx.reply(labels[action] ?? 'Готово.');
-      } catch {
-        await ctx.answerCallbackQuery('Напоминание уже недоступно');
-      }
+      const today = todayInTimezone(await this.timezoneOf(userId));
+      const result = await this.handleAction(userId, chatId, ctx.callbackQuery.data ?? '', today);
+      await ctx.answerCallbackQuery(result.toast);
+      await reply(ctx, result);
     });
 
     bot.on('message:text', async (ctx) => {
@@ -215,63 +338,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
         await ctx.reply('Аккаунт не связан.');
         return;
       }
-      const timezone = await this.timezoneOf(userId);
-      const today = todayInTimezone(timezone);
-      const raw = ctx.message.text;
-
-      // ответ на вопрос «когда напомнить?»
-      const pending = this.pending.get(chatId);
-      if (pending) {
-        const answer = parseRelativePhrase(`напомни ${raw}`, today);
-        if (answer.date) {
-          this.pending.delete(chatId);
-          const reminder = await this.reminders.create(userId, {
-            text: pending.text,
-            scheduledDate: answer.date,
-            scheduledTime: answer.time ?? pending.time,
-            source: 'telegram',
-          });
-          await ctx.reply(
-            `Напомню ${formatLongDate(answer.date)}${reminder.scheduledTime ? ` в ${reminder.scheduledTime}` : ' в утренней сводке'}: «${reminder.text}».`,
-            { reply_markup: this.actionKeyboard(reminder.id) },
-          );
-          return;
-        }
-      }
-
-      const parsed = parseRelativePhrase(raw, today);
-
-      if (!parsed.isReminder) {
-        await this.inbox.create(userId, { originalText: raw, source: 'telegram' });
-        await ctx.reply('Сохранил во входящие. Ничего делать не надо.');
-        return;
-      }
-
-      if (!parsed.date) {
-        this.pending.set(chatId, { text: parsed.text, time: parsed.time });
-        await ctx.reply(`Когда напомнить: «${parsed.text}»?`, {
-          reply_markup: new InlineKeyboard()
-            .text('Сегодня вечером', 'setdate:today')
-            .text('Завтра', 'setdate:tomorrow'),
-        });
-        return;
-      }
-
-      const reminder = await this.reminders.create(userId, {
-        text: parsed.text,
-        scheduledDate: parsed.date,
-        scheduledTime: parsed.time,
-        source: 'telegram',
-      });
-
-      // День недели всегда подтверждаем: «в субботу» неоднозначно.
-      const prefix = parsed.ambiguousWeekday
-        ? `Ты имеешь в виду ${parsed.ambiguousWeekday}, ${formatLongDate(parsed.date)}? `
-        : '';
-      await ctx.reply(
-        `${prefix}Напомню ${formatLongDate(parsed.date)}${parsed.time ? ` в ${parsed.time}` : ' в утренней сводке'}: «${reminder.text}».`,
-        { reply_markup: this.actionKeyboard(reminder.id) },
-      );
+      const today = todayInTimezone(await this.timezoneOf(userId));
+      await reply(ctx, await this.handleText(userId, chatId, ctx.message.text, today));
     });
   }
 

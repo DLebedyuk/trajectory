@@ -15,6 +15,13 @@
       "when": 1787862992780,
       "tag": "0001_clever_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787909967297,
+      "tag": "0002_rare_old_lace",
+      "breakpoints": true
     }
   ]
 }

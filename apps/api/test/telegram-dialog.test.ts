@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TEST_DB_URL } from './setup.js';
 
 process.env.DATABASE_URL = TEST_DB_URL;
 process.env.TELEGRAM_MODE = 'off';
 process.env.NODE_ENV = 'test';
 
-const { TelegramService } = await import('../src/modules/telegram/telegram.service.js');
+let TelegramService: typeof import('../src/modules/telegram/telegram.service.js').TelegramService;
+
+beforeAll(async () => {
+  ({ TelegramService } = await import('../src/modules/telegram/telegram.service.js'));
+});
 
 const USER_ID = '00000000-0000-4000-8000-0000000000ff';
 const CHAT_ID = '555';

@@ -1,11 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { TEST_DB_URL, TEST_USER_ID } from './setup.js';
 
 process.env.DATABASE_URL = TEST_DB_URL;
 process.env.NODE_ENV = 'test';
 process.env.TELEGRAM_MODE = 'off';
 
-const { DevAuthGuard } = await import('../src/common/current-user.js');
+let DevAuthGuard: typeof import('../src/common/current-user.js').DevAuthGuard;
+
+beforeAll(async () => {
+  ({ DevAuthGuard } = await import('../src/common/current-user.js'));
+});
 
 const DEV_USER = '00000000-0000-4000-8000-000000000001';
 

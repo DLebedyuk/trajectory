@@ -20,6 +20,9 @@ import { dateOnly, iso, isoRequired } from '../../common/mappers.js';
 
 type Row = typeof reminders.$inferSelect;
 
+/** Единое «вечером» для переносов и для догоняния пропущенного. */
+export const EVENING_TIME = '20:00';
+
 const toReminder = (r: Row): Reminder => ({
   id: r.id,
   userId: r.userId,
@@ -189,20 +192,32 @@ export class RemindersService {
     return toReminder(row as Row);
   }
 
-  async snooze(userId: string, id: string, input: SnoozeReminderInput): Promise<Reminder> {
+  /**
+   * Перенос напоминания. `now` передаётся явно, чтобы поведение можно было
+   * проверить тестом, и чтобы «через час» в 23:30 не уезжало в прошлое.
+   */
+  async snooze(
+    userId: string,
+    id: string,
+    input: SnoozeReminderInput,
+    now: Date = new Date(),
+  ): Promise<Reminder> {
     const current = await this.get(userId, id);
     const { timezone } = await this.userContext(userId);
-    const today = todayInTimezone(timezone);
+    const today = todayInTimezone(timezone, now);
     let date = current.scheduledDate;
     let time: string | null = current.scheduledTime;
     if (input.mode === 'hour') {
-      const [hh, mm] = timeInTimezone(timezone).split(':').map(Number) as [number, number];
-      const next = (hh + 1) % 24;
-      date = today;
-      time = `${String(next).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      const [hh, mm] = timeInTimezone(timezone, now).split(':').map(Number) as [number, number];
+      const nextHour = hh + 1;
+      // через полночь переносим на завтра, иначе напоминание окажется в прошлом
+      date = nextHour >= 24 ? addDaysToDateOnly(today, 1) : today;
+      time = `${String(nextHour % 24).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     } else if (input.mode === 'evening') {
-      date = today;
-      time = '20:00';
+      // если вечер уже прошёл, «вечером» означает завтрашний вечер
+      const past = timeInTimezone(timezone, now) >= EVENING_TIME;
+      date = past ? addDaysToDateOnly(today, 1) : today;
+      time = EVENING_TIME;
     } else if (input.mode === 'tomorrow') {
       date = addDaysToDateOnly(today, 1);
     } else {

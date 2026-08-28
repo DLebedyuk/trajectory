@@ -198,9 +198,12 @@ export const reminderDeliveries = pgTable(
   'reminder_deliveries',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    reminderId: uuid('reminder_id')
+    userId: uuid('user_id')
       .notNull()
-      .references(() => reminders.id, { onDelete: 'cascade' }),
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Доставка относится либо к напоминанию, либо к задаче с remindAt. */
+    reminderId: uuid('reminder_id').references(() => reminders.id, { onDelete: 'cascade' }),
+    taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
     scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull(),
     channel: varchar('channel', { length: 20 }).notNull().default('telegram'),
     status: varchar('status', { length: 12 }).notNull().default('pending'),
