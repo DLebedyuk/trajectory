@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Checkbox, IconBell, IconCalendar } from '@planner/ui';
-import { plural } from '@planner/shared';
+import { formatLongDate, plural } from '@planner/shared';
 import type { Reminder, TaskWithContext } from '@planner/contracts';
 import type { CalendarEventView } from '../api/client.js';
 
@@ -134,7 +134,7 @@ export function TodayBlock({
                   <Link className="tmain" to={`/tasks/${t.id}`} style={{ flex: 1, fontSize: 13.5 }}>
                     {t.title}
                     <span className="tmeta">
-                      {t.projectTitle} · срок {t.deadline}
+                      {t.projectTitle} · срок {t.deadline ? formatLongDate(t.deadline) : '—'}
                     </span>
                   </Link>
                 </div>

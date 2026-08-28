@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build": "echo \"Сборка десктопа: pnpm --filter @planner/desktop tauri:build (нужен Rust)\"",
+    "build": "node scripts/build.mjs",
     "tauri": "tauri",
     "tauri:build": "tauri build",
     "typecheck": "echo \"нет TypeScript-кода: интерфейс берётся из apps/web\"",

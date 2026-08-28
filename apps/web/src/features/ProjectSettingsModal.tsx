@@ -68,30 +68,16 @@ export function ProjectSettingsModal({
       }
     >
       <FormField label="Название">
-        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
       </FormField>
       <FormField label="Желаемый результат" hint="По чему будет понятно, что проект закончен">
-        <textarea
-          className="input"
-          rows={3}
-          value={outcome}
-          onChange={(e) => setOutcome(e.target.value)}
-        />
+        <textarea rows={3} value={outcome} onChange={(e) => setOutcome(e.target.value)} />
       </FormField>
       <FormField label="Срок" hint="Необязательно. Пусто — значит срока нет">
-        <input
-          className="input"
-          type="date"
-          value={deadline}
-          onChange={(e) => setDeadline(e.target.value)}
-        />
+        <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
       </FormField>
       <FormField label="Направление">
-        <select
-          className="input"
-          value={directionId}
-          onChange={(e) => setDirectionId(e.target.value)}
-        >
+        <select value={directionId} onChange={(e) => setDirectionId(e.target.value)}>
           {directions.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}

@@ -92,18 +92,13 @@ export function DirectionSettingsModal({
       }
     >
       <FormField label="Название">
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
       </FormField>
       <FormField label="Описание" hint="Необязательно">
-        <textarea
-          className="input"
-          rows={2}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
+        <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
       </FormField>
       <FormField label="Девиз" hint="Своими словами. Чужие цитаты придумывать не нужно">
-        <input className="input" value={motto} onChange={(e) => setMotto(e.target.value)} />
+        <input type="text" value={motto} onChange={(e) => setMotto(e.target.value)} />
       </FormField>
       <label className="field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
@@ -114,7 +109,7 @@ export function DirectionSettingsModal({
         <span className="hint">Показывать девиз на странице направления</span>
       </label>
       <FormField label="Цвет">
-        <select className="input" value={color} onChange={(e) => setColor(e.target.value)}>
+        <select value={color} onChange={(e) => setColor(e.target.value)}>
           {DIRECTION_COLORS.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}

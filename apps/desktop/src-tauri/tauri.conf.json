@@ -28,7 +28,13 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis", "deb", "dmg"],
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.ico", "icons/icon.icns"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "copyright": "Личный проект",
     "category": "Productivity",
     "shortDescription": "Личный планировщик",
