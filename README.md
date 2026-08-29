@@ -77,7 +77,7 @@ personal-planner/
 ```bash
 corepack enable
 pnpm install
-cp .env.example .env            # и, при желании, apps/api/.env
+cp .env.example .env            # одного файла в корне достаточно
 
 # 1. база
 docker compose up -d postgres   # или свой PostgreSQL
@@ -108,6 +108,10 @@ pnpm dev                        # API на :3000, веб на :5173
 | `DEV_AUTH`             | `true` — все запросы от `DEV_USER_ID`; **только для разработки** |
 | `APP_TIMEZONE`         | таймзона по умолчанию                                            |
 | `VITE_API_URL`         | адрес API для фронтенда (в dev работает прокси Vite)             |
+
+`.env` ищется вверх по дереву от текущей папки, поэтому одного файла в корне
+монорепо хватает и для `pnpm dev`, и для `pnpm db:migrate`, который запускается
+внутри `apps/api`. Локальный `apps/api/.env`, если он есть, перекрывает корневой.
 
 ### Про авторизацию
 
