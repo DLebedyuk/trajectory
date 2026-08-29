@@ -2,18 +2,20 @@
 FROM node:22-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+# В сборке нет терминала: pnpm не должен ничего спрашивать
+ENV CI=true
 RUN corepack enable
 
 FROM base AS build
 WORKDIR /app
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* .npmrc tsconfig.base.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/shared/package.json packages/shared/
 COPY packages/ui/package.json packages/ui/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/desktop/package.json apps/desktop/
-RUN pnpm install --frozen-lockfile=false
+RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @planner/contracts --filter @planner/shared build \
  && pnpm --filter @planner/api build

@@ -1,0 +1,38 @@
+# Контекст сборки общий для обоих образов (в docker-compose.yml у api и web
+# context: .), поэтому файл один на весь монорепо.
+
+# Зависимости ставятся внутри образа. Если сюда попадёт node_modules,
+# собранный на другой платформе, pnpm попытается снести папку, не сможет
+# спросить подтверждение (в сборке нет терминала) и упадёт с
+# ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY.
+node_modules/
+**/node_modules/
+
+# Результаты сборки — образ собирает их сам
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+*.tsbuildinfo
+**/*.tsbuildinfo
+.turbo/
+**/.turbo/
+apps/web/dev-dist/
+apps/desktop/src-tauri/target/
+
+# Секреты внутрь образа не попадают, а пример настроек — попадает
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
+# Служебное
+.git/
+.gitignore
+.github/
+_to_delete/
+*.log
+.DS_Store
