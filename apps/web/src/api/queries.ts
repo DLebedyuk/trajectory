@@ -67,11 +67,11 @@ export const useDoneTasks = (directionId: string, enabled = true) =>
   });
 export const useProject = (id: string) =>
   useQuery({ queryKey: qk.project(id), queryFn: () => api.projects.get(id), enabled: Boolean(id) });
-export const useTasks = (projectId: string, filter?: TaskFilter) =>
+export const useTasks = (projectId: string, filter?: TaskFilter, enabled = true) =>
   useQuery({
     queryKey: qk.tasks(projectId, filter),
     queryFn: () => api.tasks.listByProject(projectId, filter),
-    enabled: Boolean(projectId),
+    enabled: enabled && Boolean(projectId),
   });
 export const useTask = (id: string) =>
   useQuery({ queryKey: qk.task(id), queryFn: () => api.tasks.get(id), enabled: Boolean(id) });

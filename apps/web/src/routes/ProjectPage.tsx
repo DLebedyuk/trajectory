@@ -1,20 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  Button,
-  Checkbox,
-  FormField,
-  IconArchive,
-  IconChevron,
-  IconClock,
-  IconPause,
-  IconPlus,
-  Modal,
-  PageHeader,
-  useToast,
-} from '@planner/ui';
-import { DURATION_LABEL, formatLongDate, humanDate, todayInTimezone } from '@planner/shared';
+import { Button, FormField, IconPause, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
+import { formatLongDate, todayInTimezone } from '@planner/shared';
 import type { TaskFilter } from '@planner/contracts';
 import { api } from '../api/client.js';
 import {
@@ -29,8 +17,8 @@ import {
   useTogglePin,
 } from '../api/queries.js';
 import { TaskLine } from '../features/TaskLine.js';
-import { PickTaskModal } from '../features/PickTaskModal.js';
 import { ProjectSettingsModal } from '../features/ProjectSettingsModal.js';
+import { ProjectArchiveModal } from '../features/ProjectArchiveModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 import { useUiStore } from '../store/ui.js';
 
@@ -54,15 +42,13 @@ export function ProjectPage() {
     sort: filterState.sort as 'manual' | 'deadline' | 'pinned',
   };
   const tasks = useTasks(projectId, filter);
-  const doneTasks = useTasks(projectId, { status: 'done' });
 
   const completeTask = useCompleteTask();
   const togglePin = useTogglePin();
-  const [pickOpen, setPickOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [showArchive, setShowArchive] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [deadline, setDeadline] = useState('');
   const [duration, setDuration] = useState('');
@@ -70,8 +56,8 @@ export function ProjectPage() {
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
   const activeTaskId = dashboard.data?.focus.activeTaskId ?? null;
-  const activeTask = dashboard.data?.focus.activeTask ?? null;
-  const isActiveHere = activeTask?.projectId === projectId ? activeTask : null;
+  // Активная задача — глобальное состояние; в списке она просто подсвечена.
+  // Проектный «Следующий шаг» из интерфейса убран, модель в API и БД осталась.
 
   const createTask = useMutation({
     mutationFn: () =>
@@ -93,17 +79,6 @@ export function ProjectPage() {
     },
   });
 
-  const setActive = useMutation({
-    mutationFn: (taskId: string) => api.tasks.activate(taskId),
-    onSuccess: () => {
-      invalidateFocusScope(qc, projectId);
-      toast.show('Следующий шаг выбран');
-    },
-  });
-  const clearActive = useMutation({
-    mutationFn: () => api.focus.clearActiveTask(),
-    onSuccess: () => invalidateFocusScope(qc, projectId),
-  });
   const changeStatus = useMutation({
     mutationFn: (action: 'pause' | 'resume' | 'complete') => api.projects[action](projectId),
     onSuccess: (_d, action) => {
@@ -136,13 +111,6 @@ export function ProjectPage() {
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.project(projectId) }),
   });
-  const reopen = useMutation({
-    mutationFn: (taskId: string) => api.tasks.reopen(taskId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['tasks', projectId] });
-      toast.show('Задача снова в работе');
-    },
-  });
 
   if (project.isLoading) return <Loading what="Загружаю проект" />;
   if (project.isError) return <ErrorBox error={project.error} />;
@@ -150,8 +118,7 @@ export function ProjectPage() {
   if (!p) return null;
 
   const color = direction.data?.color ?? '--d-eng';
-  // Активная задача показана в «Следующем шаге» — во втором списке её не дублируем.
-  const otherTasks = (tasks.data ?? []).filter((t) => t.id !== isActiveHere?.id);
+  const openTasks = tasks.data ?? [];
 
   return (
     <>
@@ -179,6 +146,9 @@ export function ProjectPage() {
             <Button size="sm" onClick={() => setSettingsOpen(true)}>
               Настройки
             </Button>
+            <Button size="sm" onClick={() => setArchiveOpen(true)}>
+              Архив
+            </Button>
             {p.status === 'active' ? (
               <Button size="sm" onClick={() => changeStatus.mutate('pause')}>
                 <IconPause />
@@ -198,211 +168,115 @@ export function ProjectPage() {
         }
       />
 
-      <div className="stack" style={{ maxWidth: 860 }}>
-        <div>
-          <span className="lbl" style={{ display: 'block', marginBottom: 8 }}>
-            Следующий шаг
-          </span>
-          {isActiveHere ? (
-            <div className="focusbar" style={{ ['--fc' as string]: `var(${color})` }}>
-              <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
-                <Checkbox
-                  checked={false}
-                  onChange={() => completeTask.mutate(isActiveHere.id)}
-                  label={`Выполнить: ${isActiveHere.title}`}
-                  size={23}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: 'Literata, serif', fontSize: 19 }}>
-                    {isActiveHere.title}
-                  </div>
-                  <div className="tline-meta" style={{ marginTop: 6 }}>
-                    {isActiveHere.deadline ? (
-                      <i>
-                        <IconClock />
-                        до {formatLongDate(isActiveHere.deadline)}
-                      </i>
-                    ) : null}
-                    {isActiveHere.estimatedDuration ? (
-                      <i>{DURATION_LABEL[isActiveHere.estimatedDuration]}</i>
-                    ) : null}
-                  </div>
-                  <div style={{ display: 'flex', gap: 7, marginTop: 14, flexWrap: 'wrap' }}>
-                    <Button size="sm" onClick={() => navigate(`/tasks/${isActiveHere.id}`)}>
-                      Открыть задачу
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setPickOpen(true)}>
-                      Выбрать другой
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => clearActive.mutate()}>
-                      Убрать
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        togglePin.mutate({ taskId: isActiveHere.id, pinned: isActiveHere.pinned })
-                      }
-                    >
-                      {isActiveHere.pinned ? 'Открепить' : 'Закрепить'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="focus-empty" style={{ textAlign: 'left', padding: '18px 20px' }}>
-              <p style={{ fontSize: 14.5 }}>Следующий шаг для этого проекта не выбран.</p>
-              <Button size="sm" style={{ marginTop: 12 }} onClick={() => setPickOpen(true)}>
-                Выбрать из задач проекта
+      <div className="two">
+        <div className="stack">
+          <div className="card">
+            <div className="card-h">
+              <h3 style={{ fontSize: 16 }}>Задачи</h3>
+              <Button size="sm" onClick={() => setTaskOpen(true)}>
+                <IconPlus />
+                Новая задача
               </Button>
             </div>
-          )}
+
+            <div className="filterbar">
+              <label>
+                Примерное время
+                <select
+                  aria-label="Примерное время"
+                  value={filterState.estimatedDuration}
+                  onChange={(e) => setFilter({ estimatedDuration: e.target.value })}
+                >
+                  <option value="all">любое</option>
+                  <option value="short">до 15 минут</option>
+                  <option value="medium">около часа</option>
+                  <option value="long">несколько часов</option>
+                </select>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={filterState.withDeadlineOnly}
+                  onChange={(e) => setFilter({ withDeadlineOnly: e.target.checked })}
+                />
+                Только с дедлайном
+              </label>
+              <label style={{ marginLeft: 'auto' }}>
+                Порядок
+                <select
+                  aria-label="Порядок"
+                  value={filterState.sort}
+                  onChange={(e) => setFilter({ sort: e.target.value })}
+                >
+                  <option value="manual">вручную</option>
+                  <option value="deadline">сначала ближайшие</option>
+                  <option value="pinned">сначала закреплённые</option>
+                </select>
+              </label>
+            </div>
+
+            {openTasks.length > 0 ? (
+              openTasks.map((t) => (
+                <TaskLine
+                  key={t.id}
+                  task={t}
+                  isActive={activeTaskId === t.id}
+                  directionColor={color}
+                  onOpen={() => navigate(`/tasks/${t.id}`)}
+                  onComplete={() => completeTask.mutate(t.id)}
+                  onTogglePin={() => togglePin.mutate({ taskId: t.id, pinned: t.pinned })}
+                />
+              ))
+            ) : (
+              <p className="hint" style={{ padding: '8px 2px' }}>
+                {tasks.data?.length === 0
+                  ? 'Под этот фильтр ничего не попадает.'
+                  : 'Открытых задач нет.'}
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="card">
-          <div className="card-h">
-            <h3 style={{ fontSize: 16 }}>Задачи</h3>
-            <Button size="sm" onClick={() => setTaskOpen(true)}>
-              <IconPlus />
-              Новая задача
-            </Button>
-          </div>
-
-          <div className="filterbar">
-            <label>
-              Примерное время
-              <select
-                aria-label="Примерное время"
-                value={filterState.estimatedDuration}
-                onChange={(e) => setFilter({ estimatedDuration: e.target.value })}
-              >
-                <option value="all">любое</option>
-                <option value="short">до 15 минут</option>
-                <option value="medium">около часа</option>
-                <option value="long">несколько часов</option>
-              </select>
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={filterState.withDeadlineOnly}
-                onChange={(e) => setFilter({ withDeadlineOnly: e.target.checked })}
-              />
-              Только с дедлайном
-            </label>
-            <label style={{ marginLeft: 'auto' }}>
-              Порядок
-              <select
-                aria-label="Порядок"
-                value={filterState.sort}
-                onChange={(e) => setFilter({ sort: e.target.value })}
-              >
-                <option value="manual">вручную</option>
-                <option value="deadline">сначала ближайшие</option>
-                <option value="pinned">сначала закреплённые</option>
-              </select>
-            </label>
-          </div>
-
-          {otherTasks.length > 0 ? (
-            otherTasks.map((t) => (
-              <TaskLine
-                key={t.id}
-                task={t}
-                isActive={activeTaskId === t.id}
-                directionColor={color}
-                onOpen={() => navigate(`/tasks/${t.id}`)}
-                onComplete={() => completeTask.mutate(t.id)}
-                onTogglePin={() => togglePin.mutate({ taskId: t.id, pinned: t.pinned })}
-              />
-            ))
-          ) : (
-            <p className="hint" style={{ padding: '8px 2px' }}>
-              {tasks.data?.length === 0
-                ? 'Под этот фильтр ничего не попадает.'
-                : 'Других открытых задач нет.'}
-            </p>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="card-h">
-            <h3 style={{ fontSize: 16 }}>Заметки</h3>
-            <Button size="sm" variant="ghost" onClick={() => setNoteOpen(true)}>
-              <IconPlus />
-              Заметка
-            </Button>
-          </div>
-          {p.notes.length > 0 ? (
-            p.notes.map((n, i) => (
-              <div className="row" key={`${n}-${i}`}>
-                <div className="row-main" style={{ fontSize: 13.5 }}>
-                  {n}
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => removeNote.mutate(i)}>
-                  Удалить
-                </Button>
-              </div>
-            ))
-          ) : (
-            <p className="hint">Заметок нет.</p>
-          )}
-        </div>
-
-        <div className="fold">
-          <button type="button" className="fold-h" onClick={() => setShowArchive((v) => !v)}>
-            <span className="lbl" style={{ display: 'inline-flex', gap: 7, alignItems: 'center' }}>
-              <IconArchive /> Архив завершённых · {doneTasks.data?.length ?? 0}
-            </span>
-            <span
-              style={{
-                transform: showArchive ? 'rotate(180deg)' : undefined,
-                display: 'inline-flex',
-                color: 'var(--text-3)',
-              }}
-            >
-              <IconChevron />
-            </span>
-          </button>
-          {showArchive ? (
-            <div className="fold-b">
-              {(doneTasks.data ?? []).map((t) => (
-                <div className="row" key={t.id} style={{ padding: '9px 0' }}>
-                  <div className="row-main">
-                    <div className="row-title done-strike" style={{ fontWeight: 400 }}>
-                      {t.title}
-                    </div>
-                    <div className="row-sub">
-                      {t.completedAt
-                        ? `завершена ${humanDate(t.completedAt.slice(0, 10), today)}`
-                        : ''}
-                    </div>
+        <aside className="side">
+          <div className="card">
+            <div className="card-h">
+              <h3 style={{ fontSize: 16 }}>Заметки</h3>
+              <Button size="sm" variant="ghost" onClick={() => setNoteOpen(true)}>
+                <IconPlus />
+                Заметка
+              </Button>
+            </div>
+            {p.notes.length > 0 ? (
+              p.notes.map((n, i) => (
+                <div className="row" key={`${n}-${i}`}>
+                  <div className="row-main" style={{ fontSize: 13.5 }}>
+                    {n}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => reopen.mutate(t.id)}>
-                    Вернуть
+                  <Button size="sm" variant="ghost" onClick={() => removeNote.mutate(i)}>
+                    Удалить
                   </Button>
                 </div>
-              ))}
-              {doneTasks.data?.length === 0 ? <p className="hint">Пусто.</p> : null}
-            </div>
-          ) : null}
-        </div>
+              ))
+            ) : (
+              <p className="hint">Заметок нет.</p>
+            )}
+          </div>
+        </aside>
       </div>
+
+      <ProjectArchiveModal
+        projectId={projectId}
+        projectTitle={p.title}
+        today={today}
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+      />
 
       <ProjectSettingsModal
         project={p}
         directions={allDirections.data ?? []}
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-      />
-
-      <PickTaskModal
-        open={pickOpen}
-        onOpenChange={setPickOpen}
-        mode="active"
-        excludeTaskId={activeTaskId}
-        onPick={(taskId) => setActive.mutate(taskId)}
       />
 
       <Modal
