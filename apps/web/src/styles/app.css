@@ -789,16 +789,17 @@ main.content {
 
 .two {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 316px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 22px;
   align-items: start;
 }
+/* Боковая колонка не липкая: она бывает выше экрана, и тогда её низ
+   оказывается недостижимым. */
 .side {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  position: sticky;
-  top: 26px;
+  gap: 16px;
+  min-width: 0;
 }
 
 @media (max-width: 1080px) {
@@ -809,21 +810,31 @@ main.content {
     grid-template-columns: minmax(0, 1fr);
     gap: 20px;
   }
-  .side {
-    position: static;
-  }
 }
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* Панель становится шапкой: она не должна съедать пол-экрана до контента. */
   .rail {
     position: static;
     height: auto;
+    padding: 14px 14px 12px;
+    gap: 12px;
   }
   .nav {
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 2px;
+  }
+  .rail-foot {
+    margin-top: 4px;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .rail-foot .seg {
+    max-width: 260px;
   }
   main.content {
     padding: 18px 14px 60px;

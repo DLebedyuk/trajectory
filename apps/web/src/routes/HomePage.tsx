@@ -127,33 +127,117 @@ export function HomePage() {
         </div>
       </div>
 
-      <div className="stack" style={{ maxWidth: 840 }}>
-        <TodayBlock
-          events={data.events}
-          tasks={data.dueTasks}
-          overdue={data.overdueTasks}
-          reminders={data.todayReminders}
-          onCompleteTask={(id) => completeTask.mutate(id)}
-          onCompleteReminder={(id) => completeReminder.mutate(id)}
-          onOpenArchive={() => setArchiveOpen(true)}
-        />
+      <div className="two">
+        <div className="stack">
+          <TodayBlock
+            events={data.events}
+            tasks={data.dueTasks}
+            overdue={data.overdueTasks}
+            reminders={data.todayReminders}
+            onCompleteTask={(id) => completeTask.mutate(id)}
+            onCompleteReminder={(id) => completeReminder.mutate(id)}
+            onOpenArchive={() => setArchiveOpen(true)}
+          />
 
-        <FocusCard
-          focus={data.focus}
-          onComplete={() => data.focus.activeTaskId && completeTask.mutate(data.focus.activeTaskId)}
-          onPickTask={() => {
-            setPickMode('active');
-            setPickOpen(true);
-          }}
-          onClearActive={() => clearActive.mutate()}
-          onChangeDirection={() => setDirOpen(true)}
-          onClearFocus={() => setDirection.mutate({ directionId: null, onConflict: 'clearTask' })}
-        />
+          <FocusCard
+            focus={data.focus}
+            onComplete={() =>
+              data.focus.activeTaskId && completeTask.mutate(data.focus.activeTaskId)
+            }
+            onPickTask={() => {
+              setPickMode('active');
+              setPickOpen(true);
+            }}
+            onClearActive={() => clearActive.mutate()}
+            onChangeDirection={() => setDirOpen(true)}
+            onClearFocus={() => setDirection.mutate({ directionId: null, onConflict: 'clearTask' })}
+          />
 
-        {data.pinnedTasks.length > 0 ? (
-          <div>
-            <div className="sec-h">
-              <span className="lbl">Закреплённое</span>
+          <div className="card">
+            <div className="card-h">
+              <div>
+                <div className="lbl">Касания по всем направлениям</div>
+                <div className="hint" style={{ marginTop: 3 }}>
+                  Нажми на день, чтобы увидеть, что было.
+                </div>
+              </div>
+              <Button size="sm" onClick={() => setTouchOpen(true)}>
+                <IconPlus />
+                Записать касание
+              </Button>
+            </div>
+            <Heatmap days={data.heatmap.days} today={data.today} onDayClick={setDay} />
+            <div className="legend">
+              {(directions.data ?? []).map((d) => (
+                <b key={d.id}>
+                  <i className="dot" style={{ background: `var(${d.color})` }} />
+                  {d.name}
+                </b>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: 14,
+                paddingTop: 12,
+                borderTop: '1px solid var(--line)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span className="quiet">
+                За эту неделю: {weekTotal} {plural(weekTotal, 'касание', 'касания', 'касаний')}.
+              </span>
+              <Link className="quiet-link" to="/activity">
+                Посмотреть историю
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <aside className="side">
+          {data.pinnedTasks.length > 0 ? (
+            <div>
+              <div className="sec-h">
+                <span className="lbl">Закреплённое</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setPickMode('pin');
+                    setPickOpen(true);
+                  }}
+                >
+                  <IconPlus />
+                  Закрепить
+                </Button>
+              </div>
+              <div className="pin-grid">
+                {data.pinnedTasks.map((t) => (
+                  <ProjectTaskCard
+                    key={t.id}
+                    projectTitle={t.projectTitle}
+                    taskTitle={t.title}
+                    directionName={t.directionName}
+                    directionColor={t.directionColor}
+                    meta={
+                      t.deadline
+                        ? `до ${formatLongDate(t.deadline)}`
+                        : t.estimatedDuration
+                          ? DURATION_LABEL[t.estimatedDuration]
+                          : null
+                    }
+                    onOpen={() => navigate(`/tasks/${t.id}`)}
+                    onComplete={() => completeTask.mutate(t.id)}
+                    onUnpin={() => togglePin.mutate({ taskId: t.id, pinned: true })}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '2px 4px' }}>
+              <span className="quiet">Закреплённых задач пока нет.</span>
               <Button
                 size="sm"
                 variant="ghost"
@@ -162,138 +246,60 @@ export function HomePage() {
                   setPickOpen(true);
                 }}
               >
-                <IconPlus />
-                Закрепить
+                Закрепить задачу
               </Button>
             </div>
-            <div className="pin-grid">
-              {data.pinnedTasks.map((t) => (
-                <ProjectTaskCard
-                  key={t.id}
-                  projectTitle={t.projectTitle}
-                  taskTitle={t.title}
-                  directionName={t.directionName}
-                  directionColor={t.directionColor}
-                  meta={
-                    t.deadline
-                      ? `до ${formatLongDate(t.deadline)}`
-                      : t.estimatedDuration
-                        ? DURATION_LABEL[t.estimatedDuration]
-                        : null
-                  }
-                  onOpen={() => navigate(`/tasks/${t.id}`)}
-                  onComplete={() => completeTask.mutate(t.id)}
-                  onUnpin={() => togglePin.mutate({ taskId: t.id, pinned: true })}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '2px 4px' }}>
-            <span className="quiet">Закреплённых задач пока нет.</span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setPickMode('pin');
-                setPickOpen(true);
-              }}
-            >
-              Закрепить задачу
-            </Button>
-          </div>
-        )}
+          )}
 
-        <div className="card">
-          <div className="card-h">
+          {data.pinnedMedia.length > 0 ? (
             <div>
-              <div className="lbl">Касания по всем направлениям</div>
-              <div className="hint" style={{ marginTop: 3 }}>
-                Нажми на день, чтобы увидеть, что было.
+              <div className="sec-h">
+                <span className="lbl">Читаю и смотрю</span>
+                <Link className="quiet-link" to="/media">
+                  Вся полка
+                </Link>
+              </div>
+              <div className="strip">
+                {data.pinnedMedia.map((m) => (
+                  <Link key={m.id} className="chipcard" to={`/media/${m.id}`}>
+                    <span className="em" style={{ fontSize: 19 }}>
+                      {m.coverEmoji ?? '📘'}
+                    </span>
+                    <span>
+                      <span
+                        style={{ fontFamily: 'Literata, serif', fontSize: 13.5, display: 'block' }}
+                      >
+                        {m.title}
+                      </span>
+                      <span className="quiet">{m.authorOrDirector ?? m.categoryName ?? ''}</span>
+                    </span>
+                  </Link>
+                ))}
               </div>
             </div>
-            <Button size="sm" onClick={() => setTouchOpen(true)}>
-              <IconPlus />
-              Записать касание
-            </Button>
-          </div>
-          <Heatmap days={data.heatmap.days} today={data.today} onDayClick={setDay} />
-          <div className="legend">
-            {(directions.data ?? []).map((d) => (
-              <b key={d.id}>
-                <i className="dot" style={{ background: `var(${d.color})` }} />
-                {d.name}
-              </b>
-            ))}
-          </div>
+          ) : null}
+
           <div
+            className="card"
             style={{
-              marginTop: 14,
-              paddingTop: 12,
-              borderTop: '1px solid var(--line)',
               display: 'flex',
+              alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 12,
+              gap: 16,
               flexWrap: 'wrap',
             }}
           >
-            <span className="quiet">
-              За эту неделю: {weekTotal} {plural(weekTotal, 'касание', 'касания', 'касаний')}.
-            </span>
-            <Link className="quiet-link" to="/activity">
-              Посмотреть историю
-            </Link>
+            <div>
+              <div style={{ fontFamily: 'Literata, serif', fontSize: 16 }}>
+                Хочется чего-нибудь совсем другого?
+              </div>
+              <div className="hint" style={{ marginTop: 4 }}>
+                Загляни в меню возможностей.
+              </div>
+            </div>
+            <Button onClick={() => navigate('/menu')}>Открыть меню</Button>
           </div>
-        </div>
-
-        {data.pinnedMedia.length > 0 ? (
-          <div>
-            <div className="sec-h">
-              <span className="lbl">Читаю и смотрю</span>
-              <Link className="quiet-link" to="/media">
-                Вся полка
-              </Link>
-            </div>
-            <div className="strip">
-              {data.pinnedMedia.map((m) => (
-                <Link key={m.id} className="chipcard" to={`/media/${m.id}`}>
-                  <span className="em" style={{ fontSize: 19 }}>
-                    {m.coverEmoji ?? '📘'}
-                  </span>
-                  <span>
-                    <span
-                      style={{ fontFamily: 'Literata, serif', fontSize: 13.5, display: 'block' }}
-                    >
-                      {m.title}
-                    </span>
-                    <span className="quiet">{m.authorOrDirector ?? m.categoryName ?? ''}</span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div
-          className="card"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <div style={{ fontFamily: 'Literata, serif', fontSize: 16 }}>
-              Хочется чего-нибудь совсем другого?
-            </div>
-            <div className="hint" style={{ marginTop: 4 }}>
-              Загляни в меню возможностей.
-            </div>
-          </div>
-          <Button onClick={() => navigate('/menu')}>Открыть меню</Button>
-        </div>
+        </aside>
       </div>
 
       <PickTaskModal
