@@ -32,7 +32,9 @@ export function DirectionsPage() {
 
   const create = useMutation({
     mutationFn: () =>
-      api.directions.create({ name, color: '--d-eng', icon: 'spark', showMotto: true }),
+      // motto/showMotto — легаси-поля: девизы убраны из интерфейса,
+      // данные в БД пока остаются, но новые направления их не показывают
+      api.directions.create({ name, color: '--d-eng', icon: 'spark', showMotto: false }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.directions });
       toast.show('Направление создано');
@@ -83,11 +85,7 @@ export function DirectionsPage() {
                   </span>
                 ) : null}
               </div>
-              {d.showMotto && d.motto ? (
-                <p className="hint" style={{ fontStyle: 'italic' }}>
-                  «{d.motto}»
-                </p>
-              ) : null}
+
               <Heatmap
                 days={heat?.days ?? []}
                 today={today}

@@ -15,6 +15,7 @@ export const qk = {
   tasks: (projectId: string, filter?: TaskFilter) => ['tasks', projectId, filter ?? {}] as const,
   task: (id: string) => ['task', id] as const,
   pinnedTasks: (directionId?: string) => ['pinnedTasks', directionId ?? 'all'] as const,
+  doneTasks: (directionId: string) => ['doneTasks', directionId] as const,
   touches: (query: unknown) => ['touches', query] as const,
   heatmap: (weeks: number, directionId?: string) =>
     ['heatmap', weeks, directionId ?? 'all'] as const,
@@ -56,6 +57,13 @@ export const useProjects = (directionId: string) =>
     queryKey: qk.projects(directionId),
     queryFn: () => api.projects.listByDirection(directionId),
     enabled: Boolean(directionId),
+  });
+/** Архив направления: завершённые задачи всех его проектов. */
+export const useDoneTasks = (directionId: string, enabled = true) =>
+  useQuery({
+    queryKey: qk.doneTasks(directionId),
+    queryFn: () => api.tasks.doneByDirection(directionId),
+    enabled: enabled && Boolean(directionId),
   });
 export const useProject = (id: string) =>
   useQuery({ queryKey: qk.project(id), queryFn: () => api.projects.get(id), enabled: Boolean(id) });

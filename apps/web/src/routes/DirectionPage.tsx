@@ -26,6 +26,7 @@ import { ErrorBox, Loading } from '../components/Loading.js';
 import { TouchModal } from '../features/TouchModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DirectionSettingsModal } from '../features/DirectionSettingsModal.js';
+import { DirectionArchiveModal } from '../features/DirectionArchiveModal.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 
 /** Страница направления. Задачи здесь не показываются — только проекты. */
@@ -49,6 +50,7 @@ export function DirectionPage() {
   const [showPaused, setShowPaused] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -90,37 +92,25 @@ export function DirectionPage() {
     <button
       key={p.id}
       type="button"
-      className="card"
-      style={{
-        display: 'block',
-        width: '100%',
-        textAlign: 'left',
-        marginBottom: 10,
-        background: prominent ? undefined : 'transparent',
-      }}
+      className="projcard"
+      data-quiet={!prominent}
       onClick={() => navigate(`/projects/${p.id}`)}
     >
-      <div style={{ fontFamily: 'Literata, serif', fontSize: prominent ? 17 : 15.5 }}>
-        {p.title}
-        {p.status === 'paused' ? (
-          <span className="quiet" style={{ marginLeft: 6 }}>
-            на паузе
-          </span>
-        ) : null}
+      <div className="projcard-title">
+        <span>{p.title}</span>
+        {p.status === 'paused' ? <span className="quiet">на паузе</span> : null}
       </div>
-      {p.desiredOutcome ? (
-        <p className="hint" style={{ marginTop: 5, maxWidth: '70ch' }}>
-          {p.desiredOutcome}
-        </p>
-      ) : null}
-      <div className="quiet" style={{ marginTop: 9 }}>
-        {[
-          p.hasActiveTask && p.activeTaskTitle ? `Сейчас: ${p.activeTaskTitle}` : null,
-          p.pinnedCount ? `Закреплено: ${p.pinnedCount}` : null,
-          p.deadline ? `срок ${formatLongDate(p.deadline)}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ')}
+      {p.desiredOutcome ? <p className="projcard-out">{p.desiredOutcome}</p> : null}
+      <div className="projcard-meta">
+        {p.openTaskCount ? (
+          <span>
+            {p.openTaskCount} {plural(p.openTaskCount, 'задача', 'задачи', 'задач')}
+          </span>
+        ) : (
+          <span>без открытых задач</span>
+        )}
+        {p.pinnedCount ? <span>закреплено: {p.pinnedCount}</span> : null}
+        {p.deadline ? <span>срок {formatLongDate(p.deadline)}</span> : null}
       </div>
     </button>
   );
@@ -131,16 +121,15 @@ export function DirectionPage() {
         onBack={() => navigate('/directions')}
         backLabel="Направления"
         title={d.name}
-        eyebrow={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Glyph name={d.name} color={d.color} large />
-          </div>
-        }
-        subtitle={d.showMotto && d.motto ? <em>«{d.motto}»</em> : d.description}
+        icon={<Glyph name={d.name} color={d.color} large />}
+        subtitle={d.description}
         actions={
           <>
             <Button size="sm" onClick={() => setSettingsOpen(true)}>
               Настройки
+            </Button>
+            <Button size="sm" onClick={() => setArchiveOpen(true)}>
+              Архив
             </Button>
             <Button
               size="sm"
@@ -157,15 +146,7 @@ export function DirectionPage() {
       />
 
       <div className="card">
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1fr) 300px',
-            gap: 26,
-            alignItems: 'start',
-          }}
-          className="dirsplit"
-        >
+        <div className="dirsplit">
           <div>
             <div className="lbl" style={{ marginBottom: 10 }}>
               Карта касаний
@@ -202,7 +183,7 @@ export function DirectionPage() {
         </div>
       </div>
 
-      <div style={{ marginTop: 20 }}>
+      <section className="dir-projects" aria-label="Проекты направления">
         <div className="sec-h">
           <h3 style={{ fontSize: 17 }}>Проекты</h3>
           <Button size="sm" onClick={() => setProjectOpen(true)}>
@@ -211,8 +192,12 @@ export function DirectionPage() {
           </Button>
         </div>
 
-        {hot.map((p) => projectCard(p, true))}
-        {rest.map((p) => projectCard(p, false))}
+        {hot.length + rest.length > 0 ? (
+          <div className="projgrid">
+            {hot.map((p) => projectCard(p, true))}
+            {rest.map((p) => projectCard(p, false))}
+          </div>
+        ) : null}
         {list.length === 0 ? (
           <div className="card">
             <p className="hint">Проектов пока нет. Направление живёт и без них.</p>
@@ -234,7 +219,9 @@ export function DirectionPage() {
               </span>
             </button>
             {showPaused ? (
-              <div className="fold-b">{paused.map((p) => projectCard(p, false))}</div>
+              <div className="fold-b">
+                <div className="projgrid">{paused.map((p) => projectCard(p, false))}</div>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -242,7 +229,7 @@ export function DirectionPage() {
         {archived.length > 0 ? (
           <div className="fold" style={{ marginTop: 8 }}>
             <button type="button" className="fold-h" onClick={() => setShowArchive((v) => !v)}>
-              <span className="lbl">Архив · {archived.length}</span>
+              <span className="lbl">Завершённые проекты · {archived.length}</span>
               <span
                 style={{
                   transform: showArchive ? 'rotate(180deg)' : undefined,
@@ -277,7 +264,7 @@ export function DirectionPage() {
             ) : null}
           </div>
         ) : null}
-      </div>
+      </section>
 
       <TouchModal
         open={touchOpen}
@@ -286,6 +273,14 @@ export function DirectionPage() {
         today={today}
       />
       <DayTouchesModal date={day} directionId={directionId} onClose={() => setDay(null)} />
+
+      <DirectionArchiveModal
+        directionId={directionId}
+        directionName={d.name}
+        today={today}
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+      />
 
       <DirectionSettingsModal
         direction={d}

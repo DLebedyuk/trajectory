@@ -55,6 +55,11 @@ export class TasksController {
     return this.service.listDue(userId, date);
   }
 
+  @Get('done')
+  done(@CurrentUser() userId: string, @Query('directionId') directionId: string) {
+    return this.service.listDoneByDirection(userId, directionId);
+  }
+
   @Get('overdue')
   overdue(@CurrentUser() userId: string, @Query('date') date: string) {
     return this.service.listOverdue(userId, date);

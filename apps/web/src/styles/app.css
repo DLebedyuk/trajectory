@@ -685,6 +685,103 @@ main.content {
   left: 19px;
 }
 
+/* --- страница направления --- */
+/* Карта касаний и «Последние касания» — одна карточка в две колонки. */
+.dirsplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 26px;
+  align-items: start;
+}
+
+/* Секция проектов отделена от карты касаний воздухом и линией заголовка. */
+.dir-projects {
+  margin-top: 34px;
+}
+.dir-projects > .sec-h {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.projgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+/* Проект — самостоятельный блок, а не строка в списке. */
+.projcard {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.projcard:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+.projcard[data-quiet='true'] {
+  background: transparent;
+}
+.projcard-title {
+  font-family: 'Literata', Georgia, serif;
+  font-size: 16.5px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.projcard-out {
+  font-size: 12.5px;
+  color: var(--text-3);
+  margin-top: 6px;
+}
+.projcard-meta {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+/* --- архив: общий список завершённого --- */
+.arch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.arch-row {
+  display: block;
+  padding: 9px 8px;
+  border-radius: 8px;
+}
+.arch-row:hover {
+  background: var(--surface-2);
+}
+.arch-title {
+  display: block;
+  font-size: 13.5px;
+}
+.arch-meta {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.arch-meta b {
+  font-weight: 500;
+  color: var(--text-2);
+}
+
 .two {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 316px;
@@ -702,6 +799,10 @@ main.content {
 @media (max-width: 1080px) {
   .two {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .dirsplit {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
   }
   .side {
     position: static;
@@ -733,6 +834,9 @@ main.content {
   }
   .pin-grid {
     grid-template-columns: 1fr;
+  }
+  .projgrid {
+    grid-template-columns: minmax(0, 1fr);
   }
   .trow {
     flex-wrap: wrap;

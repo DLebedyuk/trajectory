@@ -141,6 +141,31 @@ export class TasksService {
     return result;
   }
 
+  /**
+   * Завершённые задачи всех проектов направления — архив направления.
+   * Проект у каждой задачи виден, иначе список превращается в кашу.
+   */
+  async listDoneByDirection(userId: string, directionId: string): Promise<TaskWithContext[]> {
+    const rows = await this.db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .innerJoin(projects, eq(projects.id, tasks.projectId))
+      .where(
+        and(
+          eq(tasks.userId, userId),
+          eq(tasks.status, 'done'),
+          eq(projects.directionId, directionId),
+        ),
+      )
+      .orderBy(desc(tasks.completedAt));
+    const result: TaskWithContext[] = [];
+    for (const r of rows) {
+      const t = await this.focus.loadTaskWithContext(userId, r.id);
+      if (t) result.push(t);
+    }
+    return result;
+  }
+
   async create(userId: string, input: CreateTaskInput): Promise<Task> {
     const [project] = await this.db
       .select({ id: projects.id, status: projects.status })

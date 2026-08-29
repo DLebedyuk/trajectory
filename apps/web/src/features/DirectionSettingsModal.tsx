@@ -29,16 +29,12 @@ export function DirectionSettingsModal({
   const toast = useToast();
   const [name, setName] = useState(direction.name);
   const [description, setDescription] = useState(direction.description ?? '');
-  const [motto, setMotto] = useState(direction.motto ?? '');
-  const [showMotto, setShowMotto] = useState(direction.showMotto);
   const [color, setColor] = useState(direction.color);
 
   useEffect(() => {
     if (!open) return;
     setName(direction.name);
     setDescription(direction.description ?? '');
-    setMotto(direction.motto ?? '');
-    setShowMotto(direction.showMotto);
     setColor(direction.color);
   }, [open, direction]);
 
@@ -52,8 +48,6 @@ export function DirectionSettingsModal({
       api.directions.update(direction.id, {
         name: name.trim(),
         description: description.trim() || null,
-        motto: motto.trim() || null,
-        showMotto,
         color,
       }),
     onSuccess: () => {
@@ -97,17 +91,6 @@ export function DirectionSettingsModal({
       <FormField label="Описание" hint="Необязательно">
         <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
       </FormField>
-      <FormField label="Девиз" hint="Своими словами. Чужие цитаты придумывать не нужно">
-        <input type="text" value={motto} onChange={(e) => setMotto(e.target.value)} />
-      </FormField>
-      <label className="field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <input
-          type="checkbox"
-          checked={showMotto}
-          onChange={(e) => setShowMotto(e.target.checked)}
-        />
-        <span className="hint">Показывать девиз на странице направления</span>
-      </label>
       <FormField label="Цвет">
         <select value={color} onChange={(e) => setColor(e.target.value)}>
           {DIRECTION_COLORS.map((c) => (

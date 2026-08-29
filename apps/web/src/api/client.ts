@@ -169,6 +169,9 @@ export const api = {
       get<Task[]>('/api/tasks', { projectId, ...(filter as Query) }),
     get: (id: string) => get<TaskWithContext>(`/api/tasks/${id}`),
     pinned: (directionId?: string) => get<TaskWithContext[]>('/api/tasks/pinned', { directionId }),
+    /** Завершённые задачи всех проектов направления — архив направления. */
+    doneByDirection: (directionId: string) =>
+      get<TaskWithContext[]>('/api/tasks/done', { directionId }),
     create: (input: CreateTaskInput) => post<Task>('/api/tasks', input),
     update: (id: string, input: UpdateTaskInput) => patch<Task>(`/api/tasks/${id}`, input),
     remove: (id: string) => del<{ ok: true }>(`/api/tasks/${id}`),

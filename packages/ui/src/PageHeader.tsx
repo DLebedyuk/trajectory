@@ -5,6 +5,7 @@ export function PageHeader({
   title,
   subtitle,
   eyebrow,
+  icon,
   actions,
   onBack,
   backLabel = 'Назад',
@@ -12,6 +13,8 @@ export function PageHeader({
   title: string;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
+  /** Значок перед заголовком — стоит с ним на одной строке. */
+  icon?: ReactNode;
   actions?: ReactNode;
   onBack?: () => void;
   backLabel?: string;
@@ -41,7 +44,17 @@ export function PageHeader({
       >
         <div style={{ maxWidth: '66ch' }}>
           {eyebrow}
-          <h1 style={{ fontSize: 26, marginTop: eyebrow ? 8 : 0 }}>{title}</h1>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              marginTop: eyebrow ? 8 : 0,
+            }}
+          >
+            {icon}
+            <h1 style={{ fontSize: 26 }}>{title}</h1>
+          </div>
           {subtitle ? (
             <div className="hint" style={{ marginTop: 5, fontSize: 14 }}>
               {subtitle}
