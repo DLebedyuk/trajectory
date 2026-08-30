@@ -87,7 +87,15 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
         this.logger.error('TELEGRAM_MODE=webhook, но TELEGRAM_WEBHOOK_URL пуст');
         return;
       }
-      await this.bot.api.setWebhook(env.TELEGRAM_WEBHOOK_URL);
+      if (!env.TELEGRAM_WEBHOOK_SECRET) {
+        this.logger.error(
+          'TELEGRAM_MODE=webhook, но TELEGRAM_WEBHOOK_SECRET пуст: ручка вебхука была бы открыта всем. Бот не запущен.',
+        );
+        return;
+      }
+      await this.bot.api.setWebhook(env.TELEGRAM_WEBHOOK_URL, {
+        secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+      });
       this.logger.log(`Webhook установлен: ${env.TELEGRAM_WEBHOOK_URL}`);
       return;
     }

@@ -20,7 +20,7 @@ import {
 } from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { iso, isoRequired } from '../../common/mappers.js';
-import { MockAiProvider } from './ai.provider.js';
+import { AI_PROVIDER, type AiProvider } from './ai.provider.js';
 
 type Row = typeof inboxItems.$inferSelect;
 
@@ -39,7 +39,7 @@ const toItem = (r: Row): InboxItem => ({
 export class InboxService {
   constructor(
     @Inject(DB) private readonly db: Database,
-    @Inject(MockAiProvider) private readonly ai: MockAiProvider,
+    @Inject(AI_PROVIDER) private readonly ai: AiProvider,
   ) {}
 
   async list(userId: string): Promise<InboxItem[]> {

@@ -58,6 +58,7 @@ services:
       TELEGRAM_MODE: ${TELEGRAM_MODE:-off}
       TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
 
       # Миграции применяются при каждом старте; демо-данные — только по просьбе.
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}

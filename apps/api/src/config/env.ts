@@ -11,6 +11,19 @@ const envSchema = z.object({
   TELEGRAM_WEBHOOK_URL: z.string().optional().default(''),
   /** Имя бота без @ — нужно для deep link «открыть бота с кодом». */
   TELEGRAM_BOT_USERNAME: z.string().optional().default(''),
+  /**
+   * Секрет вебхука. Telegram присылает его в X-Telegram-Bot-Api-Secret-Token,
+   * и без проверки ручку /api/telegram/webhook может дёрнуть кто угодно.
+   */
+  TELEGRAM_WEBHOOK_SECRET: z
+    .string()
+    .optional()
+    .default('')
+    // Telegram принимает только эти символы; кириллицу он молча не примет,
+    // а HTTP-заголовок с ней вообще не собирается
+    .refine((v) => v === '' || /^[A-Za-z0-9_-]{1,256}$/.test(v), {
+      message: 'TELEGRAM_WEBHOOK_SECRET: только латиница, цифры, дефис и подчёркивание',
+    }),
   DEV_USER_ID: z.string().uuid().default('00000000-0000-4000-8000-000000000001'),
   DEV_AUTH: z
     .string()

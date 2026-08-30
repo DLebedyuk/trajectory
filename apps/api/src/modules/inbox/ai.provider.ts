@@ -7,6 +7,8 @@ export interface AiParseContext {
   projects: { id: string; title: string; directionName: string }[];
 }
 
+export const AI_PROVIDER = Symbol('AI_PROVIDER');
+
 export interface AiProvider {
   readonly name: string;
   propose(
