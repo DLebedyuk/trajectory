@@ -28,6 +28,50 @@ export class GoogleAccessRevokedError extends Error {
 }
 
 /**
+ * Google не выполнил запрос, но доступ при этом жив: выключенный в проекте API,
+ * исчерпанная квота, временный сбой. Переподключение такое не лечит, поэтому
+ * помечать доступ отозванным здесь нельзя.
+ */
+export class GoogleApiError extends Error {}
+
+/**
+ * Из всех 403 переподключение помогает только при нехватке разрешений.
+ * Остальные 403 (accessNotConfigured, квоты) к согласию пользователя
+ * отношения не имеют.
+ */
+const REVOKING_REASONS = new Set([
+  'insufficientPermissions',
+  'ACCESS_TOKEN_SCOPE_INSUFFICIENT',
+  'UNAUTHENTICATED',
+]);
+
+/**
+ * Причина и текст ошибки от Google. Календарное API кладёт причину в
+ * error.errors[].reason, OAuth-эндпоинт — в error строкой. Текст сохраняем
+ * как есть: без него разбираться в отказе невозможно.
+ */
+async function readGoogleError(res: Response): Promise<{ reason: string; message: string }> {
+  let reason = '';
+  let message = '';
+  try {
+    const body = (await res.json()) as {
+      error?: string | { message?: string; status?: string; errors?: { reason?: string }[] };
+      error_description?: string;
+    };
+    if (typeof body.error === 'string') {
+      reason = body.error;
+      message = body.error_description ?? body.error;
+    } else if (body.error) {
+      reason = body.error.errors?.[0]?.reason ?? body.error.status ?? '';
+      message = body.error.message ?? '';
+    }
+  } catch {
+    // тело не JSON — остаётся только статус
+  }
+  return { reason, message: message || `HTTP ${res.status}` };
+}
+
+/**
  * Обращения к Google вынесены за интерфейс: тесты подставляют заглушку и
  * проверяют разбор, склейку и защиту от дублей, не ходя в сеть.
  */
@@ -88,11 +132,15 @@ export class RealGoogleCalendarApi implements GoogleCalendarApi {
         grant_type: 'refresh_token',
       }),
     });
-    if (res.status === 400 || res.status === 401) {
-      // именно так Google отвечает на отозванный или просроченный refresh-токен
-      throw new GoogleAccessRevokedError();
+    if (!res.ok) {
+      const { reason, message } = await readGoogleError(res);
+      // именно так Google отвечает на отозванный или просроченный refresh-токен;
+      // остальные 400 (invalid_client и подобные) — наша конфигурация, не отзыв
+      if (reason === 'invalid_grant' || res.status === 401) {
+        throw new GoogleAccessRevokedError(message);
+      }
+      throw new GoogleApiError(`Google не обновил токен: ${message}`);
     }
-    if (!res.ok) throw new Error(`Google не обновил токен: HTTP ${res.status}`);
     const data = (await res.json()) as { access_token: string; expires_in: number };
     return {
       accessToken: data.access_token,
@@ -102,8 +150,17 @@ export class RealGoogleCalendarApi implements GoogleCalendarApi {
 
   private async get<T>(accessToken: string, url: string): Promise<T> {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (res.status === 401 || res.status === 403) throw new GoogleAccessRevokedError();
-    if (!res.ok) throw new Error(`Google Calendar ответил HTTP ${res.status}`);
+    if (!res.ok) {
+      const { reason, message } = await readGoogleError(res);
+      // 401 — токен больше не принимают, это и есть отзыв. 403 бывает разным:
+      // выключенный в проекте Calendar API отвечает ровно так же, как нехватка
+      // прав, и раньше мы гасили подключение из-за настройки в Google Cloud.
+      if (res.status === 401) throw new GoogleAccessRevokedError(message);
+      if (res.status === 403 && REVOKING_REASONS.has(reason)) {
+        throw new GoogleAccessRevokedError(message);
+      }
+      throw new GoogleApiError(message);
+    }
     return (await res.json()) as T;
   }
 

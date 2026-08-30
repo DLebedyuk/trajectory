@@ -106,6 +106,12 @@ export function CalendarCard() {
             </span>
           </div>
 
+          {c.lastError ? (
+            <p className="hint" style={{ marginTop: 10 }}>
+              Google ответил: {c.lastError}
+            </p>
+          ) : null}
+
           {!c.encryptionReady ? (
             <p className="hint" style={{ marginTop: 10 }}>
               Сначала задайте <code>TOKEN_ENCRYPTION_KEY</code> в <code>.env</code>: без него

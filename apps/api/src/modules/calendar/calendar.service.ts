@@ -13,6 +13,7 @@ import {
 import {
   GOOGLE_CALENDAR_API,
   GoogleAccessRevokedError,
+  GoogleApiError,
   type GoogleCalendarApi,
 } from './google-calendar.api.js';
 
@@ -178,13 +179,7 @@ export class CalendarService {
         .where(eq(googleCredentials.userId, userId));
       return fresh.accessToken;
     } catch (e) {
-      if (e instanceof GoogleAccessRevokedError) {
-        await this.markRevoked(userId, e.message);
-        throw ApiException.validation(
-          'Доступ к Google Calendar отозван или истёк. Подключите календарь заново.',
-        );
-      }
-      throw e;
+      return await this.failFromGoogle(userId, e);
     }
   }
 
@@ -193,6 +188,33 @@ export class CalendarService {
       .update(googleCredentials)
       .set({ revokedAt: new Date(), lastError: message })
       .where(eq(googleCredentials.userId, userId));
+  }
+
+  /** Отказ Google, который не связан с согласием: запоминаем, доступ не трогаем. */
+  private async markError(userId: string, message: string): Promise<void> {
+    await this.db
+      .update(googleCredentials)
+      .set({ lastError: message })
+      .where(eq(googleCredentials.userId, userId));
+  }
+
+  /**
+   * Единая реакция на отказ Google. Отзыв гасит подключение и требует нового
+   * согласия; всё остальное только записывается — гасить доступ из-за квоты
+   * или выключенного в проекте API нельзя, переподключение это не чинит.
+   */
+  private async failFromGoogle(userId: string, e: unknown): Promise<never> {
+    if (e instanceof GoogleAccessRevokedError) {
+      await this.markRevoked(userId, e.message);
+      throw ApiException.validation(
+        `Доступ к Google Calendar отозван (${e.message}). Подключите календарь заново.`,
+      );
+    }
+    if (e instanceof GoogleApiError) {
+      await this.markError(userId, e.message);
+      throw ApiException.validation(`Google Calendar не ответил: ${e.message}`);
+    }
+    throw e;
   }
 
   /**
@@ -208,11 +230,7 @@ export class CalendarService {
     try {
       remoteCalendars = await this.api.listCalendars(token);
     } catch (e) {
-      if (e instanceof GoogleAccessRevokedError) {
-        await this.markRevoked(userId, e.message);
-        throw ApiException.validation('Доступ к Google Calendar отозван. Подключите заново.');
-      }
-      throw e;
+      return await this.failFromGoogle(userId, e);
     }
 
     for (const rc of remoteCalendars) {
@@ -246,16 +264,20 @@ export class CalendarService {
     };
 
     let eventCount = 0;
+    // один сломавшийся календарь не должен ронять синхронизацию остальных,
+    // но и молчать о нём нельзя — текст доедет до настроек
+    let softError: string | null = null;
     for (const cal of enabled) {
       let remoteEvents;
       try {
         remoteEvents = await this.api.listEvents(token, cal.externalId as string, range, timezone);
       } catch (e) {
         if (e instanceof GoogleAccessRevokedError) {
-          await this.markRevoked(userId, e.message);
-          throw ApiException.validation('Доступ к Google Calendar отозван. Подключите заново.');
+          return await this.failFromGoogle(userId, e);
         }
-        this.logger.warn(`Календарь ${cal.name} не синхронизирован: ${String(e)}`);
+        const message = e instanceof Error ? e.message : String(e);
+        softError = `Календарь «${cal.name}» не синхронизирован: ${message}`;
+        this.logger.warn(softError);
         continue;
       }
 
@@ -284,7 +306,7 @@ export class CalendarService {
 
     await this.db
       .update(googleCredentials)
-      .set({ lastSyncAt: new Date(), lastError: null })
+      .set({ lastSyncAt: new Date(), lastError: softError })
       .where(eq(googleCredentials.userId, userId));
 
     return { calendars: remoteCalendars.length, events: eventCount };

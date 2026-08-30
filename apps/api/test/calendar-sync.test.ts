@@ -14,10 +14,13 @@ let db: ReturnType<typeof drizzle>;
 let schema: typeof import('../src/db/schema.js');
 let CalendarService: typeof import('../src/modules/calendar/calendar.service.js').CalendarService;
 let Revoked: typeof import('../src/modules/calendar/google-calendar.api.js').GoogleAccessRevokedError;
+let ApiErr: typeof import('../src/modules/calendar/google-calendar.api.js').GoogleApiError;
 
 /** Заглушка Google: сценарии синхронизации проверяются без сети. */
 const fake = {
   revokeAccess: false,
+  /** Отказ, не связанный с согласием: выключенный API, квота, сбой. */
+  apiError: null as string | null,
   calendars: [
     { externalId: 'primary@gmail.com', name: 'Личный', primary: true },
     { externalId: 'work@group.calendar', name: 'Работа', primary: false },
@@ -41,10 +44,12 @@ function makeApi() {
     refreshAccessToken: async () => {
       fake.refreshCalls += 1;
       if (fake.revokeAccess) throw new Revoked();
+      if (fake.apiError) throw new ApiErr(fake.apiError);
       return { accessToken: 'access-token', expiresAt: new Date(Date.now() + 3600_000) };
     },
     listCalendars: async () => {
       if (fake.revokeAccess) throw new Revoked();
+      if (fake.apiError) throw new ApiErr(fake.apiError);
       return fake.calendars;
     },
     listEvents: async (_t: string, calendarExternalId: string) => {
@@ -63,7 +68,7 @@ beforeAll(async () => {
   client = postgres(TEST_DB_URL, { max: 2 });
   db = drizzle(client, { schema });
   ({ CalendarService } = await import('../src/modules/calendar/calendar.service.js'));
-  ({ GoogleAccessRevokedError: Revoked } =
+  ({ GoogleAccessRevokedError: Revoked, GoogleApiError: ApiErr } =
     await import('../src/modules/calendar/google-calendar.api.js'));
   service = new CalendarService(db as never, makeApi() as never);
 }, 60_000);
@@ -83,6 +88,7 @@ async function connect(refreshToken: string | null = 'refresh-1'): Promise<void>
 
 beforeEach(async () => {
   fake.revokeAccess = false;
+  fake.apiError = null;
   fake.refreshCalls = 0;
   await db.delete(schema.calendarEvents);
   await db.delete(schema.calendars);
@@ -175,6 +181,51 @@ describe('Google Calendar', () => {
     const state = await service.connection(TEST_USER_ID);
     expect(state.revoked).toBe(true);
     expect(state.connected).toBe(false);
+  });
+
+  it('текст отказа от Google сохраняется, а не заменяется общей фразой', async () => {
+    await connect();
+    fake.revokeAccess = true;
+    await db
+      .update(schema.googleCredentials)
+      .set({ accessTokenExpiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.googleCredentials.userId, TEST_USER_ID));
+
+    await expect(service.sync(TEST_USER_ID)).rejects.toThrow();
+    const [row] = await db
+      .select()
+      .from(schema.googleCredentials)
+      .where(eq(schema.googleCredentials.userId, TEST_USER_ID));
+    expect(row?.lastError).toBeTruthy();
+  });
+
+  /**
+   * Ровно этот случай сломал живое подключение: в проекте Google Cloud не был
+   * включён Calendar API, Google ответил 403, а мы погасили доступ и показали
+   * «отозван». Переподключение такое не чинит — гасить доступ здесь нельзя.
+   */
+  it('403 без отзыва не гасит подключение, но виден в состоянии', async () => {
+    await connect();
+    fake.apiError = 'Google Calendar API has not been used in project 123 before or it is disabled';
+
+    await expect(service.sync(TEST_USER_ID)).rejects.toThrow();
+
+    const state = await service.connection(TEST_USER_ID);
+    expect(state.revoked).toBe(false);
+    expect(state.connected).toBe(true);
+    expect(state.lastError).toMatch(/has not been used/);
+  });
+
+  it('после починки на стороне Google синхронизация проходит, ошибка гаснет', async () => {
+    await connect();
+    fake.apiError = 'quota exceeded';
+    await expect(service.sync(TEST_USER_ID)).rejects.toThrow();
+
+    fake.apiError = null;
+    await service.sync(TEST_USER_ID);
+    const state = await service.connection(TEST_USER_ID);
+    expect(state.lastError).toBeNull();
+    expect(state.lastSyncAt).not.toBeNull();
   });
 
   it('повторное подключение без нового refresh-токена сохраняет прежний', async () => {

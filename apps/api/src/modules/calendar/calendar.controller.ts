@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Logger,
+  Param,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { env, isGoogleAuthConfigured } from '../../config/env.js';
@@ -79,6 +90,8 @@ export class CalendarController {
 @ApiTags('calendar')
 @Controller('api/calendar')
 export class CalendarCallbackController {
+  private readonly logger = new Logger('Calendar');
+
   constructor(
     @Inject(CalendarService) private readonly service: CalendarService,
     @Inject(AuthService) private readonly auth: AuthService,
@@ -109,8 +122,13 @@ export class CalendarCallbackController {
 
     try {
       await this.service.sync(stateRow.userId);
-    } catch {
-      // первая синхронизация может не удаться — подключение от этого не ломается
+    } catch (e) {
+      // подключение состоялось: согласие получено и токены сохранены. Причина
+      // неудачной первой синхронизации уже записана в lastError и видна в
+      // настройках, но в логе она нужнее — там есть ответ Google целиком.
+      this.logger.warn(
+        `Первая синхронизация после подключения не удалась: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
     res.redirect(stateRow.redirectTo ?? `${env.APP_BASE_URL}/settings?calendar=connected`);
   }
