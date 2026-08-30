@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, PageHeader, useToast } from '@planner/ui';
+import { PageHeader, useToast } from '@planner/ui';
 import { api } from '../api/client.js';
 import { TelegramCard } from '../features/TelegramCard.js';
+import { CalendarCard } from '../features/CalendarCard.js';
 import { qk, useSettings } from '../api/queries.js';
 import { applyTheme, useUiStore } from '../store/ui.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
@@ -168,36 +169,7 @@ export function SettingsPage() {
 
         <TelegramCard />
 
-        <div className="card">
-          <h3 style={{ fontSize: 17, marginBottom: 10 }}>Интеграции</h3>
-          <div className="setrow">
-            <div className="setrow-main">
-              <b>Google Calendar</b>
-              <small>Будущая интеграция: нужен OAuth и серверный обмен токенами.</small>
-            </div>
-            <Button size="sm" onClick={() => toast.show('Google Calendar — будущая интеграция')}>
-              Скоро
-            </Button>
-          </div>
-          <div className="setrow">
-            <div className="setrow-main">
-              <b>Яндекс Календарь</b>
-              <small>Будущая интеграция через CalDAV.</small>
-            </div>
-            <Button size="sm" onClick={() => toast.show('Яндекс Календарь — будущая интеграция')}>
-              Скоро
-            </Button>
-          </div>
-          <div className="setrow">
-            <div className="setrow-main">
-              <b>Экспорт данных</b>
-              <small>Будущая функция: выгрузка всего в JSON.</small>
-            </div>
-            <Button size="sm" onClick={() => toast.show('Экспорт — будущая функция')}>
-              Скоро
-            </Button>
-          </div>
-        </div>
+        <CalendarCard />
       </div>
     </>
   );

@@ -150,6 +150,21 @@ export interface TelegramLinkCode {
   deepLink: string | null;
 }
 
+export interface CalendarConnection {
+  connected: boolean;
+  revoked: boolean;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  encryptionReady: boolean;
+}
+
+export interface CalendarView {
+  id: string;
+  name: string;
+  enabled: boolean;
+  primary: boolean;
+}
+
 export interface AuthStatus {
   authenticated: boolean;
   googleConfigured: boolean;
@@ -163,6 +178,17 @@ export const api = {
     loginUrl: (redirectTo?: string) =>
       `${BASE}/api/auth/google${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
     logout: () => post<{ ok: true }>('/api/auth/logout'),
+  },
+
+  calendar: {
+    connection: () => get<CalendarConnection>('/api/calendar/connection'),
+    list: () => get<CalendarView[]>('/api/calendar/list'),
+    setEnabled: (id: string, enabled: boolean) =>
+      post<CalendarView>(`/api/calendar/${id}/enabled`, { enabled }),
+    sync: () => post<{ calendars: number; events: number }>('/api/calendar/sync'),
+    disconnect: () => post<{ ok: true }>('/api/calendar/disconnect'),
+    /** Согласие на календарь — обычная навигация, не fetch. */
+    connectUrl: () => `${BASE}/api/calendar/google/connect`,
   },
 
   telegram: {

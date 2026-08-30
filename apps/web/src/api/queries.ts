@@ -6,6 +6,8 @@ import type { TaskFilter } from '@planner/contracts';
 export const qk = {
   authStatus: ['authStatus'] as const,
   telegram: ['telegram'] as const,
+  calendarConnection: ['calendarConnection'] as const,
+  calendars: ['calendars'] as const,
   dashboard: ['dashboard'] as const,
   me: ['me'] as const,
   settings: ['settings'] as const,

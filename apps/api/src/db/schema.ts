@@ -370,16 +370,43 @@ export const mediaItems = pgTable(
  * Подключённые календари и их события. В первой итерации наполняются seed-ом:
  * синхронизация с Google Calendar и Яндекс Календарём — следующий этап.
  */
-export const calendars = pgTable('calendars', {
-  id: uuid('id').primaryKey().defaultRandom(),
+/**
+ * Доступ к Google API отдельно от входа: вход даёт только личность, календарь —
+ * второе, явное согласие. Refresh-токен лежит зашифрованным (AES-256-GCM).
+ */
+export const googleCredentials = pgTable('google_credentials', {
   userId: uuid('user_id')
-    .notNull()
+    .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  name: varchar('name', { length: 120 }).notNull(),
-  provider: varchar('provider', { length: 20 }).notNull().default('google'),
-  enabled: boolean('enabled').notNull().default(true),
-  createdAt: now(),
+  refreshTokenEnc: text('refresh_token_enc').notNull(),
+  accessTokenEnc: text('access_token_enc'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+  scope: text('scope').notNull(),
+  connectedAt: now(),
+  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+  /** Заполняется, когда Google перестал принимать токен: доступ отозвали. */
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  lastError: text('last_error'),
 });
+
+export const calendars = pgTable(
+  'calendars',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 120 }).notNull(),
+    provider: varchar('provider', { length: 20 }).notNull().default('google'),
+    /** id календаря у провайдера: по нему список обновляется без дублей. */
+    externalId: varchar('external_id', { length: 200 }),
+    enabled: boolean('enabled').notNull().default(true),
+    createdAt: now(),
+  },
+  (t) => ({
+    byExternal: uniqueIndex('calendars_user_external_idx').on(t.userId, t.externalId),
+  }),
+);
 
 export const calendarEvents = pgTable(
   'calendar_events',
@@ -391,13 +418,20 @@ export const calendarEvents = pgTable(
     calendarId: uuid('calendar_id')
       .notNull()
       .references(() => calendars.id, { onDelete: 'cascade' }),
+    /** id события у провайдера: повторная синхронизация обновляет, а не дублирует. */
+    externalId: varchar('external_id', { length: 300 }),
     title: varchar('title', { length: 300 }).notNull(),
     date: date('date').notNull(),
     time: varchar('time', { length: 5 }).notNull(),
     duration: varchar('duration', { length: 40 }),
+    allDay: boolean('all_day').notNull().default(false),
     createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => ({ byUserDate: index('calendar_events_user_date_idx').on(t.userId, t.date) }),
+  (t) => ({
+    byUserDate: index('calendar_events_user_date_idx').on(t.userId, t.date),
+    byExternal: uniqueIndex('calendar_events_external_idx').on(t.calendarId, t.externalId),
+  }),
 );
 
 /** Служебная таблица для идемпотентного seed. */

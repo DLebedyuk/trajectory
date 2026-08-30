@@ -15,6 +15,7 @@ import { SettingsModule } from './modules/settings/settings.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { DashboardModule } from './modules/dashboard/dashboard.module.js';
 import { TelegramModule } from './modules/telegram/telegram.module.js';
+import { CalendarModule } from './modules/calendar/calendar.module.js';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TelegramModule } from './modules/telegram/telegram.module.js';
     DashboardModule,
     HealthModule,
     TelegramModule,
+    CalendarModule,
   ],
 })
 export class AppModule {}

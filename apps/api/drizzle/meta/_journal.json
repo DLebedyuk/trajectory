@@ -36,6 +36,13 @@
       "when": 1788115464320,
       "tag": "0004_strange_molly_hayes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788117128914,
+      "tag": "0005_quick_ezekiel",
+      "breakpoints": true
     }
   ]
 }
