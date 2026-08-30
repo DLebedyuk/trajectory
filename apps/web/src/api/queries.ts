@@ -4,6 +4,7 @@ import type { TaskFilter } from '@planner/contracts';
 
 /** Ключи запросов. Инвалидация точечная: обновляем только связанное. */
 export const qk = {
+  authStatus: ['authStatus'] as const,
   dashboard: ['dashboard'] as const,
   me: ['me'] as const,
   settings: ['settings'] as const,

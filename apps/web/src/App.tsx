@@ -1,5 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { api } from './api/client.js';
+import { qk } from './api/queries.js';
 import { Shell } from './components/Shell.js';
+import { LoginPage } from './routes/LoginPage.js';
 import { HomePage } from './routes/HomePage.js';
 import { DirectionsPage } from './routes/DirectionsPage.js';
 import { DirectionPage } from './routes/DirectionPage.js';
@@ -14,6 +18,14 @@ import { SettingsPage } from './routes/SettingsPage.js';
 import { ActivityPage } from './routes/ActivityPage.js';
 
 export function App() {
+  const status = useQuery({ queryKey: qk.authStatus, queryFn: api.auth.status, retry: false });
+
+  // пока статус неизвестен — ничего не рисуем, иначе мигает экран входа
+  if (status.isPending) return null;
+  if (!status.data?.authenticated) {
+    return <LoginPage googleConfigured={status.data?.googleConfigured ?? false} />;
+  }
+
   return (
     <Shell>
       <Routes>

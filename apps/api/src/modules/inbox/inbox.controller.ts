@@ -12,12 +12,12 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { applyInboxProposalsSchema, createInboxItemSchema } from '@planner/contracts';
 import { z } from 'zod';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { InboxService } from './inbox.service.js';
 
 @ApiTags('inbox')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/inbox')
 export class InboxController {
   constructor(@Inject(InboxService) private readonly service: InboxService) {}

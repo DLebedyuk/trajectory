@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Inject, Patch, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { updateSettingsSchema } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { SettingsService } from './settings.service.js';
 
 @ApiTags('settings')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api')
 export class SettingsController {
   constructor(@Inject(SettingsService) private readonly service: SettingsService) {}

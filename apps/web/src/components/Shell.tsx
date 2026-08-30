@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client.js';
 import { qk } from '../api/queries.js';
 import { applyTheme, useUiStore } from '../store/ui.js';
@@ -21,6 +22,15 @@ export function Shell({ children }: { children: ReactNode }) {
 
   const reminders = useQuery({ queryKey: qk.reminders, queryFn: api.reminders.today });
   const inbox = useQuery({ queryKey: qk.inbox, queryFn: api.inbox.list });
+  const me = useQuery({ queryKey: qk.me, queryFn: api.me });
+  const qc = useQueryClient();
+  const logout = useMutation({
+    mutationFn: api.auth.logout,
+    onSuccess: () => {
+      qc.clear();
+      window.location.assign('/');
+    },
+  });
 
   const counts: Record<string, number> = {
     reminders: reminders.data?.length ?? 0,
@@ -66,6 +76,16 @@ export function Shell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="rail-foot">
+          {me.data ? (
+            <div className="whoami">
+              <div className="whoami-name" title={me.data.email}>
+                {me.data.displayName}
+              </div>
+              <button type="button" className="quiet-link" onClick={() => logout.mutate()}>
+                Выйти
+              </button>
+            </div>
+          ) : null}
           <div>
             <div className="lbl" style={{ marginBottom: 6 }}>
               Тема

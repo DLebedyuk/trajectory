@@ -12,12 +12,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createMenuItemSchema, menuFilterSchema, updateMenuItemSchema } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { MenuService } from './menu.service.js';
 
 @ApiTags('menu')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/menu')
 export class MenuController {
   constructor(@Inject(MenuService) private readonly service: MenuService) {}

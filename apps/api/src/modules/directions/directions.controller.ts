@@ -11,12 +11,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createDirectionSchema, reorderSchema, updateDirectionSchema } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { DirectionsService } from './directions.service.js';
 
 @ApiTags('directions')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/directions')
 export class DirectionsController {
   constructor(@Inject(DirectionsService) private readonly service: DirectionsService) {}

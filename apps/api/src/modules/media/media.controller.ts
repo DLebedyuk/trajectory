@@ -16,12 +16,12 @@ import {
   createMediaItemSchema,
   updateMediaItemSchema,
 } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { MediaService } from './media.service.js';
 
 @ApiTags('media')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/media')
 export class MediaController {
   constructor(@Inject(MediaService) private readonly service: MediaService) {}

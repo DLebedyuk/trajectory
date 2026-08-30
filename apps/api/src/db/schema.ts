@@ -20,11 +20,58 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 320 }).notNull().unique(),
   displayName: varchar('display_name', { length: 120 }).notNull(),
+  /** sub из Google ID-токена: стабильный идентификатор аккаунта. */
+  googleSub: varchar('google_sub', { length: 64 }).unique(),
+  avatarUrl: text('avatar_url'),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Europe/Moscow'),
   locale: varchar('locale', { length: 10 }).notNull().default('ru'),
   createdAt: now(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Серверные сессии. В куке лежит только случайный токен, в базе — его SHA-256:
+ * утечка дампа не даёт войти под пользователем.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    userAgent: varchar('user_agent', { length: 300 }),
+    createdAt: now(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => ({
+    byToken: uniqueIndex('sessions_token_hash_idx').on(t.tokenHash),
+    byUser: index('sessions_user_idx').on(t.userId, t.expiresAt),
+  }),
+);
+
+/**
+ * Одноразовый state для OAuth: защищает от подделки ответа Google.
+ * Хранится в базе, а не в куке, чтобы работать и при строгих SameSite.
+ */
+export const oauthStates = pgTable(
+  'oauth_states',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    state: varchar('state', { length: 64 }).notNull(),
+    /** 'login' или 'calendar' — какой сценарий начинали. */
+    purpose: varchar('purpose', { length: 20 }).notNull(),
+    /** Для календаря: чей аккаунт подключаем. Для входа пусто. */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    redirectTo: varchar('redirect_to', { length: 500 }),
+    createdAt: now(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (t) => ({ byState: uniqueIndex('oauth_states_state_idx').on(t.state) }),
+);
 
 export const userSettings = pgTable('user_settings', {
   userId: uuid('user_id')

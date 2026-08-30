@@ -1,12 +1,12 @@
 import { Body, Controller, Delete, Get, Inject, Put, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { setActiveTaskSchema, setFocusDirectionSchema } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { FocusService } from './focus.service.js';
 
 @ApiTags('focus')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/focus')
 export class FocusController {
   constructor(@Inject(FocusService) private readonly service: FocusService) {}

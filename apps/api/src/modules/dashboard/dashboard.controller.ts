@@ -2,7 +2,7 @@ import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { and, eq } from 'drizzle-orm';
 import { todayInTimezone } from '@planner/shared';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { DB, type Database } from '../../db/db.module.js';
 import { calendarEvents, calendars, users } from '../../db/schema.js';
 import { FocusService } from '../focus/focus.service.js';
@@ -16,7 +16,7 @@ import { TouchesService } from '../touches/touches.service.js';
  * карта касаний и закреплённые книги. Экономит десяток round-trip.
  */
 @ApiTags('dashboard')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/dashboard')
 export class DashboardController {
   constructor(

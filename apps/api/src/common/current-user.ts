@@ -1,11 +1,14 @@
 import {
   createParamDecorator,
   type ExecutionContext,
+  Inject,
   Injectable,
   type CanActivate,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { env, isDevAuthEnabled } from '../config/env.js';
+import { AuthService } from '../modules/auth/auth.service.js';
+import { readSessionToken } from '../modules/auth/auth.controller.js';
 import { ApiException } from './api-error.js';
 
 export interface AuthenticatedRequest extends Request {
@@ -25,18 +28,16 @@ export function authConfigFromEnv(): AuthConfig {
 }
 
 /**
- * Кто выполняет запрос.
+ * Кто выполняет запрос, когда настоящей сессии нет.
  *
  * Заголовок x-user-id — инструмент разработки: он позволяет проверять
- * многопользовательские сценарии, не поднимая настоящий auth. Доверять ему
+ * многопользовательские сценарии, не поднимая настоящий вход. Доверять ему
  * можно ТОЛЬКО при включённой dev-авторизации, иначе кто угодно представится
- * кем угодно. Вне dev-режима — 401 и ожидание настоящего провайдера.
+ * кем угодно.
  */
 export function resolveUserId(header: string | undefined, config: AuthConfig): string {
   if (!config.devAuth) {
-    throw ApiException.unauthorized(
-      'Авторизация не настроена. Включите DEV_AUTH для локальной разработки или подключите реальный провайдер.',
-    );
+    throw ApiException.unauthorized('Нужно войти в аккаунт.');
   }
   if (header === undefined) return config.devUserId;
   if (!UUID_RE.test(header)) {
@@ -46,20 +47,28 @@ export function resolveUserId(header: string | undefined, config: AuthConfig): s
 }
 
 /**
- * DEVELOPMENT-ONLY. Подставляет пользователя без настоящей авторизации.
+ * Основной гвард: сначала настоящая сессия из куки, затем — dev-режим.
  *
- * Конструктора у гварда нет намеренно. Nest создаёт гвард через контейнер
- * внедрения; при сборке через tsc включён emitDecoratorMetadata, и любой
- * параметр конструктора попадает в design:paramtypes. Интерфейс в метаданных
- * вырождается в Object, Nest ищет провайдер Object, не находит и роняет
- * приложение на старте. В dev через tsx этого не видно — esbuild метаданные
- * не эмитит, — поэтому решение принимает чистая функция resolveUserId,
- * которую можно проверить тестом без всякого Nest.
+ * Параметры конструктора помечены явным @Inject. Без этого tsc записал бы в
+ * design:paramtypes тип, который Nest попытался бы найти как провайдер, и
+ * собранное приложение упало бы на старте.
  */
 @Injectable()
-export class DevAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+export class AuthGuard implements CanActivate {
+  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
+
+    const token = readSessionToken(req);
+    if (token) {
+      const userId = await this.auth.resolveSession(token);
+      if (userId) {
+        req.userId = userId;
+        return true;
+      }
+    }
+
     req.userId = resolveUserId(req.header('x-user-id'), authConfigFromEnv());
     return true;
   }

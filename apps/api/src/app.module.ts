@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DbModule } from './db/db.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 import { DirectionsModule } from './modules/directions/directions.module.js';
 import { ProjectsModule } from './modules/projects/projects.module.js';
 import { TasksModule } from './modules/tasks/tasks.module.js';
@@ -19,6 +20,7 @@ import { TelegramModule } from './modules/telegram/telegram.module.js';
   imports: [
     ScheduleModule.forRoot(),
     DbModule,
+    AuthModule,
     DirectionsModule,
     ProjectsModule,
     TasksModule,

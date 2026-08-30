@@ -85,6 +85,8 @@ function withQuery(path: string, query?: Query): string {
 async function call<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
   const res = await fetch(`${BASE}${withQuery(path, query)}`, {
     method,
+    // сессия живёт в httpOnly-куке, поэтому запросы должны её нести
+    credentials: 'include',
     headers: {
       ...authHeaders(),
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
@@ -135,7 +137,21 @@ export interface DashboardData {
   heatmap: Heatmap;
 }
 
+export interface AuthStatus {
+  authenticated: boolean;
+  googleConfigured: boolean;
+  devAuth: boolean;
+}
+
 export const api = {
+  auth: {
+    status: () => get<AuthStatus>('/api/auth/status'),
+    /** Переход на Google — обычная навигация, не fetch. */
+    loginUrl: (redirectTo?: string) =>
+      `${BASE}/api/auth/google${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
+    logout: () => post<{ ok: true }>('/api/auth/logout'),
+  },
+
   dashboard: () => get<DashboardData>('/api/dashboard'),
 
   me: () => get<User>('/api/me'),

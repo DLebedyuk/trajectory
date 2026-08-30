@@ -5,6 +5,7 @@ export const userSchema = z.object({
   id: uuid,
   email: z.string().email(),
   displayName: z.string().min(1).max(120),
+  avatarUrl: z.string().nullable().default(null),
   timezone: z.string().min(1),
   locale: z.string().min(2).max(10),
   createdAt: z.string().datetime(),

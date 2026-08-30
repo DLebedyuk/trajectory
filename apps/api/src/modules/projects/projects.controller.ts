@@ -11,13 +11,13 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createProjectSchema, updateProjectSchema } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { ProjectsService } from './projects.service.js';
 import { ApiException } from '../../common/api-error.js';
 
 @ApiTags('projects')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/projects')
 export class ProjectsController {
   constructor(@Inject(ProjectsService) private readonly service: ProjectsService) {}

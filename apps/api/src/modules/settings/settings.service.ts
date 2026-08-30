@@ -17,6 +17,7 @@ export class SettingsService {
       id: row.id,
       email: row.email,
       displayName: row.displayName,
+      avatarUrl: row.avatarUrl,
       timezone: row.timezone,
       locale: row.locale,
       createdAt: isoRequired(row.createdAt),

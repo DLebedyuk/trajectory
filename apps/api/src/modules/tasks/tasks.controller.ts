@@ -19,14 +19,14 @@ import {
   updateChecklistItemSchema,
   updateTaskSchema,
 } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { TasksService } from './tasks.service.js';
 import { FocusService } from '../focus/focus.service.js';
 import { ApiException } from '../../common/api-error.js';
 
 @ApiTags('tasks')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/tasks')
 export class TasksController {
   constructor(

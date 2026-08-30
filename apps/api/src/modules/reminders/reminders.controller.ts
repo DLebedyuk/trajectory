@@ -16,12 +16,12 @@ import {
   snoozeReminderSchema,
   updateReminderSchema,
 } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { RemindersService } from './reminders.service.js';
 
 @ApiTags('reminders')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/reminders')
 export class RemindersController {
   constructor(@Inject(RemindersService) private readonly service: RemindersService) {}

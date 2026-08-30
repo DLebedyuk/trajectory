@@ -11,12 +11,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createTouchSchema, touchQuerySchema } from '@planner/contracts';
-import { CurrentUser, DevAuthGuard } from '../../common/current-user.js';
+import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { TouchesService } from './touches.service.js';
 
 @ApiTags('touches')
-@UseGuards(DevAuthGuard)
+@UseGuards(AuthGuard)
 @Controller('api/touches')
 export class TouchesController {
   constructor(@Inject(TouchesService) private readonly service: TouchesService) {}

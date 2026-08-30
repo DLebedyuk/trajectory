@@ -18,11 +18,15 @@ const devOff = { devAuth: false, devUserId: DEV_USER };
 interface FakeRequest {
   userId?: string;
   header(name: string): string | undefined;
+  headers: Record<string, string>;
 }
 
 /** Минимальный ExecutionContext: гвард читает только http-запрос. */
 function contextWith(headers: Record<string, string>): { ctx: unknown; req: FakeRequest } {
-  const req: FakeRequest = { header: (name: string) => headers[name.toLowerCase()] };
+  const req: FakeRequest = {
+    header: (name: string) => headers[name.toLowerCase()],
+    headers,
+  };
   return { ctx: { switchToHttp: () => ({ getRequest: () => req }) }, req };
 }
 
@@ -48,21 +52,31 @@ describe('заголовок x-user-id — только для разработ�
   });
 });
 
-describe('DevAuthGuard', () => {
-  it('кладёт пользователя из заголовка в запрос', () => {
-    const guard = new mod.DevAuthGuard();
+describe('AuthGuard', () => {
+  const noSessions = { resolveSession: async () => null } as never;
+
+  it('без сессии в dev-режиме подставляет пользователя из заголовка', async () => {
+    const guard = new mod.AuthGuard(noSessions);
     const { ctx, req } = contextWith({ 'x-user-id': TEST_USER_ID });
-    expect(guard.canActivate(ctx as never)).toBe(true);
+    expect(await guard.canActivate(ctx as never)).toBe(true);
     expect(req.userId).toBe(TEST_USER_ID);
   });
 
-  /**
-   * Гвард не должен иметь параметров конструктора: Nest создаёт его через
-   * контейнер внедрения, и в собранном через tsc коде параметр-интерфейс
-   * превращается в Object, которого в контейнере нет. В dev через tsx это
-   * незаметно, а собранное приложение падает на старте.
-   */
-  it('не имеет параметров конструктора — иначе Nest не соберёт зависимости', () => {
-    expect(mod.DevAuthGuard.length).toBe(0);
+  it('настоящая сессия важнее dev-режима и заголовка', async () => {
+    const sessionUser = '00000000-0000-4000-8000-0000000000aa';
+    const withSession = { resolveSession: async () => sessionUser } as never;
+    const guard = new mod.AuthGuard(withSession);
+    const { ctx, req } = contextWith({
+      'x-user-id': TEST_USER_ID,
+      cookie: `traektoria_session=abc`,
+    });
+    expect(await guard.canActivate(ctx as never)).toBe(true);
+    expect(req.userId).toBe(sessionUser);
+  });
+
+  it('протухшая кука не пускает мимо проверки заголовка', async () => {
+    const guard = new mod.AuthGuard(noSessions);
+    const { ctx } = contextWith({ 'x-user-id': 'admin', cookie: 'traektoria_session=stale' });
+    await expect(guard.canActivate(ctx as never)).rejects.toThrow();
   });
 });
