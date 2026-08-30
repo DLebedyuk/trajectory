@@ -11,7 +11,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // autoUpdate, а не prompt: интерфейса «доступна новая версия» у нас нет,
+      // поэтому при prompt новый service worker вставал в очередь и навсегда
+      // оставался ждать, а браузер продолжал отдавать старую сборку из кеша.
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'offline.html'],
       manifest: {
         name: 'Траектория',
@@ -29,6 +32,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // новая сборка заменяет старую сразу, не дожидаясь закрытия всех вкладок
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/, /^\/docs/, /^\/health/, /^\/ready/],

@@ -246,6 +246,13 @@ TELEGRAM_BOT_TOKEN=... TELEGRAM_MODE=polling pnpm dev:api
 
 ## PWA
 
+Service worker обновляется сам (`registerType: 'autoUpdate'`, `skipWaiting`,
+`clientsClaim`): новая сборка вытесняет старую при следующей загрузке. Раньше
+стоял режим `prompt`, а интерфейса «доступна новая версия» в приложении нет —
+из-за этого браузер мог бесконечно отдавать старую сборку из кеша, даже когда
+контейнер уже пересобран. Если такое всё же случилось, помогает
+Ctrl+Shift+R или DevTools → Application → Service Workers → Unregister.
+
 Сборка `pnpm --filter @planner/web build` генерирует манифест и service worker.
 Кешируется только оболочка приложения; запросы к `/api` идут по стратегии `NetworkOnly` —
 показывать вчерашний дедлайн как сегодняшний опаснее, чем показать ошибку сети.
