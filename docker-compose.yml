@@ -24,19 +24,44 @@ services:
     environment:
       DATABASE_URL: postgres://planner:planner@postgres:5432/planner
       PORT: '3000'
-      # ВНИМАНИЕ: это локальный демо-стенд, а не боевой запуск.
-      # Настоящей авторизации в проекте пока нет, поэтому сборка поднимается
-      # в dev-режиме: любой запрос выполняется от seed-пользователя.
-      # Для боевого запуска нужно подключить auth-провайдер, поставить
-      # NODE_ENV=production и DEV_AUTH=false — иначе API ответит 401 на всё.
-      NODE_ENV: development
+
+      # Стенд целиком отдаётся на :8080 через Caddy, поэтому и возврат из Google
+      # приходит сюда же. Значения из .env для :3000/:5173 — это для `pnpm dev`,
+      # здесь они намеренно перекрыты.
       WEB_ORIGIN: http://localhost:8080
-      DEV_AUTH: 'true'
+      APP_BASE_URL: http://localhost:8080
+      GOOGLE_AUTH_REDIRECT_URI: http://localhost:8080/api/auth/google/callback
+      GOOGLE_CALENDAR_REDIRECT_URI: http://localhost:8080/api/calendar/google/callback
+
+      # NODE_ENV намеренно development: в production кука сессии получает флаг
+      # Secure и по http://localhost браузер её просто выбросит. Настоящий вход
+      # через Google включается не этим, а DEV_AUTH=false.
+      NODE_ENV: development
+      DEV_AUTH: ${DEV_AUTH:-true}
       DEV_USER_ID: ${DEV_USER_ID:-00000000-0000-4000-8000-000000000001}
+
+      # Секреты берутся из .env рядом с docker-compose.yml и в образ не попадают.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-20000}
+
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Moscow}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_MODE: ${TELEGRAM_MODE:-off}
       TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+
+      # Миграции применяются при каждом старте; демо-данные — только по просьбе.
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_SEED: ${RUN_SEED:-false}
     depends_on:
       postgres:
         condition: service_healthy
