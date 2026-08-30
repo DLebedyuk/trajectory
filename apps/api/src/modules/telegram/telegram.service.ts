@@ -10,9 +10,10 @@ import { eq } from 'drizzle-orm';
 import { parseRelativePhrase, formatLongDate, todayInTimezone } from '@planner/shared';
 import { DB, type Database } from '../../db/db.module.js';
 import { telegramAccounts, users } from '../../db/schema.js';
-import { env } from '../../config/env.js';
+import { env, isDevAuthEnabled } from '../../config/env.js';
 import { EVENING_TIME, RemindersService } from '../reminders/reminders.service.js';
 import { InboxService } from '../inbox/inbox.service.js';
+import { TelegramLinkService } from './telegram-link.service.js';
 import { NotificationRouter } from '../reminders/providers/notification.router.js';
 import type {
   NotificationProvider,
@@ -67,6 +68,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     @Inject(RemindersService) private readonly reminders: RemindersService,
     @Inject(InboxService) private readonly inbox: InboxService,
     @Inject(NotificationRouter) private readonly router: NotificationRouter,
+    @Inject(TelegramLinkService) private readonly link: TelegramLinkService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -124,15 +126,21 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     });
   }
 
-  private async resolveUser(telegramUserId: string, chatId: string): Promise<string | null> {
+  private async resolveUser(telegramUserId: string): Promise<string | null> {
     const [existing] = await this.db
       .select()
       .from(telegramAccounts)
       .where(eq(telegramAccounts.telegramUserId, telegramUserId));
-    if (existing) return existing.userId;
+    return existing?.userId ?? null;
+  }
 
-    // DEVELOPMENT: первый написавший связывается с seed-пользователем.
-    if (env.NODE_ENV === 'production') return null;
+  /**
+   * DEVELOPMENT-ONLY: связать первого написавшего с seed-пользователем.
+   * Привязано к dev-режиму авторизации, а не к NODE_ENV, чтобы случайно
+   * не включиться там, где настроен настоящий вход.
+   */
+  private async devAutoLink(telegramUserId: string, chatId: string): Promise<string | null> {
+    if (!isDevAuthEnabled) return null;
     const [user] = await this.db.select().from(users).where(eq(users.id, env.DEV_USER_ID));
     if (!user) return null;
     await this.db
@@ -297,16 +305,43 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     };
 
     bot.command('start', async (ctx) => {
-      const userId = await this.resolveUser(String(ctx.from?.id), String(ctx.chat.id));
+      const telegramUserId = String(ctx.from?.id);
+      const chatId = String(ctx.chat.id);
+      const payload = (ctx.match ?? '').toString().trim();
+
+      if (payload) {
+        try {
+          await this.link.redeemCode(payload, {
+            telegramUserId,
+            chatId,
+            username: ctx.from?.username ?? null,
+          });
+          await ctx.reply(
+            'Аккаунт связан. Пиши что угодно — мысль попадёт во «Входящие», ' +
+              'а «напомни…» станет напоминанием.',
+          );
+        } catch {
+          await ctx.reply(
+            'Код не подошёл: он уже использован или устарел. ' +
+              'Открой «Настройки» в «Траектории» и получи новый.',
+          );
+        }
+        return;
+      }
+
+      const known =
+        (await this.resolveUser(telegramUserId)) ??
+        (await this.devAutoLink(telegramUserId, chatId));
       await ctx.reply(
-        userId
+        known
           ? 'Привет. Пиши что угодно — мысль попадёт во «Входящие», а «напомни…» станет напоминанием.'
-          : 'Аккаунт не связан. В production нужна авторизация через приложение.',
+          : 'Этот чат ещё не связан с аккаунтом. Открой «Настройки» в «Траектории», ' +
+              'нажми «Подключить Telegram» и пришли сюда полученный код.',
       );
     });
 
     bot.command('cancel', async (ctx) => {
-      const userId = await this.resolveUser(String(ctx.from?.id), String(ctx.chat.id));
+      const userId = await this.resolveUser(String(ctx.from?.id));
       if (!userId) return;
       const last = await this.reminders.lastCreated(userId);
       if (!last) {
@@ -319,7 +354,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
 
     bot.on('callback_query:data', async (ctx) => {
       const chatId = String(ctx.chat?.id ?? '');
-      const userId = await this.resolveUser(String(ctx.from.id), chatId);
+      const userId = await this.resolveUser(String(ctx.from.id));
       if (!userId) return;
       const today = todayInTimezone(await this.timezoneOf(userId));
       const result = await this.handleAction(userId, chatId, ctx.callbackQuery.data ?? '', today);
@@ -329,9 +364,14 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
 
     bot.on('message:text', async (ctx) => {
       const chatId = String(ctx.chat.id);
-      const userId = await this.resolveUser(String(ctx.from?.id), chatId);
+      const userId =
+        (await this.resolveUser(String(ctx.from?.id))) ??
+        (await this.devAutoLink(String(ctx.from?.id), chatId));
       if (!userId) {
-        await ctx.reply('Аккаунт не связан.');
+        await ctx.reply(
+          'Этот чат не связан с аккаунтом. Открой «Настройки» в «Траектории», ' +
+            'нажми «Подключить Telegram» и пришли сюда код.',
+        );
         return;
       }
       const today = todayInTimezone(await this.timezoneOf(userId));

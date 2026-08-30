@@ -103,8 +103,30 @@ export const telegramAccounts = pgTable('telegram_accounts', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   chatId: varchar('chat_id', { length: 40 }).notNull(),
+  /** Как подписан в Telegram — чтобы в настройках было видно, что подключено. */
+  telegramUsername: varchar('telegram_username', { length: 64 }),
   createdAt: now(),
 });
+
+/**
+ * Одноразовый код связывания. Пользователь получает его в приложении и
+ * отправляет боту: так аккаунт Telegram привязывается именно к тому, кто
+ * нажал кнопку, а не к первому написавшему.
+ */
+export const telegramLinkCodes = pgTable(
+  'telegram_link_codes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    code: varchar('code', { length: 32 }).notNull(),
+    createdAt: now(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+  },
+  (t) => ({ byCode: uniqueIndex('telegram_link_codes_code_idx').on(t.code) }),
+);
 
 export const directions = pgTable(
   'directions',

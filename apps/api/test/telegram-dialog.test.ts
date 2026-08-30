@@ -38,7 +38,14 @@ function makeService() {
   };
   const inbox = { create: inboxCreate };
   const router = { register: vi.fn() };
-  return new TelegramService({} as never, reminders as never, inbox as never, router as never);
+  const link = { redeemCode: vi.fn(), status: vi.fn(), issueCode: vi.fn(), disconnect: vi.fn() };
+  return new TelegramService(
+    {} as never,
+    reminders as never,
+    inbox as never,
+    router as never,
+    link as never,
+  );
 }
 
 /**

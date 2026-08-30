@@ -9,6 +9,8 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),
   TELEGRAM_MODE: z.enum(['polling', 'webhook', 'off']).default('polling'),
   TELEGRAM_WEBHOOK_URL: z.string().optional().default(''),
+  /** Имя бота без @ — нужно для deep link «открыть бота с кодом». */
+  TELEGRAM_BOT_USERNAME: z.string().optional().default(''),
   DEV_USER_ID: z.string().uuid().default('00000000-0000-4000-8000-000000000001'),
   DEV_AUTH: z
     .string()

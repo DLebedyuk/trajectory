@@ -24,7 +24,8 @@ let server: ReturnType<INestApplication['getHttpServer']>;
 
 /** Заглушка Google: сценарий проверяется целиком, но без сети. */
 const fakeGoogle = {
-  authorizeUrl: ({ state }: { state: string }) => `https://accounts.google.test/auth?state=${state}`,
+  authorizeUrl: ({ state }: { state: string }) =>
+    `https://accounts.google.test/auth?state=${state}`,
   exchangeCode: async () => ({
     accessToken: 'access',
     refreshToken: null,
@@ -57,9 +58,15 @@ afterAll(async () => {
 });
 
 /** Проходит вход целиком и возвращает куку сессии. */
+function stateFrom(location: string): string {
+  const state = new URL(location).searchParams.get('state');
+  if (!state) throw new Error('в редиректе нет state');
+  return state;
+}
+
 async function login(): Promise<string> {
   const start = await request(server).get('/api/auth/google');
-  const state = new URL(start.headers.location).searchParams.get('state');
+  const state = stateFrom(start.headers.location as string);
   const cb = await request(server).get(`/api/auth/google/callback?code=abc&state=${state}`);
   const cookie = cb.headers['set-cookie']?.[0];
   if (!cookie) throw new Error('сервер не выдал куку сессии');
@@ -83,7 +90,7 @@ describe('вход через Google', () => {
     const res = await request(server).get('/api/auth/google');
     expect(res.status).toBe(302);
     expect(res.headers.location).toContain('accounts.google.test');
-    expect(new URL(res.headers.location).searchParams.get('state')).toBeTruthy();
+    expect(stateFrom(res.headers.location as string)).toBeTruthy();
   });
 
   it('после возврата от Google выдаётся сессия и появляется свой пользователь', async () => {
@@ -97,7 +104,7 @@ describe('вход через Google', () => {
 
   it('кука httpOnly и не уходит на чужие сайты', async () => {
     const start = await request(server).get('/api/auth/google');
-    const state = new URL(start.headers.location).searchParams.get('state');
+    const state = stateFrom(start.headers.location as string);
     const cb = await request(server).get(`/api/auth/google/callback?code=abc&state=${state}`);
     const raw = cb.headers['set-cookie']?.[0] ?? '';
     expect(raw).toContain('HttpOnly');
@@ -106,7 +113,7 @@ describe('вход через Google', () => {
 
   it('повторно использовать state нельзя', async () => {
     const start = await request(server).get('/api/auth/google');
-    const state = new URL(start.headers.location).searchParams.get('state');
+    const state = stateFrom(start.headers.location as string);
     const first = await request(server).get(`/api/auth/google/callback?code=abc&state=${state}`);
     expect(first.status).toBe(302);
 

@@ -137,6 +137,19 @@ export interface DashboardData {
   heatmap: Heatmap;
 }
 
+export interface TelegramStatus {
+  connected: boolean;
+  username: string | null;
+  connectedAt: string | null;
+  botUsername: string | null;
+}
+
+export interface TelegramLinkCode {
+  code: string;
+  expiresAt: string;
+  deepLink: string | null;
+}
+
 export interface AuthStatus {
   authenticated: boolean;
   googleConfigured: boolean;
@@ -150,6 +163,12 @@ export const api = {
     loginUrl: (redirectTo?: string) =>
       `${BASE}/api/auth/google${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
     logout: () => post<{ ok: true }>('/api/auth/logout'),
+  },
+
+  telegram: {
+    status: () => get<TelegramStatus>('/api/telegram/status'),
+    issueCode: () => post<TelegramLinkCode>('/api/telegram/link-code'),
+    disconnect: () => post<{ ok: true }>('/api/telegram/disconnect'),
   },
 
   dashboard: () => get<DashboardData>('/api/dashboard'),

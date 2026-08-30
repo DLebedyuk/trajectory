@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, PageHeader, useToast } from '@planner/ui';
 import { api } from '../api/client.js';
+import { TelegramCard } from '../features/TelegramCard.js';
 import { qk, useSettings } from '../api/queries.js';
 import { applyTheme, useUiStore } from '../store/ui.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
@@ -165,22 +166,7 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 style={{ fontSize: 17, marginBottom: 10 }}>Telegram</h3>
-          <div className="setrow">
-            <div className="setrow-main">
-              <b>Бот</b>
-              <small>
-                {s.telegramLinked
-                  ? 'Аккаунт связан. Пиши боту «напомни завтра…» — напоминание создастся само.'
-                  : 'Аккаунт не связан. Задай TELEGRAM_BOT_TOKEN в .env и напиши боту /start.'}
-              </small>
-            </div>
-            <span className="tag" style={{ color: s.telegramLinked ? 'var(--good)' : undefined }}>
-              {s.telegramLinked ? 'подключён' : 'не подключён'}
-            </span>
-          </div>
-        </div>
+        <TelegramCard />
 
         <div className="card">
           <h3 style={{ fontSize: 17, marginBottom: 10 }}>Интеграции</h3>

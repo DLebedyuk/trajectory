@@ -787,6 +787,24 @@ main.content {
   color: var(--text-2);
 }
 
+/* --- код связывания Telegram --- */
+.linkcode {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.linkcode-value {
+  font-size: 26px;
+  letter-spacing: 0.16em;
+  margin-top: 6px;
+}
+.linkcode code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+}
+
 /* --- экран входа --- */
 .login {
   min-height: 100vh;
