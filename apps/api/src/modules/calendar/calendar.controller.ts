@@ -15,6 +15,7 @@ import type { Response } from 'express';
 import { env, isGoogleAuthConfigured } from '../../config/env.js';
 import { ApiException } from '../../common/api-error.js';
 import { isEncryptionConfigured } from '../../common/crypto.js';
+import { safeRedirect } from '../../common/safe-redirect.js';
 import { AuthGuard, CurrentUser } from '../../common/current-user.js';
 import { AuthService } from '../auth/auth.service.js';
 import { CALENDAR_SCOPES, GOOGLE_OAUTH, type GoogleOAuthClient } from '../auth/google-oauth.js';
@@ -130,6 +131,6 @@ export class CalendarCallbackController {
         `Первая синхронизация после подключения не удалась: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
-    res.redirect(stateRow.redirectTo ?? `${env.APP_BASE_URL}/settings?calendar=connected`);
+    res.redirect(safeRedirect(stateRow.redirectTo, '/settings?calendar=connected'));
   }
 }

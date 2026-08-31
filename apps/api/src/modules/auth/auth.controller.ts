@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { env, isDevAuthEnabled, isGoogleAuthConfigured } from '../../config/env.js';
 import { ApiException } from '../../common/api-error.js';
+import { safeRedirect } from '../../common/safe-redirect.js';
 import { AuthService, SESSION_COOKIE } from './auth.service.js';
 import { GOOGLE_OAUTH, LOGIN_SCOPES, type GoogleOAuthClient } from './google-oauth.js';
 
@@ -62,7 +63,8 @@ export class AuthController {
         'Вход через Google не настроен: не заданы GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET.',
       );
     }
-    const state = await this.auth.createState('login', undefined, redirectTo);
+    // проверяем на входе, чтобы в базу не попал чужой адрес
+    const state = await this.auth.createState('login', undefined, safeRedirect(redirectTo));
     res.redirect(
       this.google.authorizeUrl({
         state,
@@ -94,7 +96,8 @@ export class AuthController {
     await this.auth.purgeExpired();
 
     res.setHeader('Set-Cookie', sessionCookie(token, ttlMs));
-    res.redirect(stateRow.redirectTo ?? env.APP_BASE_URL);
+    // и на выходе тоже: строка в базе могла появиться до этой проверки
+    res.redirect(safeRedirect(stateRow.redirectTo));
   }
 
   @Post('logout')
