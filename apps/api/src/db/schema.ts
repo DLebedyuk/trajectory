@@ -367,6 +367,8 @@ export const mediaItems = pgTable(
     comment: text('comment'),
     link: varchar('link', { length: 500 }),
     startedAt: date('started_at'),
+    /** want | doing | done — «хочу», «в процессе», «закончила». */
+    status: varchar('status', { length: 10 }).notNull().default('want'),
     rating: smallint('rating').notNull().default(0),
     createdAt: now(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

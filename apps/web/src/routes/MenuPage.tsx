@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, EmptyState, FormField, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
+import {
+  Button,
+  EmptyState,
+  FormField,
+  IconPlus,
+  IconTrash,
+  Modal,
+  PageHeader,
+  useToast,
+} from '@planner/ui';
 import { MENU_DEFAULTS, MENU_LABELS } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { useMenu } from '../api/queries.js';
@@ -87,8 +96,8 @@ export function MenuPage() {
           <button
             key={value}
             type="button"
-            className="chip"
-            data-on={filter[key] === value}
+            className={`chip${filter[key] === value ? ' is-active' : ''}`}
+            aria-pressed={filter[key] === value}
             onClick={() => setF(key, value)}
           >
             {label}
@@ -126,42 +135,53 @@ export function MenuPage() {
           action={<Button onClick={() => setOpen(true)}>Добавить возможность</Button>}
         />
       ) : (
-        <div className="grid">
+        <div className="menu-ideas">
           {(menu.data ?? []).map((m) => (
-            <div className="mcard" key={m.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                <h4 style={{ fontSize: 15, lineHeight: 1.3 }}>{m.title}</h4>
-                {m.tried ? <span className="tag">пробовала</span> : null}
+            <div className={`menu-idea${m.tried ? ' is-tried' : ''}`} key={m.id}>
+              <div className="top">
+                <span className="cat">{m.category}</span>
               </div>
+              <div className="ttl">{m.title}</div>
               {m.comment ? <p className="hint">{m.comment}</p> : null}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto' }}>
-                <span className="tag">{m.category}</span>
-                <span className="tag">{ENERGY[m.energy]}</span>
-                <span className="tag">{TIME[m.estimatedTime]}</span>
-                <span className="tag">{COST[m.cost]}</span>
-                <span className="tag">{PLACE[m.place]}</span>
-                <span className="tag">{COMPANY[m.company]}</span>
+              <div className="params">
+                <span className="p">
+                  <span className="lbl">Энергия</span>
+                  {ENERGY[m.energy]}
+                </span>
+                <span className="p">
+                  <span className="lbl">Время</span>
+                  {TIME[m.estimatedTime]}
+                </span>
+                <span className="p">
+                  <span className="lbl">Стоимость</span>
+                  {COST[m.cost]}
+                </span>
+                <span className="p">
+                  <span className="lbl">Место</span>
+                  {PLACE[m.place]}
+                </span>
+                <span className="p">
+                  <span className="lbl">Компания</span>
+                  {COMPANY[m.company]}
+                </span>
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  marginTop: 9,
-                  paddingTop: 10,
-                  borderTop: '1px solid var(--line)',
-                }}
-              >
+              <div className="actions">
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant={m.tried ? 'ghost' : undefined}
                   onClick={() => toggleTried.mutate({ id: m.id, tried: m.tried })}
                 >
                   {m.tried ? 'Убрать отметку' : 'Попробовала'}
                 </Button>
-                <Button size="sm" variant="ghost" danger onClick={() => remove.mutate(m.id)}>
-                  Удалить
-                </Button>
+                <button
+                  type="button"
+                  className="row-del"
+                  aria-label={`Удалить из меню: ${m.title}`}
+                  title="Удалить"
+                  onClick={() => remove.mutate(m.id)}
+                >
+                  <IconTrash />
+                </button>
               </div>
             </div>
           ))}

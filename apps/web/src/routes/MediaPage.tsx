@@ -13,6 +13,7 @@ import {
   useToast,
 } from '@planner/ui';
 import type { MediaItem } from '@planner/contracts';
+import { MEDIA_STATUS_LABELS, mediaStatus } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { qk, useMedia, useMediaCategories } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
@@ -20,13 +21,27 @@ import { ErrorBox, Loading } from '../components/Loading.js';
 const KIND_LABEL: Record<string, string> = { book: 'Книги', film: 'Фильмы', series: 'Сериалы' };
 
 /** Полка без статусов: только категории и закрепление. Закреплять можно несколько. */
+/** Вкладки полки: подписи зависят от вида, значения — общие. */
+const STATUS_TABS = [
+  { value: null, book: 'Всё', film: 'Всё' },
+  { value: 'want' as const, book: 'Хочу прочитать', film: 'Хочу посмотреть' },
+  { value: 'doing' as const, book: 'Читаю', film: 'Смотрю' },
+  { value: 'done' as const, book: 'Прочитано', film: 'Просмотрено' },
+];
+
+const STATUS_CLASS: Record<'want' | 'doing' | 'done', string> = {
+  want: 'want',
+  doing: 'now',
+  done: 'done',
+};
+
 export function MediaPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const [tab, setTab] = useState<'book' | 'film'>('book');
   const [category, setCategory] = useState<string>('all');
-  const [justPinned, setJustPinned] = useState<string | null>(null);
+  const [statusTab, setStatusTab] = useState<'want' | 'doing' | 'done' | null>(null);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
@@ -37,14 +52,22 @@ export function MediaPage() {
   const media = useMedia();
   const categories = useMediaCategories();
 
+  const setStatus = useMutation({
+    mutationFn: (v: { id: string; status: 'want' | 'doing' | 'done' }) =>
+      api.media.update(v.id, { status: v.status }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['media'] });
+      void qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+    onError: () => toast.show('Не удалось поменять статус'),
+  });
+
   const togglePin = useMutation({
     mutationFn: (m: MediaItem) => (m.pinned ? api.media.unpin(m.id) : api.media.pin(m.id)),
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ['media'] });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
-      setJustPinned(data.pinned ? data.id : null);
       toast.show(data.pinned ? 'Теперь перед глазами' : 'Откреплено');
-      setTimeout(() => setJustPinned(null), 500);
     },
   });
 
@@ -55,6 +78,7 @@ export function MediaPage() {
         title,
         authorOrDirector: author || null,
         categoryId: categoryId || null,
+        status: 'want',
         coverEmoji: emoji,
         pinned: false,
         rating: 0,
@@ -74,42 +98,64 @@ export function MediaPage() {
   const all = (media.data ?? []).filter((m) =>
     tab === 'book' ? m.kind === 'book' : m.kind !== 'book',
   );
-  const pinned = all.filter((m) => m.pinned);
-  const rest = all.filter((m) => !m.pinned && (category === 'all' || m.categoryId === category));
+  const shelf = all.filter(
+    (m) =>
+      (statusTab === null || m.status === statusTab) &&
+      (category === 'all' || m.categoryId === category),
+  );
   const usedCategories = (categories.data ?? []).filter((c) =>
     all.some((m) => m.categoryId === c.id),
   );
 
-  const card = (m: MediaItem, animate: boolean) => (
-    <div className={animate ? 'mitem flyin' : 'mitem'} key={m.id}>
-      <div style={{ position: 'relative' }}>
+  const card = (m: MediaItem) => (
+    <div className="media-card" key={m.id}>
+      <button
+        type="button"
+        className="cover"
+        style={{ ['--c' as string]: `var(${m.kind === 'book' ? '--d-eng' : '--d-vocal'})` }}
+        onClick={() => navigate(`/media/${m.id}`)}
+        aria-label={`Открыть «${m.title}»`}
+      >
+        {/* буква вместо эмодзи: эмодзи в каждой системе выглядит по-своему */}
+        {m.title.charAt(0)}
+      </button>
+
+      <div className="top-row">
+        <span className={`status-badge ${STATUS_CLASS[m.status]}`}>
+          {MEDIA_STATUS_LABELS[m.kind][m.status]}
+        </span>
         <button
           type="button"
-          className="cover"
-          style={{
-            background: `linear-gradient(155deg, color-mix(in srgb, var(--d-eng) 30%, transparent), color-mix(in srgb, var(--d-act) 14%, transparent))`,
-          }}
-          onClick={() => navigate(`/media/${m.id}`)}
-          aria-label={`Открыть «${m.title}»`}
-        >
-          <span className="em">{m.coverEmoji ?? '📘'}</span>
-        </button>
-        <button
-          type="button"
-          className="pinfab"
-          data-on={m.pinned}
+          className={`pin${m.pinned ? ' is-pinned' : ''}`}
           aria-label={m.pinned ? `Открепить «${m.title}»` : `Закрепить «${m.title}»`}
           onClick={() => togglePin.mutate(m)}
         >
           {m.pinned ? <IconPinFilled /> : <IconPin />}
         </button>
       </div>
-      <div>
-        <div className="mtitle">{m.title}</div>
-        <div className="mauthor">{m.authorOrDirector}</div>
-        <div className="quiet" style={{ marginTop: 4 }}>
-          {m.categoryName ?? ''}
-        </div>
+
+      <div className="ttl">{m.title}</div>
+      {m.authorOrDirector ? <div className="author">{m.authorOrDirector}</div> : null}
+
+      <div className="cat-row">
+        {m.categoryName ? <span className="cat">{m.categoryName}</span> : null}
+        {m.rating > 0 ? <span className="rating">{'★'.repeat(m.rating)}</span> : null}
+      </div>
+
+      {/* статус меняется прямо на полке: ради одного переключения незачем
+          открывать карточку */}
+      <div className="chips">
+        {mediaStatus.options.map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={`chip${m.status === value ? ' is-active' : ''}`}
+            aria-pressed={m.status === value}
+            onClick={() => setStatus.mutate({ id: m.id, status: value })}
+          >
+            {MEDIA_STATUS_LABELS[m.kind][value]}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -118,7 +164,7 @@ export function MediaPage() {
     <>
       <PageHeader
         title="Книги и фильмы"
-        subtitle="Полка. Никаких статусов и сроков — только категории и то, что сейчас перед глазами."
+        subtitle="Полка. Сроков нет — только состояние: хочу, в процессе, закончила."
         actions={
           <Button variant="primary" onClick={() => setOpen(true)}>
             <IconPlus />
@@ -185,27 +231,29 @@ export function MediaPage() {
         />
       ) : (
         <>
-          <div style={{ marginBottom: 26 }}>
-            <div className="sec-h">
-              <span className="lbl">{tab === 'book' ? 'Сейчас читаю' : 'Сейчас смотрю'}</span>
-            </div>
-            {pinned.length > 0 ? (
-              <div className="mediagrid mg-pinned">
-                {pinned.map((m) => card(m, justPinned === m.id))}
-              </div>
-            ) : (
-              <p className="hint">
-                Ничего не закреплено. Нажми на булавку на обложке, чтобы держать это перед глазами.
-              </p>
-            )}
+          <div className="media-tabs" role="tablist">
+            {STATUS_TABS.map((t) => {
+              const count = all.filter((m) => (t.value ? m.status === t.value : true)).length;
+              return (
+                <button
+                  key={t.value ?? 'all'}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusTab === t.value}
+                  className={`tab${statusTab === t.value ? ' is-active' : ''}`}
+                  onClick={() => setStatusTab(t.value)}
+                >
+                  {tab === 'book' ? t.book : t.film}
+                  <span className="ct mono">{count}</span>
+                </button>
+              );
+            })}
           </div>
-          <div className="sec-h">
-            <span className="lbl">Вся полка</span>
-          </div>
-          {rest.length > 0 ? (
-            <div className="mediagrid mg-all">{rest.map((m) => card(m, false))}</div>
+
+          {shelf.length > 0 ? (
+            <div className="media-shelf">{shelf.map((m) => card(m))}</div>
           ) : (
-            <p className="hint">В этой категории пусто.</p>
+            <p className="hint">Здесь пока пусто.</p>
           )}
         </>
       )}

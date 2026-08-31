@@ -677,6 +677,7 @@ async function main(): Promise<void> {
       categoryId: catIds['классика'] as string,
       coverEmoji: '📗',
       pinned: true,
+      status: 'doing',
       comment: 'Читаю в оригинале, по главе в день.',
       startedAt: D(-11),
     },
@@ -687,6 +688,7 @@ async function main(): Promise<void> {
       authorOrDirector: 'Константин Станиславский',
       categoryId: catIds['по профессии'] as string,
       coverEmoji: '📕',
+      status: 'want',
     },
     {
       userId: DEV_USER_ID,
@@ -696,6 +698,7 @@ async function main(): Promise<void> {
       categoryId: catIds['научпоп'] as string,
       coverEmoji: '📘',
       pinned: true,
+      status: 'doing',
       comment: 'Застряла на главе про энтропию.',
       startedAt: D(-70),
     },
@@ -708,6 +711,7 @@ async function main(): Promise<void> {
       coverEmoji: '📙',
       rating: 4,
       startedAt: D(-95),
+      status: 'want',
     },
     {
       userId: DEV_USER_ID,
@@ -717,6 +721,7 @@ async function main(): Promise<void> {
       categoryId: catIds['по профессии'] as string,
       coverEmoji: '📗',
       comment: 'Советовали для работы с зажимом.',
+      status: 'want',
     },
     {
       userId: DEV_USER_ID,
@@ -726,6 +731,7 @@ async function main(): Promise<void> {
       categoryId: catIds['драма'] as string,
       coverEmoji: '🎬',
       pinned: true,
+      status: 'doing',
       comment: 'Заодно слушаю акценты.',
       startedAt: D(-20),
     },
@@ -738,6 +744,7 @@ async function main(): Promise<void> {
       coverEmoji: '🎞️',
       rating: 5,
       startedAt: D(-120),
+      status: 'want',
     },
     {
       userId: DEV_USER_ID,
@@ -746,6 +753,7 @@ async function main(): Promise<void> {
       authorOrDirector: 'Дени Вильнёв',
       categoryId: catIds['жвачка для мозгов'] as string,
       coverEmoji: '🎥',
+      status: 'want',
     },
     {
       userId: DEV_USER_ID,
@@ -756,6 +764,7 @@ async function main(): Promise<void> {
       coverEmoji: '📺',
       comment: 'Остановилась на третьем сезоне.',
       startedAt: D(-60),
+      status: 'want',
     },
     {
       userId: DEV_USER_ID,
@@ -765,6 +774,7 @@ async function main(): Promise<void> {
       categoryId: catIds['классика'] as string,
       coverEmoji: '🎬',
       comment: 'Для разбора Шекспира.',
+      status: 'want',
     },
   ]);
 

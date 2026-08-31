@@ -22,6 +22,7 @@ const toItem = (r: Row, categoryName: string | null): MediaItem => ({
   comment: r.comment,
   link: r.link,
   startedAt: dateOnly(r.startedAt),
+  status: (r.status ?? 'want') as MediaItem['status'],
   rating: r.rating,
   createdAt: isoRequired(r.createdAt),
   updatedAt: isoRequired(r.updatedAt),
@@ -79,6 +80,7 @@ export class MediaService {
         comment: input.comment ?? null,
         link: input.link ?? null,
         startedAt: input.startedAt ?? (input.pinned ? new Date().toISOString().slice(0, 10) : null),
+        status: input.status,
         rating: input.rating,
       })
       .returning();
@@ -101,6 +103,7 @@ export class MediaService {
         ...(input.comment !== undefined ? { comment: input.comment ?? null } : {}),
         ...(input.link !== undefined ? { link: input.link ?? null } : {}),
         ...(input.startedAt !== undefined ? { startedAt: input.startedAt ?? null } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.rating !== undefined ? { rating: input.rating } : {}),
         updatedAt: new Date(),
       })

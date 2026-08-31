@@ -2319,3 +2319,52 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ============ МЕНЮ И МЕДИАТЕКА: производные ============ */
+.menu-idea .actions {
+  margin-top: auto;
+  align-items: center;
+  justify-content: space-between;
+}
+.menu-idea {
+  display: flex;
+  flex-direction: column;
+}
+.media-card .cover {
+  border: none;
+}
+.media-card .pin {
+  color: var(--text-3);
+}
+.media-card .pin.is-pinned {
+  color: var(--accent);
+}
+.media-card .chips {
+  margin-top: auto;
+}
+.media-card .chip {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+@media (max-width: 1200px) {
+  .media-shelf {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .menu-ideas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 820px) {
+  .media-shelf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .media-shelf,
+  .menu-ideas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .media-tabs {
+    overflow-x: auto;
+  }
+}

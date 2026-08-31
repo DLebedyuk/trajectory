@@ -9,6 +9,20 @@ export const mediaCategorySchema = z.object({
 });
 export type MediaCategory = z.infer<typeof mediaCategorySchema>;
 
+/**
+ * Сквозной статус для книг, фильмов и сериалов. Значения одни, подписи разные:
+ * книгу читают, фильм смотрят. Отдельные наборы для каждого вида развели бы
+ * одну и ту же модель на две.
+ */
+export const mediaStatus = z.enum(['want', 'doing', 'done']);
+export type MediaStatus = z.infer<typeof mediaStatus>;
+
+export const MEDIA_STATUS_LABELS = {
+  book: { want: 'Хочу прочитать', doing: 'Читаю', done: 'Прочитано' },
+  film: { want: 'Хочу посмотреть', doing: 'Смотрю', done: 'Просмотрено' },
+  series: { want: 'Хочу посмотреть', doing: 'Смотрю', done: 'Просмотрено' },
+} as const;
+
 export const mediaItemSchema = z.object({
   id: uuid,
   userId: uuid,
@@ -24,6 +38,7 @@ export const mediaItemSchema = z.object({
   comment: z.string().max(2000).nullable(),
   link: z.string().max(500).nullable(),
   startedAt: dateOnly.nullable(),
+  status: mediaStatus,
   rating: z.number().int().min(0).max(5),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -41,6 +56,7 @@ export const createMediaItemSchema = z.object({
   comment: z.string().max(2000).nullish(),
   link: z.string().max(500).nullish(),
   startedAt: dateOnly.nullish(),
+  status: mediaStatus.default('want'),
   rating: z.number().int().min(0).max(5).default(0),
 });
 export type CreateMediaItemInput = z.infer<typeof createMediaItemSchema>;
