@@ -1,10 +1,18 @@
 import type { SVGProps } from 'react';
 
+/*
+ * Все иконки приложения — один набор: обводка currentColor, размер задаётся
+ * классом .ic (1em от текущего кегля). Без него svg без width/height
+ * растягивается до размера контейнера — так в панели навигации вырастал
+ * колокольчик.
+ */
 const base = (props: SVGProps<SVGSVGElement>) => ({
   fill: 'none' as const,
   stroke: 'currentColor',
   strokeWidth: 1.5,
+  'aria-hidden': true,
   ...props,
+  className: ['ic', props.className].filter(Boolean).join(' '),
 });
 
 export const IconCheck = (p: SVGProps<SVGSVGElement>) => (
