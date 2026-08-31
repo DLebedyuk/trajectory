@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Checkbox, IconBell, IconCalendar } from '@planner/ui';
+import { IconBell, IconCalendar } from '@planner/ui';
 import { formatLongDate, plural } from '@planner/shared';
 import type { Reminder, TaskWithContext } from '@planner/contracts';
 import type { CalendarEventView } from '../api/client.js';
@@ -13,9 +13,18 @@ export interface TodayBlockProps {
   reminders: Reminder[];
   onCompleteTask: (id: string) => void;
   onCompleteReminder: (id: string) => void;
-  onOpenArchive: () => void;
 }
 
+/** Кружок «выполнить». Событие календаря выполнить нельзя — у него нет кружка. */
+function Check({ label, onDone }: { label: string; onDone: () => void }) {
+  return <button type="button" className="check" aria-label={label} onClick={onDone} />;
+}
+
+/**
+ * «Сегодня» — единственное место, где сходятся события календаря, задачи со
+ * сроком, напоминания с точным временем и без него. Просроченное свёрнуто:
+ * оно должно быть доступно, но не должно давить сверху каждый день.
+ */
 export function TodayBlock({
   events,
   tasks,
@@ -23,7 +32,6 @@ export function TodayBlock({
   reminders,
   onCompleteTask,
   onCompleteReminder,
-  onOpenArchive,
 }: TodayBlockProps) {
   const timed = reminders
     .filter((r) => r.scheduledTime)
@@ -33,91 +41,69 @@ export function TodayBlock({
   const total = events.length + tasks.length + reminders.length;
 
   return (
-    <section className="today" aria-label="Сегодня">
-      <div className="today-h">
-        <div>
-          <div className="lbl">Сегодня</div>
-          <div className="hint" style={{ marginTop: 3 }}>
-            {total > 0
-              ? `${total} ${plural(total, 'пункт', 'пункта', 'пунктов')} — события, сроки и напоминания`
-              : 'Ничего обязательного на сегодня'}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 14 }}>
-          <Link className="quiet-link" to="/reminders">
-            Все напоминания
-          </Link>
-          <button type="button" className="quiet-link" onClick={onOpenArchive}>
-            Архив за 7 дней
-          </button>
-        </div>
-      </div>
+    <section className="card today-block" aria-label="Сегодня">
+      <h4>
+        Сегодня
+        <span className="today-links">
+          <Link to="/reminders">Все напоминания</Link>
+          <Link to="/reminders/archive">Архив за 7 дней</Link>
+        </span>
+      </h4>
 
-      {total === 0 ? (
-        <div style={{ padding: 18, borderTop: '1px solid var(--line)' }}>
-          <p className="hint">
-            Свободный день. Можно взять что-нибудь из фокуса или ничего не брать.
-          </p>
-        </div>
-      ) : null}
+      <p className="hint today-sub">
+        {total > 0
+          ? `${total} ${plural(total, 'пункт', 'пункта', 'пунктов')} — события, сроки и напоминания`
+          : 'Свободный день. Можно взять что-нибудь из фокуса или ничего не брать.'}
+      </p>
 
       {events.map((e) => (
-        <div className="trow" key={e.id}>
-          <span className="ttime">{e.time}</span>
-          <span className="tico">
+        <div className="t-row" key={e.id}>
+          <span className="time mono">{e.time}</span>
+          {/* событие календаря невозможно «выполнить»: оно не наше */}
+          <span className="check event" aria-hidden="true">
             <IconCalendar />
           </span>
-          <span className="tmain">
-            <b>{e.title}</b>
-            <span className="tmeta">
-              {e.calendarName}
-              {e.duration ? ` · ${e.duration}` : ''} · календарь
-            </span>
+          <span className="ttl event">{e.title}</span>
+          <span className="meta">
+            {e.calendarName}
+            {e.duration ? ` · ${e.duration}` : ''} · календарь
           </span>
         </div>
       ))}
 
       {timed.map((r) => (
-        <div className="trow" key={r.id}>
-          <span className="ttime">{r.scheduledTime}</span>
-          <Checkbox
-            checked={false}
-            onChange={() => onCompleteReminder(r.id)}
+        <div className="t-row" key={r.id}>
+          <span className="time mono">{r.scheduledTime}</span>
+          <Check
             label={`Выполнить напоминание: ${r.text}`}
+            onDone={() => onCompleteReminder(r.id)}
           />
-          <span className="tmain">
-            <b>{r.text}</b>
-            <span className="tmeta">
-              <IconBell /> напоминание{r.repeatRule ? ' · повторяется' : ''}
-            </span>
+          <span className="ttl">{r.text}</span>
+          <span className="meta">
+            <IconBell /> напоминание{r.repeatRule ? ' · повторяется' : ''}
           </span>
         </div>
       ))}
 
       {tasks.map((t) => (
-        <div className="trow" key={t.id}>
-          <span className="ttime" data-soft={!t.exactTime}>
-            {t.exactTime ?? 'до конца дня'}
-          </span>
-          <Checkbox
-            checked={false}
-            onChange={() => onCompleteTask(t.id)}
-            label={`Выполнить: ${t.title}`}
-          />
-          <Link className="tmain" to={`/tasks/${t.id}`}>
-            <b>{t.title}</b>
-            <span className="tmeta">
-              {t.projectTitle} · {t.directionName}
-            </span>
+        <div className="t-row" key={t.id}>
+          <span className="time mono">{t.exactTime ?? 'до конца дня'}</span>
+          <Check label={`Выполнить: ${t.title}`} onDone={() => onCompleteTask(t.id)} />
+          <Link className="ttl" to={`/tasks/${t.id}`}>
+            {t.title}
           </Link>
+          <span className="meta">
+            <i className="dir-dot" style={{ ['--c' as string]: `var(${t.directionColor})` }} />
+            {t.projectTitle} · {t.directionName}
+          </span>
         </div>
       ))}
 
       {overdue.length > 0 ? (
-        <div className="tgroup">
+        <div>
           <button
             type="button"
-            className="quiet-link"
+            className="overdue-toggle"
             aria-expanded={overdueOpen}
             onClick={() => setOverdueOpen((v) => !v)}
           >
@@ -125,18 +111,13 @@ export function TodayBlock({
           </button>
           {overdueOpen
             ? overdue.map((t) => (
-                <div className="tg-item" key={t.id}>
-                  <Checkbox
-                    checked={false}
-                    onChange={() => onCompleteTask(t.id)}
-                    label={`Выполнить: ${t.title}`}
-                  />
-                  <Link className="tmain" to={`/tasks/${t.id}`} style={{ flex: 1, fontSize: 13.5 }}>
+                <div className="t-row" key={t.id}>
+                  <span className="time mono">{t.deadline ? formatLongDate(t.deadline) : '—'}</span>
+                  <Check label={`Выполнить: ${t.title}`} onDone={() => onCompleteTask(t.id)} />
+                  <Link className="ttl" to={`/tasks/${t.id}`}>
                     {t.title}
-                    <span className="tmeta">
-                      {t.projectTitle} · срок {t.deadline ? formatLongDate(t.deadline) : '—'}
-                    </span>
                   </Link>
+                  <span className="meta">{t.projectTitle}</span>
                 </div>
               ))
             : null}
@@ -144,18 +125,12 @@ export function TodayBlock({
       ) : null}
 
       {soft.length > 0 ? (
-        <div className="tgroup">
-          <span className="lbl">
-            <IconBell /> Не забыть сегодня
-          </span>
+        <div className="notime-block">
+          <div className="lbl">Не забыть сегодня</div>
           {soft.map((r) => (
-            <div className="tg-item" key={r.id}>
-              <Checkbox
-                checked={false}
-                onChange={() => onCompleteReminder(r.id)}
-                label={`Выполнить: ${r.text}`}
-              />
-              <span style={{ flex: 1, fontSize: 13.5 }}>{r.text}</span>
+            <div className="item" key={r.id}>
+              <Check label={`Выполнить: ${r.text}`} onDone={() => onCompleteReminder(r.id)} />
+              <span>{r.text}</span>
             </div>
           ))}
         </div>

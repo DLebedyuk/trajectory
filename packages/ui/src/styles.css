@@ -14,8 +14,13 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
-  background: #ece8de;
-  color: #1f1f1f;
+  /*
+    Через токены, а не литералами: в презентации тему переключал класс на
+    макете, а в приложении тёмная тема меняет именно --bg и --text.
+    С зашитым цветом заголовок «Привет» оставался чёрным на чёрном.
+  */
+  background: var(--bg);
+  color: var(--text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   font-size: 14px;
@@ -856,4 +861,68 @@ select {
   .app-shell * {
     transition: none !important;
   }
+}
+
+/* ============ ВЫПАДАЮЩЕЕ МЕНЮ ============ */
+.menu-pop {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 5px;
+  min-width: 190px;
+  box-shadow: var(--shadow);
+  z-index: 70;
+}
+.menu-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  min-height: 36px;
+}
+.menu-pop-item:hover,
+.menu-pop-item[data-highlighted] {
+  background: var(--surface-2);
+}
+.menu-pop-item.is-danger {
+  color: var(--danger);
+}
+.menu-dots {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.menu-dots::after {
+  content: '···';
+  letter-spacing: 1px;
+  font-size: 16px;
+  line-height: 1;
+}
+.menu-dots:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* чипы дизайна расставлены в ряд */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

@@ -7,21 +7,24 @@ export interface DropdownItem {
   danger?: boolean;
 }
 
-export function Dropdown({ trigger, items }: { trigger: ReactNode; items: DropdownItem[] }) {
+export function Dropdown({
+  trigger,
+  items,
+  label = 'Ещё действия',
+}: {
+  trigger: ReactNode;
+  items: DropdownItem[];
+  label?: string;
+}) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          className="card"
-          sideOffset={6}
-          style={{ padding: 6, minWidth: 180, boxShadow: 'var(--shadow-lift)', zIndex: 70 }}
-        >
+        <DropdownMenu.Content className="menu-pop" sideOffset={6} aria-label={label}>
           {items.map((item) => (
             <DropdownMenu.Item
               key={item.label}
-              className="btn btn-ghost btn-sm"
-              style={{ width: '100%', color: item.danger ? 'var(--d-act)' : undefined }}
+              className={`menu-pop-item${item.danger ? ' is-danger' : ''}`}
               onSelect={item.onSelect}
             >
               {item.label}
@@ -30,5 +33,28 @@ export function Dropdown({ trigger, items }: { trigger: ReactNode; items: Dropdo
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+/**
+ * Кнопка «···» для редких действий. Частые действия остаются на виду:
+ * прятать всё подряд — значит прятать и то, чем пользуются каждый день.
+ */
+export function OverflowMenu({
+  items,
+  label = 'Ещё действия',
+  className = 'menu-dots',
+}: {
+  items: DropdownItem[];
+  label?: string;
+  className?: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <Dropdown
+      label={label}
+      items={items}
+      trigger={<button type="button" className={className} aria-label={label} />}
+    />
   );
 }

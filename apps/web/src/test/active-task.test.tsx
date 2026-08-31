@@ -50,7 +50,8 @@ describe('выбор активной задачи', () => {
     await screen.findByText('Записать блок narration');
     expect(screen.getAllByText('Озвучка').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Подготовить демо для сайта').length).toBeGreaterThan(0);
-    expect(screen.getByText('Сейчас занимаюсь')).toBeInTheDocument();
+    // связка направление → проект → задача видна целиком, без служебной подписи
+    expect(screen.getByText('активная')).toBeInTheDocument();
   });
 
   it('не дублирует активную задачу в блоке закреплённого', async () => {
@@ -92,7 +93,10 @@ describe('выбор активной задачи', () => {
     const user = userEvent.setup();
 
     await screen.findByText('Записать блок narration');
-    await user.click(screen.getByRole('button', { name: 'Убрать активную' }));
+    // редкое действие живёт в «···», но остаётся доступным и отличным
+    // от «Очистить фокус»: это разные операции
+    await user.click(screen.getByRole('button', { name: 'Ещё действия' }));
+    await user.click(await screen.findByText('Убрать активную задачу'));
 
     await waitFor(() => expect(dashboard).toHaveBeenCalledTimes(2));
   });

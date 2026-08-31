@@ -18,6 +18,7 @@ import { SettingsPage } from './routes/SettingsPage.js';
 import { ActivityPage } from './routes/ActivityPage.js';
 import { TouchesPage } from './routes/TouchesPage.js';
 import { DirectionArchivePage, ProjectArchivePage } from './routes/ArchivePage.js';
+import { RemindersArchivePage } from './routes/RemindersArchivePage.js';
 
 export function App() {
   const status = useQuery({ queryKey: qk.authStatus, queryFn: api.auth.status, retry: false });
@@ -41,6 +42,7 @@ export function App() {
         <Route path="/projects/:projectId" element={<ProjectPage />} />
         <Route path="/tasks/:taskId" element={<TaskPage />} />
         <Route path="/reminders" element={<RemindersPage />} />
+        <Route path="/reminders/archive" element={<RemindersArchivePage />} />
         <Route path="/menu" element={<MenuPage />} />
         <Route path="/media" element={<MediaPage />} />
         <Route path="/media/:mediaId" element={<MediaItemPage />} />

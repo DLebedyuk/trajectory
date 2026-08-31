@@ -1,16 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Button,
-  EmptyState,
-  Heatmap,
-  IconBell,
-  IconPlus,
-  Modal,
-  ProjectTaskCard,
-  useToast,
-} from '@planner/ui';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button, Heatmap, IconBell, IconPlus, Modal, useToast } from '@planner/ui';
 import { DURATION_LABEL, formatLongDate, humanDate, plural } from '@planner/shared';
 import { api } from '../api/client.js';
 import {
@@ -28,6 +19,7 @@ import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 import { TouchModal } from '../features/TouchModal.js';
 import { ReminderModal } from '../features/ReminderModal.js';
+import { QuickThoughtModal } from '../features/QuickThoughtModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 
 export function HomePage() {
@@ -46,14 +38,6 @@ export function HomePage() {
   const [touchOpen, setTouchOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const [thoughtOpen, setThoughtOpen] = useState(false);
-  const [thought, setThought] = useState('');
-  const [archiveOpen, setArchiveOpen] = useState(false);
-
-  const archive = useQuery({
-    queryKey: qk.remindersArchive,
-    queryFn: api.reminders.archive,
-    enabled: archiveOpen,
-  });
 
   const setActive = useMutation({
     mutationFn: (taskId: string) => api.tasks.activate(taskId),
@@ -80,42 +64,25 @@ export function HomePage() {
       toast.show('Готово. Напоминание ушло в архив.');
     },
   });
-  const addThought = useMutation({
-    mutationFn: () => api.inbox.create({ originalText: thought, source: 'web' }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.inbox });
-      toast.show('Сохранил во входящие. Ничего делать не надо.');
-      setThought('');
-      setThoughtOpen(false);
-    },
-  });
 
   if (dashboard.isLoading) return <Loading what="Собираю главную" />;
-  if (dashboard.isError) return <ErrorBox error={dashboard.error} />;
+  if (dashboard.isError)
+    return <ErrorBox error={dashboard.error} onRetry={() => void dashboard.refetch()} />;
   const data = dashboard.data;
   if (!data) return null;
 
   const weekTotal = data.heatmap.weekTotal;
 
   return (
-    <>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: 16,
-          marginBottom: 20,
-          flexWrap: 'wrap',
-        }}
-      >
+    <div className="home-content">
+      <div className="home-greeting">
         <div>
-          <div className="lbl">
+          <div className="date mono">
             {humanDate(data.today, data.today)}, {formatLongDate(data.today)}
           </div>
-          <h1 style={{ fontSize: 26, marginTop: 6 }}>Привет</h1>
+          <h1>Привет</h1>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="home-quick">
           <Button onClick={() => setThoughtOpen(true)}>
             <IconPlus />
             Мысль
@@ -127,8 +94,8 @@ export function HomePage() {
         </div>
       </div>
 
-      <div className="two">
-        <div className="stack">
+      <div className="two-col">
+        <div className="home-main">
           <TodayBlock
             events={data.events}
             tasks={data.dueTasks}
@@ -136,7 +103,6 @@ export function HomePage() {
             reminders={data.todayReminders}
             onCompleteTask={(id) => completeTask.mutate(id)}
             onCompleteReminder={(id) => completeReminder.mutate(id)}
-            onOpenArchive={() => setArchiveOpen(true)}
           />
 
           <FocusCard
@@ -154,90 +120,40 @@ export function HomePage() {
           />
 
           <div className="card">
-            <div className="card-h">
-              <div>
-                <div className="lbl">Касания по всем направлениям</div>
-                <div className="hint" style={{ marginTop: 3 }}>
-                  Нажми на день, чтобы увидеть, что было.
-                </div>
-              </div>
+            <h4>
+              Касания по всем направлениям
               <Button size="sm" onClick={() => setTouchOpen(true)}>
                 <IconPlus />
                 Записать касание
               </Button>
+            </h4>
+            <p className="hint" style={{ marginBottom: 10 }}>
+              Нажми на день, чтобы увидеть, что было.
+            </p>
+            <div className="scroll-x">
+              <Heatmap days={data.heatmap.days} today={data.today} onDayClick={setDay} />
             </div>
-            <Heatmap days={data.heatmap.days} today={data.today} onDayClick={setDay} />
-            <div className="legend">
+            <div className="heat-legend">
               {(directions.data ?? []).map((d) => (
-                <b key={d.id}>
-                  <i className="dot" style={{ background: `var(${d.color})` }} />
+                <span key={d.id}>
+                  <i className="dir-dot" style={{ ['--c' as string]: `var(${d.color})` }} />
                   {d.name}
-                </b>
+                </span>
               ))}
             </div>
-            <div
-              style={{
-                marginTop: 14,
-                paddingTop: 12,
-                borderTop: '1px solid var(--line)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                flexWrap: 'wrap',
-              }}
-            >
-              <span className="quiet">
+            <div className="card-foot">
+              <span className="hint">
                 За эту неделю: {weekTotal} {plural(weekTotal, 'касание', 'касания', 'касаний')}.
               </span>
-              <Link className="quiet-link" to="/activity">
-                Посмотреть историю
-              </Link>
+              <Link to="/touches">Посмотреть историю</Link>
             </div>
           </div>
         </div>
 
-        <aside className="side">
-          {data.pinnedTasks.length > 0 ? (
-            <div>
-              <div className="sec-h">
-                <span className="lbl">Закреплённое</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setPickMode('pin');
-                    setPickOpen(true);
-                  }}
-                >
-                  <IconPlus />
-                  Закрепить
-                </Button>
-              </div>
-              <div className="pin-grid">
-                {data.pinnedTasks.map((t) => (
-                  <ProjectTaskCard
-                    key={t.id}
-                    projectTitle={t.projectTitle}
-                    taskTitle={t.title}
-                    directionName={t.directionName}
-                    directionColor={t.directionColor}
-                    meta={
-                      t.deadline
-                        ? `до ${formatLongDate(t.deadline)}`
-                        : t.estimatedDuration
-                          ? DURATION_LABEL[t.estimatedDuration]
-                          : null
-                    }
-                    onOpen={() => navigate(`/tasks/${t.id}`)}
-                    onComplete={() => completeTask.mutate(t.id)}
-                    onUnpin={() => togglePin.mutate({ taskId: t.id, pinned: true })}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '2px 4px' }}>
-              <span className="quiet">Закреплённых задач пока нет.</span>
+        <aside className="right-col">
+          <div className="card">
+            <h4>
+              Закреплённое
               <Button
                 size="sm"
                 variant="ghost"
@@ -246,56 +162,84 @@ export function HomePage() {
                   setPickOpen(true);
                 }}
               >
-                Закрепить задачу
+                <IconPlus />
+                Закрепить
               </Button>
-            </div>
-          )}
-
-          {data.pinnedMedia.length > 0 ? (
-            <div>
-              <div className="sec-h">
-                <span className="lbl">Читаю и смотрю</span>
-                <Link className="quiet-link" to="/media">
-                  Вся полка
-                </Link>
-              </div>
-              <div className="strip">
-                {data.pinnedMedia.map((m) => (
-                  <Link key={m.id} className="chipcard" to={`/media/${m.id}`}>
-                    <span className="em" style={{ fontSize: 19 }}>
-                      {m.coverEmoji ?? '📘'}
-                    </span>
-                    <span>
-                      <span
-                        style={{ fontFamily: 'Literata, serif', fontSize: 13.5, display: 'block' }}
-                      >
-                        {m.title}
-                      </span>
-                      <span className="quiet">{m.authorOrDirector ?? m.categoryName ?? ''}</span>
+            </h4>
+            {data.pinnedTasks.length === 0 ? (
+              <p className="hint">Закреплённых задач пока нет.</p>
+            ) : (
+              data.pinnedTasks.map((t) => (
+                <div className="pinned-row" key={t.id}>
+                  <button
+                    type="button"
+                    className="check"
+                    aria-label={`Выполнить: ${t.title}`}
+                    onClick={() => completeTask.mutate(t.id)}
+                  />
+                  <Link className="info" to={`/tasks/${t.id}`}>
+                    <span className="proj">{t.projectTitle}</span>
+                    <span className="ttl">{t.title}</span>
+                    <span className="meta">
+                      <i
+                        className="dir-dot"
+                        style={{ ['--c' as string]: `var(${t.directionColor})` }}
+                      />
+                      {t.directionName}
+                      {t.deadline
+                        ? ` · до ${formatLongDate(t.deadline)}`
+                        : t.estimatedDuration
+                          ? ` · ${DURATION_LABEL[t.estimatedDuration]}`
+                          : ''}
                     </span>
                   </Link>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    className="pin-off"
+                    aria-label={`Открепить: ${t.title}`}
+                    title="Открепить"
+                    onClick={() => togglePin.mutate({ taskId: t.id, pinned: true })}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {data.pinnedMedia.length > 0 ? (
+            <div className="card">
+              <h4>
+                Читаю и смотрю
+                <Link className="more" to="/media">
+                  Вся полка
+                </Link>
+              </h4>
+              {data.pinnedMedia.map((m) => (
+                <Link key={m.id} className="media-row" to={`/media/${m.id}`}>
+                  <span
+                    className="cover"
+                    // у медиа нет направления: обложка красится по типу записи
+                    style={{
+                      ['--c' as string]: `var(${m.kind === 'book' ? '--d-eng' : '--d-vocal'})`,
+                    }}
+                    aria-hidden="true"
+                  >
+                    {m.title.charAt(0)}
+                  </span>
+                  <span className="info">
+                    <span className="ttl">{m.title}</span>
+                    <span className="sub">{m.authorOrDirector ?? m.categoryName ?? ''}</span>
+                  </span>
+                </Link>
+              ))}
             </div>
           ) : null}
 
-          <div
-            className="card"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 16,
-              flexWrap: 'wrap',
-            }}
-          >
+          <div className="card menu-invite">
             <div>
-              <div style={{ fontFamily: 'Literata, serif', fontSize: 16 }}>
-                Хочется чего-нибудь совсем другого?
-              </div>
-              <div className="hint" style={{ marginTop: 4 }}>
-                Загляни в меню возможностей.
-              </div>
+              <div className="menu-invite-title">Хочется чего-нибудь совсем другого?</div>
+              <p className="hint">Загляни в меню возможностей.</p>
             </div>
             <Button onClick={() => navigate('/menu')}>Открыть меню</Button>
           </div>
@@ -339,11 +283,10 @@ export function HomePage() {
               <button
                 key={d.id}
                 type="button"
-                className="chip"
-                data-on={data.focus.focusDirectionId === d.id}
+                className={`chip${data.focus.focusDirectionId === d.id ? ' is-active' : ''}`}
                 onClick={() => setDirection.mutate({ directionId: d.id, onConflict: 'ask' })}
               >
-                <i className="dot" style={{ background: `var(${d.color})` }} />
+                <i className="dir-dot" style={{ ['--c' as string]: `var(${d.color})` }} />
                 {d.name}
               </button>
             ))}
@@ -356,60 +299,7 @@ export function HomePage() {
       <DayTouchesModal date={day} onClose={() => setDay(null)} />
       <TouchModal open={touchOpen} onOpenChange={setTouchOpen} today={data.today} />
       <ReminderModal open={remindOpen} onOpenChange={setRemindOpen} today={data.today} />
-
-      <Modal
-        open={thoughtOpen}
-        onOpenChange={setThoughtOpen}
-        title="Записать мысль"
-        description="Попадёт во «Входящие». Это ещё не задача."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setThoughtOpen(false)}>
-              Отмена
-            </Button>
-            <Button
-              variant="primary"
-              disabled={thought.trim().length === 0 || addThought.isPending}
-              onClick={() => addThought.mutate()}
-            >
-              Сохранить
-            </Button>
-          </>
-        }
-      >
-        <div className="field">
-          <textarea rows={3} value={thought} onChange={(e) => setThought(e.target.value)} />
-        </div>
-      </Modal>
-
-      <Modal
-        open={archiveOpen}
-        onOpenChange={setArchiveOpen}
-        title="Архив напоминаний"
-        description="Последние семь дней. Дальше приложение ничего не хранит на виду."
-        footer={
-          <Button variant="ghost" onClick={() => setArchiveOpen(false)}>
-            Закрыть
-          </Button>
-        }
-      >
-        <div style={{ marginTop: 14 }}>
-          {(archive.data ?? []).map((r) => (
-            <div className="row" key={r.id}>
-              <div className="row-main">
-                <div className="row-title">{r.text}</div>
-                <div className="row-sub">
-                  {formatLongDate(r.scheduledDate)} ·{' '}
-                  {r.status === 'done' ? 'выполнено' : 'удалено'}
-                </div>
-              </div>
-            </div>
-          ))}
-          {archive.data?.length === 0 ? (
-            <EmptyState title="За неделю ничего не закрывалось" />
-          ) : null}
-        </div>
-      </Modal>
-    </>
+      <QuickThoughtModal open={thoughtOpen} onOpenChange={setThoughtOpen} />
+    </div>
   );
 }
