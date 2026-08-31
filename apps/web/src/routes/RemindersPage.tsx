@@ -214,6 +214,10 @@ export function RemindersPage() {
         subtitle="Внешняя память. Не задачи и не проекты — мелочь, которую не нужно держать в голове."
         actions={
           <>
+            {/* напоминания приходят из Telegram — кнопка на случай задержки */}
+            <Button size="sm" variant="ghost" onClick={() => void reminders.refetch()}>
+              Обновить
+            </Button>
             <Button size="sm" onClick={() => setArchiveOpen(true)}>
               <IconArchive />
               Архив

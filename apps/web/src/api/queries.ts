@@ -46,7 +46,26 @@ export function invalidateFocusScope(qc: QueryClient, projectId?: string): void 
   void qc.invalidateQueries({ queryKey: ['projects'] });
 }
 
-export const useDashboard = () => useQuery({ queryKey: qk.dashboard, queryFn: api.dashboard });
+/**
+ * Данные, которые меняются снаружи приложения: бот в Telegram создаёт
+ * напоминания и входящие, а вкладка об этом не знает. Общий staleTime в 30
+ * секунд означал, что открытый экран продолжает показывать старый кеш.
+ *
+ * Поэтому здесь: свежий запрос при открытии экрана, свежий при возврате
+ * в окно и спокойный опрос раз в 15 секунд, пока экран открыт. Чаще незачем —
+ * пользователь один, а сервер не резиновый.
+ */
+const EXTERNALLY_CHANGED = {
+  staleTime: 0,
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: 'always',
+  refetchInterval: 15_000,
+  // в фоновой вкладке не опрашиваем: смысла нет, а батарею жалко
+  refetchIntervalInBackground: false,
+} as const;
+
+export const useDashboard = () =>
+  useQuery({ queryKey: qk.dashboard, queryFn: api.dashboard, ...EXTERNALLY_CHANGED });
 export const useFocus = () => useQuery({ queryKey: qk.focus, queryFn: api.focus.get });
 export const useDirections = () =>
   useQuery({ queryKey: qk.directions, queryFn: api.directions.list });
@@ -88,10 +107,12 @@ export const useHeatmap = (weeks: number, directionId?: string) =>
   });
 export const useTouches = (query: { directionId?: string; limit?: number }) =>
   useQuery({ queryKey: qk.touches(query), queryFn: () => api.touches.list(query) });
-export const useReminders = () => useQuery({ queryKey: qk.reminders, queryFn: api.reminders.list });
+export const useReminders = () =>
+  useQuery({ queryKey: qk.reminders, queryFn: api.reminders.list, ...EXTERNALLY_CHANGED });
 export const useRemindersArchive = () =>
   useQuery({ queryKey: qk.remindersArchive, queryFn: api.reminders.archive });
-export const useInbox = () => useQuery({ queryKey: qk.inbox, queryFn: api.inbox.list });
+export const useInbox = () =>
+  useQuery({ queryKey: qk.inbox, queryFn: api.inbox.list, ...EXTERNALLY_CHANGED });
 export const useMenu = (filter: Record<string, string | undefined>) =>
   useQuery({ queryKey: qk.menu(filter), queryFn: () => api.menu.list(filter as never) });
 export const useMedia = (kind?: string) =>

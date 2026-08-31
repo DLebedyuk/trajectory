@@ -3,7 +3,10 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './render.js';
 
-const applied = vi.fn(async () => ({ applied: 1, skipped: [] }));
+const applied = vi.fn(async (_proposals: Record<string, unknown>[]) => ({
+  applied: 1,
+  skipped: [] as unknown[],
+}));
 
 const ITEM = {
   id: 'i1',
@@ -70,7 +73,7 @@ describe('идея меню во входящих', () => {
     await user.click(screen.getByRole('button', { name: 'Сохранить' }));
 
     expect(applied).toHaveBeenCalled();
-    const sent = applied.mock.calls.at(-1)?.[0] as unknown as Record<string, unknown>[];
+    const sent = applied.mock.calls.at(-1)?.[0] ?? [];
     expect(sent[0]?.type).toBe('menu');
     expect(sent[0]?.energy).toBe('low');
     expect(sent[0]?.cost).toBe('budget');

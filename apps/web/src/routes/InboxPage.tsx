@@ -101,6 +101,10 @@ export function InboxPage() {
               <IconPlus />
               Мысль
             </Button>
+            {/* записи приходят из Telegram — на случай, если апдейт задержался */}
+            <Button size="sm" variant="ghost" onClick={() => void inbox.refetch()}>
+              Обновить
+            </Button>
             {items.length > 0 ? (
               <Button
                 variant="primary"
