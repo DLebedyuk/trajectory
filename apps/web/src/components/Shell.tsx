@@ -1,28 +1,80 @@
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  IconAuto,
+  IconBook,
+  IconDirections,
+  IconHome,
+  IconIdeas,
+  IconInbox,
+  IconLogout,
+  IconMoon,
+  IconPlus,
+  IconSettings,
+  IconSun,
+  IconThought,
+  IconTouch,
+  IconBell,
+} from '@planner/ui';
 import { api } from '../api/client.js';
-import { qk } from '../api/queries.js';
-import { applyTheme, useUiStore } from '../store/ui.js';
+import { qk, useDashboard, useFocus } from '../api/queries.js';
+import { todayInTimezone } from '@planner/shared';
+import { applyTheme, useUiStore, watchSystemTheme } from '../store/ui.js';
+import { TouchModal } from '../features/TouchModal.js';
+import { QuickThoughtModal } from '../features/QuickThoughtModal.js';
 
 const NAV = [
-  { to: '/', label: 'Главная', end: true },
-  { to: '/directions', label: 'Направления' },
-  { to: '/reminders', label: 'Напоминания', badge: 'reminders' as const },
-  { to: '/menu', label: 'Меню' },
-  { to: '/media', label: 'Книги и фильмы' },
-  { to: '/inbox', label: 'Входящие', badge: 'inbox' as const },
-  { to: '/settings', label: 'Настройки' },
+  { to: '/', label: 'Главная', end: true, Icon: IconHome },
+  { to: '/directions', label: 'Направления', Icon: IconDirections },
+  { to: '/reminders', label: 'Напоминания', badge: 'reminders' as const, Icon: IconBell },
+  { to: '/menu', label: 'Меню', Icon: IconIdeas },
+  { to: '/media', label: 'Книги и фильмы', Icon: IconBook },
+  { to: '/inbox', label: 'Входящие', badge: 'inbox' as const, Icon: IconInbox },
+  { to: '/settings', label: 'Настройки', Icon: IconSettings },
+];
+
+/** Нижняя навигация мобильного: пять точек, центральная — добавление. */
+const MOBILE_NAV = [
+  { to: '/', label: 'Главная', end: true, Icon: IconHome },
+  { to: '/directions', label: 'Направления', Icon: IconDirections },
+  { to: '/inbox', label: 'Входящие', badge: 'inbox' as const, Icon: IconInbox },
+  { to: '/menu', label: 'Меню', Icon: IconIdeas },
+];
+
+/**
+ * Ширина контента зависит от страницы. Списки и карты дышат, читаемые формы —
+ * нет: строка в 1600 пикселей не читается, а карта касаний в 700 не помещается.
+ */
+function widthClass(pathname: string): 'wide' | 'medium' | 'narrow' {
+  if (pathname === '/' || pathname === '/directions' || pathname === '/touches') return 'wide';
+  if (/^\/directions\/[^/]+\/(archive|touches)$/.test(pathname)) return 'wide';
+  if (/^\/tasks\//.test(pathname) || /^\/media\/[^/]+$/.test(pathname)) return 'narrow';
+  return 'medium';
+}
+
+const THEMES = [
+  { value: 'light' as const, label: 'Светлая', Icon: IconSun },
+  { value: 'dark' as const, label: 'Тёмная', Icon: IconMoon },
+  { value: 'system' as const, label: 'Авто', Icon: IconAuto },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
   const theme = useUiStore((s) => s.theme);
   const setTheme = useUiStore((s) => s.setTheme);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const reminders = useQuery({ queryKey: qk.reminders, queryFn: api.reminders.today });
   const inbox = useQuery({ queryKey: qk.inbox, queryFn: api.inbox.list });
   const me = useQuery({ queryKey: qk.me, queryFn: api.me });
+  const focus = useFocus();
+  const dashboard = useDashboard();
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [touchOpen, setTouchOpen] = useState(false);
+  const [thoughtOpen, setThoughtOpen] = useState(false);
+
   const qc = useQueryClient();
   const logout = useMutation({
     mutationFn: api.auth.logout,
@@ -32,81 +84,201 @@ export function Shell({ children }: { children: ReactNode }) {
     },
   });
 
+  // «Авто» обязана переключаться вслед за системой без перезагрузки
+  useEffect(() => watchSystemTheme(() => useUiStore.getState().theme), []);
+  useEffect(() => applyTheme(theme), [theme]);
+
   const counts: Record<string, number> = {
     reminders: reminders.data?.length ?? 0,
     inbox: inbox.data?.length ?? 0,
   };
 
-  const choose = (next: 'light' | 'dark' | 'system'): void => {
-    setTheme(next);
-    applyTheme(next);
-  };
+  /*
+   * Акцент всего приложения задаёт направление в фокусе — и только оно.
+   * Имена направлений здесь не участвуют: берём цвет из данных, поэтому
+   * созданное пользователем направление красит интерфейс так же, как исходные.
+   */
+  const accentColor = focus.data?.direction?.color;
+  const shellStyle = accentColor
+    ? ({ '--accent-base': `var(${accentColor})` } as CSSProperties)
+    : undefined;
+
+  const initial = (me.data?.displayName ?? '?').trim().charAt(0).toUpperCase();
 
   return (
-    <div className="app-shell">
-      <aside className="rail">
+    <div className="app-shell" style={shellStyle}>
+      <aside className="app-sidebar">
         <div className="brand">
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-            <path
-              d="M2 21C5 21 6 5 10 5s5 12 8 12 3-8 6-8"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              opacity=".35"
-            />
-            <circle cx="10" cy="5" r="2.4" fill="var(--d-act)" />
-            <circle cx="18" cy="17" r="2.4" fill="var(--d-eng)" />
-            <circle cx="24" cy="9" r="2.4" fill="var(--d-vocal)" />
-          </svg>
+          <div className="logo" aria-hidden="true" />
           <div>
-            <div className="brand-name">Траектория</div>
-            <div className="brand-sub">личный планировщик</div>
+            <div className="name">Траектория</div>
+            <div className="sub">личный планировщик</div>
           </div>
         </div>
 
-        <nav className="nav" aria-label="Основная навигация">
-          {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end}>
-              <span>{item.label}</span>
-              {item.badge && counts[item.badge] ? (
-                <span className="cnt">{counts[item.badge]}</span>
-              ) : null}
+        <nav aria-label="Основная навигация">
+          {NAV.map(({ to, label, end, badge, Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => `nav-item${isActive ? ' is-active' : ''}`}
+            >
+              <Icon />
+              <span>{label}</span>
+              {badge && counts[badge] ? <span className="ct mono">{counts[badge]}</span> : null}
             </NavLink>
           ))}
         </nav>
 
-        <div className="rail-foot">
+        <div className="bottom">
           {me.data ? (
-            <div className="whoami">
-              <div className="whoami-name" title={me.data.email}>
-                {me.data.displayName}
+            <div className="user">
+              <div className="av" aria-hidden="true">
+                {initial}
               </div>
-              <button type="button" className="quiet-link" onClick={() => logout.mutate()}>
-                Выйти
+              <div className="info">
+                <div className="nm">{me.data.displayName}</div>
+                <div className="ml">{me.data.email}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => logout.mutate()}
+                aria-label="Выйти из аккаунта"
+                title="Выйти"
+              >
+                <IconLogout />
               </button>
             </div>
           ) : null}
-          <div>
-            <div className="lbl" style={{ marginBottom: 6 }}>
-              Тема
-            </div>
-            <div className="seg">
-              {(['light', 'dark', 'system'] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  data-on={theme === value}
-                  onClick={() => choose(value)}
-                >
-                  {value === 'light' ? 'Светлая' : value === 'dark' ? 'Тёмная' : 'Авто'}
-                </button>
-              ))}
-            </div>
+
+          <div className="theme" role="group" aria-label="Тема оформления">
+            {THEMES.map(({ value, label, Icon }) => (
+              <button
+                key={value}
+                type="button"
+                className={theme === value ? 'is-active' : undefined}
+                aria-pressed={theme === value}
+                onClick={() => setTheme(value)}
+              >
+                <Icon />
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </aside>
 
-      <main className="content">{children}</main>
+      <main className={`app-main ${widthClass(location.pathname)}`}>{children}</main>
+
+      <nav className="m-bottom" aria-label="Навигация">
+        {MOBILE_NAV.slice(0, 2).map(({ to, label, end, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            className={({ isActive }) => `tab${isActive ? ' is-active' : ''}`}
+          >
+            <Icon />
+            {label}
+          </NavLink>
+        ))}
+
+        <button
+          type="button"
+          className="tab is-add"
+          onClick={() => setAddOpen(true)}
+          aria-label="Добавить"
+        >
+          <IconPlus />
+        </button>
+
+        {MOBILE_NAV.slice(2).map(({ to, label, end, badge, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            className={({ isActive }) => `tab${isActive ? ' is-active' : ''}`}
+          >
+            <Icon />
+            {label}
+            {badge && counts[badge] ? <span className="ct mono">{counts[badge]}</span> : null}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/*
+        Единственная глобальная точка добавления на мобильном. Два действия,
+        а не список всего подряд: задача создаётся в проекте, напоминание —
+        на своей странице, книга — в медиатеке.
+      */}
+      {addOpen ? (
+        <div
+          className="sheet-backdrop"
+          role="presentation"
+          onClick={() => setAddOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setAddOpen(false)}
+        >
+          <div
+            className="plus-sheet"
+            role="dialog"
+            aria-label="Что добавить"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h5>Что записать</h5>
+            <button
+              type="button"
+              className="opt"
+              onClick={() => {
+                setAddOpen(false);
+                setThoughtOpen(true);
+              }}
+            >
+              <span className="ic-wrap">
+                <IconThought />
+              </span>
+              <span className="info">
+                <span className="ttl">Во входящие</span>
+                <span className="sub">Мысль, которую разберём потом</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="opt"
+              onClick={() => {
+                setAddOpen(false);
+                setTouchOpen(true);
+              }}
+            >
+              <span className="ic-wrap">
+                <IconTouch />
+              </span>
+              <span className="info">
+                <span className="ttl">Записать касание</span>
+                <span className="sub">Факт работы по направлению</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="btn ghost sheet-cancel"
+              onClick={() => setAddOpen(false)}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <TouchModal
+        open={touchOpen}
+        onOpenChange={setTouchOpen}
+        today={dashboard.data?.today ?? todayInTimezone('UTC')}
+      />
+      <QuickThoughtModal
+        open={thoughtOpen}
+        onOpenChange={setThoughtOpen}
+        onSaved={() => navigate('/inbox')}
+      />
     </div>
   );
 }
