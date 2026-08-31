@@ -147,6 +147,42 @@ describe('разбор входящих через ИИ', () => {
     expect(out[0]?.inboxItemId).toBe('item-1');
   });
 
+  /**
+   * Раньше одна кривая запись отменяла весь ответ модели, и человек получал
+   * правила вместо разбора по всему списку. Теперь плохая запись стоит только
+   * себя: остальные доезжают от ИИ.
+   */
+  it('одна запись не по схеме не отменяет разбор остальных', async () => {
+    vi.stubGlobal('fetch', async () =>
+      reply({
+        items: [
+          {
+            inboxItemId: 'item-1',
+            type: 'task',
+            text: 'Записаться на английский',
+            projectId: 'proj-1',
+            deadline: null,
+            remindAt: null,
+            estimatedDuration: null,
+            comment: null,
+            note: null,
+          },
+          { inboxItemId: 'item-2', type: 'совершенно не тот тип', text: '' },
+        ],
+      }),
+    );
+
+    const out = await make().propose(ITEMS, CTX);
+    expect(out).toHaveLength(2);
+    const first = out.find((p) => p.inboxItemId === 'item-1');
+    const second = out.find((p) => p.inboxItemId === 'item-2');
+    expect(first?.type).toBe('task');
+    expect(first?.projectId).toBe('proj-1');
+    // про испорченную запись ИИ считается промолчавшим — она остаётся во входящих
+    expect(second?.type).toBe('keep');
+    expect(second?.text).toBe('Посмотреть спектакль в Практике');
+  });
+
   it('не-JSON в ответе не роняет разбор', async () => {
     vi.stubGlobal('fetch', async () => ({
       ok: true,
