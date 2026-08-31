@@ -34,7 +34,7 @@ export function DayTouchesModal({
     >
       <div style={{ marginTop: 14 }}>
         {list.map((t) => (
-          <div className="row" key={t.id}>
+          <div className="row" key={t.id} style={{ alignItems: 'flex-start' }}>
             <i className="dot" style={{ background: `var(${t.directionColor})`, marginTop: 6 }} />
             <div className="row-main">
               <div className="row-title">{t.title}</div>
@@ -42,6 +42,11 @@ export function DayTouchesModal({
                 {t.directionName}
                 {t.projectTitle ? ` · ${t.projectTitle}` : ''}
               </div>
+              {t.comment ? (
+                <p className="hint" style={{ marginTop: 4 }}>
+                  {t.comment}
+                </p>
+              ) : null}
             </div>
           </div>
         ))}

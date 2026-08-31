@@ -160,9 +160,26 @@ export function DirectionPage() {
           <div>
             <div className="sec-h" style={{ marginBottom: 8 }}>
               <span className="lbl">Последние касания</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Button size="sm" variant="ghost" onClick={() => setTouchOpen(true)}>
+                  <IconPlus />
+                  Записать
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => navigate(`/directions/${directionId}/touches`)}
+                >
+                  Все
+                </Button>
+              </div>
             </div>
             {(touches.data ?? []).map((t) => (
-              <div className="row" key={t.id} style={{ padding: '8px 0' }}>
+              <div
+                className="row"
+                key={t.id}
+                style={{ padding: '8px 0', alignItems: 'flex-start' }}
+              >
                 <i
                   className="dot"
                   style={{ background: `var(${t.directionColor})`, marginTop: 5 }}
@@ -175,6 +192,11 @@ export function DirectionPage() {
                     {humanDate(t.date, today)}
                     {t.projectTitle ? ` · ${t.projectTitle}` : ''}
                   </div>
+                  {t.comment ? (
+                    <p className="hint" style={{ marginTop: 3 }}>
+                      {t.comment}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ))}

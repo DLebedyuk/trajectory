@@ -16,6 +16,7 @@ import { MediaItemPage } from './routes/MediaItemPage.js';
 import { InboxPage } from './routes/InboxPage.js';
 import { SettingsPage } from './routes/SettingsPage.js';
 import { ActivityPage } from './routes/ActivityPage.js';
+import { TouchesPage } from './routes/TouchesPage.js';
 
 export function App() {
   const status = useQuery({ queryKey: qk.authStatus, queryFn: api.auth.status, retry: false });
@@ -32,6 +33,8 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/directions" element={<DirectionsPage />} />
         <Route path="/directions/:directionId" element={<DirectionPage />} />
+        <Route path="/directions/:directionId/touches" element={<TouchesPage />} />
+        <Route path="/touches" element={<TouchesPage />} />
         <Route path="/projects/:projectId" element={<ProjectPage />} />
         <Route path="/tasks/:taskId" element={<TaskPage />} />
         <Route path="/reminders" element={<RemindersPage />} />
