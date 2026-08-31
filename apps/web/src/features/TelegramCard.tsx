@@ -31,8 +31,8 @@ export function TelegramCard() {
   const code = issue.data;
 
   return (
-    <div className="card">
-      <h3 style={{ fontSize: 17, marginBottom: 10 }}>Telegram</h3>
+    <div className="settings-card settings-wide">
+      <h4>Telegram</h4>
 
       {status.isPending ? <p className="hint">Проверяю подключение…</p> : null}
       {status.isError ? (
@@ -48,8 +48,8 @@ export function TelegramCard() {
 
       {s ? (
         <>
-          <div className="setrow">
-            <div className="setrow-main">
+          <div className="row">
+            <div className="lbl">
               <b>Бот</b>
               <small>
                 {s.connected

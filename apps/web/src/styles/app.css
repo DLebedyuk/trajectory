@@ -2368,3 +2368,68 @@ body {
     overflow-x: auto;
   }
 }
+
+/* ============ НАСТРОЙКИ: производные ============ */
+.settings-wide {
+  grid-column: 1 / -1;
+}
+.settings-card .row input[type='text'],
+.settings-card .row input[type='time'] {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.settings-card .seg {
+  display: flex;
+  background: var(--surface-2);
+  border-radius: 7px;
+  padding: 2px;
+}
+.settings-card .seg button {
+  flex: 1;
+  padding: 5px 9px;
+  font-size: 12px;
+  border-radius: 5px;
+  color: var(--text-3);
+}
+.settings-card .seg button[data-on='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+@media (max-width: 900px) {
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*
+  .lbl внутри строк настроек и параметров меню — обычная подпись, а не
+  капслок-заголовок: там это название поля рядом со значением.
+*/
+.settings-card .row .lbl,
+.menu-idea .params .p .lbl,
+.dir-collapsed .lbl {
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.settings-card .row .lbl small {
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.menu-idea .params .p .lbl,
+.dir-collapsed .lbl {
+  color: var(--text-3);
+  font-size: 11px;
+}
+.dir-collapsed .lbl {
+  font-size: 13px;
+  color: var(--text-2);
+}

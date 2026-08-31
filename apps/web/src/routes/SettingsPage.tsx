@@ -57,11 +57,11 @@ export function SettingsPage() {
         subtitle="Жёсткие уведомления — только для реальных сроков. Всё остальное можно закрыть без последствий."
       />
 
-      <div className="stack" style={{ maxWidth: 760 }}>
-        <div className="card">
-          <h3 style={{ fontSize: 17, marginBottom: 10 }}>Внешний вид</h3>
-          <div className="setrow">
-            <div className="setrow-main">
+      <div className="settings-grid">
+        <div className="settings-card">
+          <h4>Внешний вид</h4>
+          <div className="row">
+            <div className="lbl">
               <b>Тема</b>
               <small>«Авто» следует настройке устройства.</small>
             </div>
@@ -83,10 +83,10 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 style={{ fontSize: 17, marginBottom: 10 }}>Время и язык</h3>
-          <div className="setrow">
-            <div className="setrow-main">
+        <div className="settings-card">
+          <h4>Время и язык</h4>
+          <div className="row">
+            <div className="lbl">
               <b>Часовой пояс</b>
               <small>Сервер отправляет напоминания по нему, а не по времени браузера.</small>
             </div>
@@ -99,8 +99,8 @@ export function SettingsPage() {
               }
             />
           </div>
-          <div className="setrow">
-            <div className="setrow-main">
+          <div className="row">
+            <div className="lbl">
               <b>Время дневной сводки</b>
               <small>Все напоминания без точного времени приходят одним сообщением.</small>
             </div>
@@ -113,10 +113,10 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 style={{ fontSize: 17, marginBottom: 10 }}>Напоминания</h3>
-          <div className="setrow">
-            <div className="setrow-main">
+        <div className="settings-card settings-wide">
+          <h4>Напоминания</h4>
+          <div className="row">
+            <div className="lbl">
               <b>Если не отметила</b>
               <small>
                 По умолчанию приложение переспрашивает один раз вечером и больше не возвращается
@@ -135,16 +135,16 @@ export function SettingsPage() {
               <button
                 key={v}
                 type="button"
-                className="chip"
-                data-on={s.missedReminderBehavior === v}
+                className={`chip${s.missedReminderBehavior === v ? ' is-active' : ''}`}
+                aria-pressed={s.missedReminderBehavior === v}
                 onClick={() => update.mutate({ missedReminderBehavior: v })}
               >
                 {l}
               </button>
             ))}
           </div>
-          <div className="setrow" style={{ marginTop: 14 }}>
-            <div className="setrow-main">
+          <div className="row" style={{ marginTop: 14 }}>
+            <div className="lbl">
               <b>Жёсткие уведомления</b>
               <small>События с точным временем, задачи с реальными дедлайнами.</small>
             </div>
@@ -154,8 +154,8 @@ export function SettingsPage() {
               onToggle={() => update.mutate({ hardNotifications: !s.hardNotifications })}
             />
           </div>
-          <div className="setrow">
-            <div className="setrow-main">
+          <div className="row">
+            <div className="lbl">
               <b>Мягкие уведомления</b>
               <small>Направления и фокус. Ответ «не сейчас» ничего не переносит в долг.</small>
             </div>

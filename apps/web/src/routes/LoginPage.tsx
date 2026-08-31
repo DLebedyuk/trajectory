@@ -1,4 +1,3 @@
-import { Button } from '@planner/ui';
 import { api } from '../api/client.js';
 
 /**
@@ -8,49 +7,54 @@ import { api } from '../api/client.js';
  */
 export function LoginPage({ googleConfigured }: { googleConfigured: boolean }) {
   return (
-    <div className="login">
+    <div className="login-screen">
       <div className="login-card">
-        <svg width="34" height="34" viewBox="0 0 26 26" fill="none" aria-hidden="true">
-          <path
-            d="M2 21C5 21 6 5 10 5s5 12 8 12 3-8 6-8"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            opacity=".35"
-          />
-          <circle cx="10" cy="5" r="2.4" fill="var(--d-act)" />
-          <circle cx="18" cy="17" r="2.4" fill="var(--d-eng)" />
-          <circle cx="24" cy="9" r="2.4" fill="var(--d-vocal)" />
-        </svg>
-        <h1 style={{ fontSize: 24, marginTop: 14 }}>Траектория</h1>
-        <p className="hint" style={{ marginTop: 8, fontSize: 13.5 }}>
-          Личный планировщик, который считает пройденное, а не оставшееся.
-        </p>
+        <div className="logo" aria-hidden="true" />
+        <h1>Траектория</h1>
+        <p className="sub">Личный планировщик, который считает пройденное, а не оставшееся.</p>
 
         {googleConfigured ? (
           <>
-            <Button
-              variant="primary"
-              style={{ marginTop: 22, width: '100%', justifyContent: 'center' }}
+            <button
+              type="button"
+              className="google-btn"
               onClick={() => {
                 window.location.href = api.auth.loginUrl(window.location.href);
               }}
             >
+              <svg className="g-logo" viewBox="0 0 18 18" aria-hidden="true">
+                <path
+                  fill="#4285F4"
+                  d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z"
+                />
+                <path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8l3-2.3z" />
+                <path
+                  fill="#EA4335"
+                  d="M9 3.6c1.3 0 2.5.5 3.4 1.3l2.6-2.6A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z"
+                />
+              </svg>
               Войти через Google
-            </Button>
-            <p className="quiet" style={{ marginTop: 14, lineHeight: 1.6 }}>
-              Мы запросим только имя и почту. Доступ к календарю — отдельно и позже, когда сама
-              решишь его подключить.
+            </button>
+            {/*
+              Вход даёт только имя и почту. Доступ к календарю — отдельное
+              согласие позже: это разные разрешения, и обещать одно вместо
+              другого нечестно.
+            */}
+            <p className="perm-note">
+              Мы запросим только <b>имя и почту</b>. Доступ к календарю — отдельно и позже, когда
+              сама решишь его подключить.
             </p>
           </>
         ) : (
-          <div style={{ marginTop: 20 }}>
-            <p className="hint">
-              Вход через Google не настроен: на сервере нет <code>GOOGLE_CLIENT_ID</code> и{' '}
-              <code>GOOGLE_CLIENT_SECRET</code>. Для локальной разработки можно включить{' '}
-              <code>DEV_AUTH=true</code>.
-            </p>
-          </div>
+          <p className="perm-note">
+            Вход через Google не настроен: на сервере нет <code>GOOGLE_CLIENT_ID</code> и{' '}
+            <code>GOOGLE_CLIENT_SECRET</code>. Для локальной разработки можно включить{' '}
+            <code>DEV_AUTH=true</code>.
+          </p>
         )}
       </div>
     </div>

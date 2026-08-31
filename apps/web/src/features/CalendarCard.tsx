@@ -78,8 +78,8 @@ export function CalendarCard() {
   const c = connection.data;
 
   return (
-    <div className="card">
-      <h3 style={{ fontSize: 17, marginBottom: 10 }}>Google Calendar</h3>
+    <div className="settings-card settings-wide">
+      <h4>Google Calendar</h4>
 
       {connection.isPending ? <p className="hint">Проверяю подключение…</p> : null}
       {connection.isError ? (
@@ -95,8 +95,8 @@ export function CalendarCard() {
 
       {c ? (
         <>
-          <div className="setrow">
-            <div className="setrow-main">
+          <div className="row">
+            <div className="lbl">
               <b>Доступ</b>
               <small>
                 {c.revoked
@@ -159,8 +159,8 @@ export function CalendarCard() {
                 <p className="hint">Календарей не нашлось. Попробуйте синхронизировать.</p>
               ) : null}
               {(list.data ?? []).map((cal) => (
-                <div className="setrow" key={cal.id}>
-                  <div className="setrow-main">
+                <div className="row" key={cal.id}>
+                  <div className="lbl">
                     <b>{cal.name}</b>
                   </div>
                   <Toggle
