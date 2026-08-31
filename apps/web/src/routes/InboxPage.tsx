@@ -2,9 +2,15 @@ import { useState } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Button, EmptyState, IconPlus, IconSpark, Modal, PageHeader, useToast } from '@planner/ui';
 import type { InboxProposal } from '@planner/contracts';
+import { MENU_DEFAULTS } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { qk, useDirections, useInbox } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
+import {
+  MenuParamFields,
+  menuParamsDefaults,
+  type MenuParamsValue,
+} from '../components/MenuParams.js';
 
 const TYPES: [InboxProposal['type'], string][] = [
   ['task', 'Задача'],
@@ -225,6 +231,18 @@ export function InboxPage() {
                   </div>
                 ) : null}
               </div>
+              {b.type === 'menu' ? (
+                <MenuParamFields
+                  value={{
+                    menuCategory: b.menuCategory ?? MENU_DEFAULTS.category,
+                    energy: b.energy ?? MENU_DEFAULTS.energy,
+                    estimatedTime: b.estimatedTime ?? MENU_DEFAULTS.estimatedTime,
+                    cost: b.cost ?? MENU_DEFAULTS.cost,
+                    place: b.place ?? MENU_DEFAULTS.place,
+                  }}
+                  onChange={(changes) => patch(index, changes)}
+                />
+              ) : null}
               {b.note ? (
                 <p className="hint" style={{ marginTop: 9 }}>
                   {b.note}
@@ -275,6 +293,7 @@ function InboxCard({
   const [value, setValue] = useState(text);
   const [projectId, setProjectId] = useState('');
   const [remindAt, setRemindAt] = useState('');
+  const [menu, setMenu] = useState<MenuParamsValue>(menuParamsDefaults);
 
   return (
     <div className="inbox-item">
@@ -319,6 +338,12 @@ function InboxCard({
           <input type="text" value={value} onChange={(e) => setValue(e.target.value)} />
         </div>
       </div>
+      {type === 'menu' ? (
+        <MenuParamFields
+          value={menu}
+          onChange={(changes) => setMenu((prev) => ({ ...prev, ...changes }))}
+        />
+      ) : null}
       <div style={{ display: 'flex', gap: 7, marginTop: 14, flexWrap: 'wrap' }}>
         <Button
           size="sm"
@@ -330,6 +355,8 @@ function InboxCard({
               text: value,
               projectId: projectId || null,
               remindAt: remindAt || null,
+              // параметры меню уходят только для меню — иначе это лишние поля
+              ...(type === 'menu' ? menu : {}),
             })
           }
         >

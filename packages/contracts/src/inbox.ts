@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { dateOnly, inboxProposedType, inboxStatus, uuid } from './common.js';
 import { deliveryMode } from './common.js';
+import { menuCost, menuEnergy, menuEstimatedTime, menuPlace } from './menu.js';
 
 export const inboxItemSchema = z.object({
   id: uuid,
@@ -21,17 +22,29 @@ export const createInboxItemSchema = z.object({
 export type CreateInboxItemInput = z.infer<typeof createInboxItemSchema>;
 
 /** Предложение разбора. Даты ИИ не выдумывает: пусто — значит спросить пользователя. */
-export const inboxProposalSchema = z.object({
-  inboxItemId: uuid,
-  type: inboxProposedType,
-  text: z.string().min(1).max(500),
-  projectId: uuid.nullish(),
-  deadline: dateOnly.nullish(),
-  remindAt: dateOnly.nullish(),
-  deliveryMode: deliveryMode.nullish(),
-  comment: z.string().max(2000).nullish(),
-  note: z.string().max(500).nullish(),
-});
+export const inboxProposalSchema = z
+  .object({
+    inboxItemId: uuid,
+    type: inboxProposedType,
+    text: z.string().min(1).max(500),
+    projectId: uuid.nullish(),
+    deadline: dateOnly.nullish(),
+    remindAt: dateOnly.nullish(),
+    deliveryMode: deliveryMode.nullish(),
+    comment: z.string().max(2000).nullish(),
+    note: z.string().max(500).nullish(),
+    // параметры «Идеи меню». Для остальных типов пусто; при type === 'menu'
+    // именно они уезжают в menu_items вместо молчаливых defaults базы
+    menuCategory: z.string().min(1).max(60).nullish(),
+    energy: menuEnergy.nullish(),
+    estimatedTime: menuEstimatedTime.nullish(),
+    cost: menuCost.nullish(),
+    place: menuPlace.nullish(),
+  })
+  // strict: посторонние поля не проглатываются молча. Предложение целиком
+  // приезжает с клиента, и лишний ключ в нём — признак рассинхронизации,
+  // а не мелочь, которую стоит выбросить без слов
+  .strict();
 export type InboxProposal = z.infer<typeof inboxProposalSchema>;
 
 export const applyInboxProposalsSchema = z.object({

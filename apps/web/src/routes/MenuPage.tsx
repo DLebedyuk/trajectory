@@ -1,15 +1,22 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, EmptyState, FormField, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
+import { MENU_DEFAULTS, MENU_LABELS } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { useMenu } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
+import {
+  MenuParamFields,
+  menuParamsDefaults,
+  type MenuParamsValue,
+} from '../components/MenuParams.js';
 
-const ENERGY = { low: 'мало', medium: 'средне', high: 'много' } as const;
-const TIME = { quick: '15 минут', hour: 'около часа', hours: 'несколько часов' } as const;
-const COST = { free: 'бесплатно', cheap: 'недорого', budget: 'нужен бюджет' } as const;
-const PLACE = { home: 'дома', out: 'вне дома' } as const;
-const COMPANY = { alone: 'одной', withSomeone: 'с кем-то', any: 'всё равно' } as const;
+// подписи и наборы значений живут в @planner/contracts — одно место на всё приложение
+const ENERGY = MENU_LABELS.energy;
+const TIME = MENU_LABELS.estimatedTime;
+const COST = MENU_LABELS.cost;
+const PLACE = MENU_LABELS.place;
+const COMPANY = MENU_LABELS.company;
 
 export function MenuPage() {
   const qc = useQueryClient();
@@ -18,20 +25,22 @@ export function MenuPage() {
   const menu = useMenu(filter);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('другое');
-  const [energy, setEnergy] = useState<'low' | 'medium' | 'high'>('medium');
-  const [time, setTime] = useState<'quick' | 'hour' | 'hours'>('hour');
+  const [params, setParams] = useState<MenuParamsValue>(() => ({
+    ...menuParamsDefaults(),
+    company: MENU_DEFAULTS.company,
+  }));
 
   const create = useMutation({
     mutationFn: () =>
       api.menu.create({
         title,
-        category,
-        energy,
-        estimatedTime: time,
-        cost: 'cheap',
-        place: 'out',
-        company: 'any',
+        category: params.menuCategory,
+        energy: params.energy,
+        estimatedTime: params.estimatedTime,
+        // раньше cost и place были зашиты в код и человек их не видел
+        cost: params.cost,
+        place: params.place,
+        company: params.company ?? MENU_DEFAULTS.company,
         tried: false,
       }),
     onSuccess: () => {
@@ -178,29 +187,11 @@ export function MenuPage() {
         <FormField label="Что хочется">
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
         </FormField>
-        <FormField label="Категория">
-          <input type="text" value={category} onChange={(e) => setCategory(e.target.value)} />
-        </FormField>
-        <div className="cols2">
-          <FormField label="Энергия">
-            <select value={energy} onChange={(e) => setEnergy(e.target.value as typeof energy)}>
-              {Object.entries(ENERGY).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Время">
-            <select value={time} onChange={(e) => setTime(e.target.value as typeof time)}>
-              {Object.entries(TIME).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        </div>
+        <MenuParamFields
+          value={params}
+          withCompany
+          onChange={(changes) => setParams((prev) => ({ ...prev, ...changes }))}
+        />
       </Modal>
     </>
   );

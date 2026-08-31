@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import type { InboxProposal } from '@planner/contracts';
+import { menuCost, menuEnergy, menuEstimatedTime, menuPlace } from '@planner/contracts';
 import { env } from '../../config/env.js';
 import { MockAiProvider, type AiParseContext, type AiProvider } from './ai.provider.js';
 
@@ -24,6 +25,12 @@ const aiItemSchema = z.object({
   estimatedDuration: z.enum(['short', 'medium', 'long']).nullable(),
   comment: z.string().max(2000).nullable(),
   note: z.string().max(500).nullable(),
+  // параметры «Идеи меню» — модель может предложить, человек всегда переспорит
+  menuCategory: z.string().min(1).max(60).nullable().optional(),
+  energy: menuEnergy.nullable().optional(),
+  estimatedTime: menuEstimatedTime.nullable().optional(),
+  cost: menuCost.nullable().optional(),
+  place: menuPlace.nullable().optional(),
 });
 /**
  * Оболочка ответа проверяется отдельно от элементов: если модель ошиблась в одной
@@ -77,6 +84,15 @@ const SYSTEM_PROMPT = `Ты помогаешь разбирать входящи
 
 Все девять полей обязательны в каждом элементе. Если значения нет — пиши null,
 а не пропускай поле. Никакого текста вне JSON.
+
+ТОЛЬКО для type "menu" можно дополнительно добавить пять полей — человек всё
+равно увидит их в форме и сможет поменять:
+  "menuCategory": короткая категория на русском ("прогулки", "театр", "еда"),
+  "energy": "low" | "medium" | "high",
+  "estimatedTime": "quick" (15 минут) | "hour" (около часа) | "hours" (несколько часов),
+  "cost": "free" | "cheap" | "budget",
+  "place": "home" | "out".
+Если не уверена в каком-то из них — null.
 
 ПРИМЕР. Запрос:
 {"today":"2026-09-01","projects":[{"id":"p1","title":"Демо-озвучка","direction":"Голос"}],
@@ -239,6 +255,12 @@ export class OpenAiProvider implements AiProvider {
         deadline: a.deadline,
         remindAt: a.remindAt,
         comment: a.comment,
+        // параметры меню имеют смысл только для меню: в задаче они лишний шум
+        menuCategory: a.type === 'menu' ? (a.menuCategory ?? null) : null,
+        energy: a.type === 'menu' ? (a.energy ?? null) : null,
+        estimatedTime: a.type === 'menu' ? (a.estimatedTime ?? null) : null,
+        cost: a.type === 'menu' ? (a.cost ?? null) : null,
+        place: a.type === 'menu' ? (a.place ?? null) : null,
         note:
           a.projectId && !projectId ? 'Проект не распознан — выберите сами' : (a.note ?? undefined),
       };

@@ -6,6 +6,7 @@ import type {
   InboxItem,
   InboxProposal,
 } from '@planner/contracts';
+import { MENU_DEFAULTS } from '@planner/contracts';
 import { todayInTimezone } from '@planner/shared';
 import { DB, type Database } from '../../db/db.module.js';
 import {
@@ -181,9 +182,19 @@ export class InboxService {
             break;
           }
           case 'menu':
-            await this.db
-              .insert(menuItems)
-              .values({ userId, title: p.text, comment: p.comment ?? null });
+            // раньше здесь были только title и comment, а energy/cost/place/
+            // category молча брались из defaults базы — человек их не выбирал
+            // и не видел. Теперь применяем ровно то, что он подтвердил.
+            await this.db.insert(menuItems).values({
+              userId,
+              title: p.text,
+              comment: p.comment ?? null,
+              category: p.menuCategory ?? MENU_DEFAULTS.category,
+              energy: p.energy ?? MENU_DEFAULTS.energy,
+              estimatedTime: p.estimatedTime ?? MENU_DEFAULTS.estimatedTime,
+              cost: p.cost ?? MENU_DEFAULTS.cost,
+              place: p.place ?? MENU_DEFAULTS.place,
+            });
             break;
           case 'book':
           case 'film':
