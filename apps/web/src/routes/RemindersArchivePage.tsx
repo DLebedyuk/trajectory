@@ -33,18 +33,15 @@ export function RemindersArchivePage() {
           description="Здесь появятся выполненные и удалённые напоминания."
         />
       ) : (
-        <div className="card">
-          <div className="arch-list">
-            {list.map((r) => (
-              <div className="arch-row arch-row-static" key={r.id}>
-                <span className="arch-title">{r.text}</span>
-                <span className="arch-meta">
-                  {formatLongDate(r.scheduledDate)} ·{' '}
-                  {r.status === 'done' ? 'выполнено' : 'удалено'}
-                </span>
-              </div>
-            ))}
-          </div>
+        <div>
+          {list.map((r) => (
+            <div className="archive-row" key={r.id}>
+              <span className={`ttl${r.status === 'done' ? ' done' : ''}`}>{r.text}</span>
+              <span className="proj">{r.status === 'done' ? 'выполнено' : 'удалено'}</span>
+              <span className="date mono">{formatLongDate(r.scheduledDate)}</span>
+              <span />
+            </div>
+          ))}
         </div>
       )}
     </>

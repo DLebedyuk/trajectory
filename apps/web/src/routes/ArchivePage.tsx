@@ -53,18 +53,22 @@ export function DirectionArchivePage() {
           description="Это не повод торопиться. Задачи попадут сюда сами, когда будут закрыты."
         />
       ) : (
-        <div className="card">
-          <div className="arch-list">
-            {tasks.map((t) => (
-              <Link className="arch-row" key={t.id} to={`/tasks/${t.id}`}>
-                <span className="arch-title">{t.title}</span>
-                <span className="arch-meta">
-                  <b>{t.projectTitle}</b>
-                  {t.completedAt ? ` · ${humanDate(t.completedAt.slice(0, 10), today)}` : ''}
-                </span>
+        <div>
+          {tasks.map((t) => (
+            <div className="archive-row" key={t.id}>
+              <Link className="ttl done" to={`/tasks/${t.id}`}>
+                {t.title}
               </Link>
-            ))}
-          </div>
+              <span className="proj">
+                <i className="dir-dot" style={{ ['--c' as string]: `var(${t.directionColor})` }} />
+                {t.projectTitle}
+              </span>
+              <span className="date mono">
+                {t.completedAt ? humanDate(t.completedAt.slice(0, 10), today) : ''}
+              </span>
+              <span />
+            </div>
+          ))}
         </div>
       )}
     </>
@@ -116,24 +120,19 @@ export function ProjectArchivePage() {
           description="Закрытые задачи проекта будут собираться здесь."
         />
       ) : (
-        <div className="card">
-          <div className="arch-list">
-            {tasks.map((t) => (
-              <div className="arch-row arch-row-static" key={t.id}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span className="arch-title done-strike">{t.title}</span>
-                  <span className="arch-meta">
-                    {t.completedAt
-                      ? `завершена ${humanDate(t.completedAt.slice(0, 10), today)}`
-                      : ''}
-                  </span>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => reopen.mutate(t.id)}>
-                  Вернуть
-                </Button>
-              </div>
-            ))}
-          </div>
+        <div>
+          {tasks.map((t) => (
+            <div className="archive-row" key={t.id}>
+              <span className="ttl done">{t.title}</span>
+              <span className="proj">{project.data?.title ?? ''}</span>
+              <span className="date mono">
+                {t.completedAt ? humanDate(t.completedAt.slice(0, 10), today) : ''}
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => reopen.mutate(t.id)}>
+                Вернуть
+              </Button>
+            </div>
+          ))}
         </div>
       )}
     </>

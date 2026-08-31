@@ -21,27 +21,29 @@ function DayGroup({
 }) {
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <div className="sec-h" style={{ marginBottom: 8 }}>
-        <span className="lbl">{formatLongDate(date)}</span>
-        <span className="hint">
+      <h4>
+        {formatLongDate(date)}
+        <span className="more">
           {items.length} {plural(items.length, 'касание', 'касания', 'касаний')}
         </span>
-      </div>
+      </h4>
       {items.map((t) => (
-        <div className="row" key={t.id} style={{ alignItems: 'flex-start' }}>
-          <i className="dot" style={{ background: `var(${t.directionColor})`, marginTop: 6 }} />
-          <div className="row-main">
-            <div className="row-title">{t.title}</div>
-            <div className="row-sub">
+        <div className="touch-item" key={t.id}>
+          <span
+            className="dir-glyph sm"
+            style={{ ['--c' as string]: `var(${t.directionColor})` }}
+            aria-hidden="true"
+          >
+            {t.directionName.charAt(0)}
+          </span>
+          <div className="info">
+            <div className="ttl">{t.title}</div>
+            <div className="meta">
               {t.directionName}
               {t.projectTitle ? ` · ${t.projectTitle}` : ''}
             </div>
             {/* комментарий — то, ради чего человек его писал; раньше он никуда не выводился */}
-            {t.comment ? (
-              <p className="hint" style={{ marginTop: 4 }}>
-                {t.comment}
-              </p>
-            ) : null}
+            {t.comment ? <p className="hint touch-comment">{t.comment}</p> : null}
           </div>
           <Button size="sm" variant="ghost" danger onClick={() => onRemove(t.id)}>
             Удалить

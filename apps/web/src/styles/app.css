@@ -2117,3 +2117,24 @@ body {
   text-align: left;
   width: 100%;
 }
+
+/* архивная строка: ссылка внутри ведёт себя как текст */
+.archive-row .ttl:hover {
+  color: var(--accent);
+}
+@media (max-width: 700px) {
+  .archive-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 4px;
+  }
+  .archive-row .proj,
+  .archive-row .date {
+    grid-column: 1;
+  }
+}
+.touch-comment {
+  margin-top: 4px;
+}
+.touch-item .info {
+  min-width: 0;
+}
