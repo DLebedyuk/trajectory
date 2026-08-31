@@ -5,10 +5,17 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/http-exception.filter.js';
 import { assertAuthConfiguration, env } from './config/env.js';
+import { BadEncryptionKeyError, encryptionKeyProblem } from './common/crypto.js';
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
   assertAuthConfiguration(logger);
+
+  // кривой ключ шифрования лучше поймать при старте, чем в момент, когда
+  // человек уже прошёл согласие Google и ждёт подключения календаря
+  const keyProblem = encryptionKeyProblem();
+  if (keyProblem instanceof BadEncryptionKeyError) throw keyProblem;
+  if (keyProblem) logger.warn(keyProblem.message);
 
   const app = await NestFactory.create(AppModule, {
     cors: { origin: env.WEB_ORIGIN, credentials: true },

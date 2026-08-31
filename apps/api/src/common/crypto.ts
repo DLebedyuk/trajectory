@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { env } from '../config/env.js';
 
 /**
@@ -18,14 +18,45 @@ export class MissingEncryptionKeyError extends Error {
   }
 }
 
+/** Ключ задан, но не является ключом: молча хешировать такое нельзя. */
+export class BadEncryptionKeyError extends Error {
+  constructor() {
+    super(
+      'TOKEN_ENCRYPTION_KEY должен быть настоящим 32-байтовым ключом: 64 hex-символа ' +
+        'или 32 байта в base64. Сгенерируйте его командой openssl rand -hex 32. ' +
+        'Короткая осмысленная строка ключом не является, даже если её захешировать.',
+    );
+  }
+}
+
+/**
+ * Только настоящий 32-байтовый ключ: hex или base64.
+ *
+ * Раньше произвольная строка молча прогонялась через sha256 и превращалась
+ * в «ключ». Выглядело это как работающее шифрование, а на деле стойкость
+ * оказывалась равна стойкости пароля вроде «planner123»: перебор идёт по
+ * исходной строке, а не по 256 битам. Худший вид проблемы — тот, что не
+ * подаёт признаков.
+ */
 function key(): Buffer {
-  const raw = env.TOKEN_ENCRYPTION_KEY;
+  const raw = env.TOKEN_ENCRYPTION_KEY.trim();
   if (!raw) throw new MissingEncryptionKeyError();
-  // допускаем hex, base64 и произвольную строку — приводим к 32 байтам
   if (/^[0-9a-f]{64}$/i.test(raw)) return Buffer.from(raw, 'hex');
-  const decoded = Buffer.from(raw, 'base64');
-  if (decoded.length === 32) return decoded;
-  return createHash('sha256').update(raw).digest();
+  if (/^[A-Za-z0-9+/]{43}=$|^[A-Za-z0-9+/]{44}$/.test(raw)) {
+    const decoded = Buffer.from(raw, 'base64');
+    if (decoded.length === 32) return decoded;
+  }
+  throw new BadEncryptionKeyError();
+}
+
+/** Ключ пригоден для работы: и задан, и имеет правильный вид. */
+export function encryptionKeyProblem(): MissingEncryptionKeyError | BadEncryptionKeyError | null {
+  try {
+    key();
+    return null;
+  } catch (e) {
+    return e instanceof MissingEncryptionKeyError || e instanceof BadEncryptionKeyError ? e : null;
+  }
 }
 
 export function encryptSecret(plain: string): string {
@@ -50,4 +81,9 @@ export function decryptSecret(payload: string): string {
   ]).toString('utf8');
 }
 
-export const isEncryptionConfigured = (): boolean => Boolean(env.TOKEN_ENCRYPTION_KEY);
+/**
+ * Кривой ключ — это «не настроено», а не «настроено криво»: подключать
+ * календарь с ним нельзя, иначе токен окажется зашифрован тем, что ключом
+ * не является.
+ */
+export const isEncryptionConfigured = (): boolean => encryptionKeyProblem() === null;
