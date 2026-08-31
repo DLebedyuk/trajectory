@@ -2248,3 +2248,74 @@ body {
   gap: 6px;
   white-space: nowrap;
 }
+
+/* ============ НАПОМИНАНИЯ: производные ============ */
+.rem-card .top .check {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text);
+  flex-shrink: 0;
+  margin-top: 3px;
+  background: none;
+  padding: 0;
+}
+.rem-card .top .check:hover {
+  border-color: var(--accent);
+}
+.rem-card .meta .badge {
+  background: var(--surface-2);
+  color: var(--text-2);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.rem-card .meta .badge.is-tg {
+  color: var(--tg);
+  background: color-mix(in srgb, var(--tg) 12%, var(--surface));
+}
+.rem-comment {
+  margin-bottom: 8px;
+}
+.rem-card .actions .menu-dots {
+  width: 28px;
+  height: 28px;
+}
+
+/* ============ ВХОДЯЩИЕ: производные ============ */
+.inbox-card .meta .badge {
+  background: var(--surface-2);
+  color: var(--text-2);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.inbox-card .meta .badge.is-tg {
+  color: var(--tg);
+  background: color-mix(in srgb, var(--tg) 12%, var(--surface));
+}
+.inbox-card[data-off='true'] {
+  opacity: 0.5;
+}
+.ai-src-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.ai-src-row input {
+  width: auto;
+  margin-top: 4px;
+}
+.ai-src-row .text {
+  font-size: 13px;
+  color: var(--text-2);
+  font-style: italic;
+}
+.theme-dark .inbox-card.is-ai {
+  background: color-mix(in srgb, var(--c-vocal) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--c-vocal) 30%, var(--line));
+}
+@media (max-width: 640px) {
+  .inbox-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

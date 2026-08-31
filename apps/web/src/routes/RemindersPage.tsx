@@ -1,25 +1,19 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
-  Checkbox,
-  EmptyState,
   IconArchive,
   IconPlus,
   Modal,
+  OverflowMenu,
   PageHeader,
   useToast,
 } from '@planner/ui';
 import { formatLongDate, todayInTimezone } from '@planner/shared';
 import type { Reminder } from '@planner/contracts';
 import { api } from '../api/client.js';
-import {
-  qk,
-  useDashboard,
-  useDirections,
-  useReminders,
-  useRemindersArchive,
-} from '../api/queries.js';
+import { qk, useDashboard, useDirections, useReminders } from '../api/queries.js';
 import { ReminderModal } from '../features/ReminderModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 
@@ -30,13 +24,12 @@ const MISS: Record<string, string> = {
 };
 
 export function RemindersPage() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const reminders = useReminders();
   const dashboard = useDashboard();
   const directions = useDirections();
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const archive = useRemindersArchive();
   const [editing, setEditing] = useState<Reminder | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [toTask, setToTask] = useState<Reminder | null>(null);
@@ -106,105 +99,103 @@ export function RemindersPage() {
   };
 
   if (reminders.isLoading) return <Loading what="Загружаю напоминания" />;
-  if (reminders.isError) return <ErrorBox error={reminders.error} />;
+  if (reminders.isError)
+    return <ErrorBox error={reminders.error} onRetry={() => void reminders.refetch()} />;
 
   const active = reminders.data ?? [];
   const todayList = active.filter((r) => r.scheduledDate <= today);
   const soon = active.filter((r) => r.scheduledDate > today && !r.repeatRule);
   const repeating = active.filter((r) => r.repeatRule);
 
+  /**
+   * Карточка напоминания. Частые действия — «Готово» и переносы — остаются
+   * на виду, редкие уезжают в «···»: на телефоне семь кнопок подряд
+   * превращаются в кашу, но исчезнуть ни одно действие не должно.
+   */
   const card = (r: Reminder) => (
-    <div className="rem" key={r.id}>
-      <Checkbox
-        checked={false}
-        onChange={() => complete.mutate(r.id)}
-        label={`Выполнить: ${r.text}`}
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="rem-txt">{r.text}</div>
-        <div className="row-sub" style={{ marginTop: 5 }}>
-          <span className="tag">
-            {formatLongDate(r.scheduledDate)}
-            {r.scheduledTime ? `, ${r.scheduledTime}` : ''}
+    <div
+      className={`rem-card${r.repeatRule ? ' is-regular' : ''}${r.source === 'telegram' ? ' is-tg' : ''}`}
+      key={r.id}
+    >
+      <div className="top">
+        <button
+          type="button"
+          className="check"
+          aria-label={`Выполнить: ${r.text}`}
+          onClick={() => complete.mutate(r.id)}
+        />
+        <span className="rt">{r.text}</span>
+        <span className="when mono">
+          {formatLongDate(r.scheduledDate)}
+          {r.scheduledTime ? `, ${r.scheduledTime}` : ''}
+        </span>
+      </div>
+
+      <div className="meta">
+        <span className="badge">
+          {r.deliveryMode === 'alert' ? 'отдельное уведомление' : 'в дневной сводке'}
+        </span>
+        {r.repeatRule ? (
+          <span className="badge">
+            {r.repeatRule === 'daily'
+              ? 'каждый день'
+              : r.repeatRule === 'weekly'
+                ? 'каждую неделю'
+                : 'каждый месяц'}
           </span>
-          <span className="tag">
-            {r.deliveryMode === 'alert' ? 'отдельное уведомление' : 'в дневной сводке'}
-          </span>
-          {r.repeatRule ? (
-            <span className="tag">
-              {r.repeatRule === 'daily'
-                ? 'каждый день'
-                : r.repeatRule === 'weekly'
-                  ? 'каждую неделю'
-                  : 'каждый месяц'}
-            </span>
-          ) : null}
-          <span
-            className="tag"
-            style={r.source === 'telegram' ? { color: 'var(--tg)' } : undefined}
-          >
-            {r.source === 'telegram' ? 'Telegram' : 'приложение'}
-          </span>
-          <span className="tag">{MISS[r.missedBehavior]}</span>
-        </div>
-        {r.comment ? (
-          <p className="hint" style={{ marginTop: 6 }}>
-            {r.comment}
-          </p>
         ) : null}
-        <div className="rem-acts">
-          <Button size="sm" onClick={() => complete.mutate(r.id)}>
-            Готово
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => snooze.mutate({ id: r.id, mode: 'hour' })}
-          >
-            Через час
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => snooze.mutate({ id: r.id, mode: 'evening' })}
-          >
-            Вечером
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => snooze.mutate({ id: r.id, mode: 'tomorrow' })}
-          >
-            Завтра
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setEditing(r);
-              setModalOpen(true);
-            }}
-          >
-            Другая дата
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void openConvert(r)}>
-            В задачу
-          </Button>
-          <Button size="sm" variant="ghost" danger onClick={() => remove.mutate(r.id)}>
-            Удалить
-          </Button>
-        </div>
+        {/* источник виден всегда: напоминание из Telegram живёт в общем списке */}
+        {r.source === 'telegram' ? <span className="badge is-tg">Telegram</span> : null}
+        <span className="badge">{MISS[r.missedBehavior]}</span>
+      </div>
+
+      {r.comment ? <p className="hint rem-comment">{r.comment}</p> : null}
+
+      <div className="actions">
+        <button type="button" className="btn primary" onClick={() => complete.mutate(r.id)}>
+          Готово
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => snooze.mutate({ id: r.id, mode: 'hour' })}
+        >
+          Через час
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => snooze.mutate({ id: r.id, mode: 'tomorrow' })}
+        >
+          Завтра
+        </button>
+        <OverflowMenu
+          label={`Ещё действия: ${r.text}`}
+          items={[
+            { label: 'Вечером', onSelect: () => snooze.mutate({ id: r.id, mode: 'evening' }) },
+            {
+              label: 'Другая дата',
+              onSelect: () => {
+                setEditing(r);
+                setModalOpen(true);
+              },
+            },
+            { label: 'Превратить в задачу', onSelect: () => void openConvert(r) },
+            { label: 'Удалить', danger: true, onSelect: () => remove.mutate(r.id) },
+          ]}
+        />
       </div>
     </div>
   );
 
   const section = (title: string, list: Reminder[], empty: string) => (
-    <div style={{ marginBottom: 22 }}>
-      <span className="lbl" style={{ display: 'block', marginBottom: 9 }}>
+    <section className="rem-section">
+      <div className="section-title">
         {title}
-      </span>
+        {list.length > 0 ? <span className="ct">{list.length}</span> : null}
+      </div>
       {list.length > 0 ? list.map(card) : <p className="hint">{empty}</p>}
-    </div>
+    </section>
   );
 
   return (
@@ -218,7 +209,7 @@ export function RemindersPage() {
             <Button size="sm" variant="ghost" onClick={() => void reminders.refetch()}>
               Обновить
             </Button>
-            <Button size="sm" onClick={() => setArchiveOpen(true)}>
+            <Button size="sm" onClick={() => navigate('/reminders/archive')}>
               <IconArchive />
               Архив
             </Button>
@@ -236,7 +227,7 @@ export function RemindersPage() {
         }
       />
 
-      <div style={{ maxWidth: 760 }}>
+      <div>
         {section('Сегодня', todayList, 'Сегодня ничего не ждёт.')}
         {section('Ближайшие', soon, 'Впереди пусто.')}
         {section('Регулярные', repeating, 'Регулярных нет.')}
@@ -244,36 +235,6 @@ export function RemindersPage() {
       </div>
 
       <ReminderModal open={modalOpen} onOpenChange={setModalOpen} today={today} editing={editing} />
-
-      <Modal
-        open={archiveOpen}
-        onOpenChange={setArchiveOpen}
-        title="Архив напоминаний"
-        description="Последние семь дней."
-        footer={
-          <Button variant="ghost" onClick={() => setArchiveOpen(false)}>
-            Закрыть
-          </Button>
-        }
-      >
-        <div style={{ marginTop: 14 }}>
-          {(archive.data ?? []).map((r) => (
-            <div className="row" key={r.id}>
-              <div className="row-main">
-                <div className="row-title">{r.text}</div>
-                <div className="row-sub">
-                  {formatLongDate(r.scheduledDate)}
-                  {r.scheduledTime ? `, ${r.scheduledTime}` : ''} ·{' '}
-                  {r.status === 'done' ? 'выполнено' : 'удалено'}
-                </div>
-              </div>
-            </div>
-          ))}
-          {archive.data?.length === 0 ? (
-            <EmptyState title="За неделю ничего не закрывалось" />
-          ) : null}
-        </div>
-      </Modal>
 
       <Modal
         open={Boolean(toTask)}

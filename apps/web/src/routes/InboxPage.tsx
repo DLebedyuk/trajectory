@@ -4,6 +4,7 @@ import { Button, EmptyState, IconPlus, IconSpark, Modal, PageHeader, useToast } 
 import type { InboxProposal } from '@planner/contracts';
 import { MENU_DEFAULTS } from '@planner/contracts';
 import { api } from '../api/client.js';
+import { humanDate } from '@planner/shared';
 import { qk, useDirections, useInbox } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 import {
@@ -83,7 +84,7 @@ export function InboxPage() {
   });
 
   if (inbox.isLoading) return <Loading what="Загружаю входящие" />;
-  if (inbox.isError) return <ErrorBox error={inbox.error} />;
+  if (inbox.isError) return <ErrorBox error={inbox.error} onRetry={() => void inbox.refetch()} />;
 
   const items = inbox.data ?? [];
 
@@ -126,12 +127,13 @@ export function InboxPage() {
           action={<Button onClick={() => setAddOpen(true)}>Записать мысль</Button>}
         />
       ) : (
-        <div style={{ maxWidth: 820 }}>
+        <div>
           {items.map((item) => (
             <InboxCard
               key={item.id}
               text={item.originalText}
               source={item.source}
+              createdAt={item.createdAt}
               projects={projects.map((p) => ({
                 id: p.id,
                 title: p.title,
@@ -170,23 +172,20 @@ export function InboxPage() {
       >
         <div style={{ marginTop: 16 }}>
           {(batch ?? []).map((b, index) => (
-            <div className="ai-card" data-off={!b.on} key={b.inboxItemId}>
-              <label
-                style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}
-              >
+            <div className="inbox-card is-ai" data-off={!b.on} key={b.inboxItemId}>
+              <label className="ai-src-row">
                 <input
                   type="checkbox"
                   checked={b.on}
-                  style={{ width: 'auto', marginTop: 3 }}
                   onChange={() => patch(index, { on: !b.on })}
                 />
-                <span className="ai-src">
+                <span className="text">
                   «{items.find((i) => i.id === b.inboxItemId)?.originalText}»
                 </span>
               </label>
-              <div className="inbox-grid" style={{ marginTop: 0 }}>
-                <div className="ffield">
-                  <span className="lbl">Тип</span>
+              <div className="inbox-fields">
+                <div className="f">
+                  <label>Тип</label>
                   <select
                     value={b.type}
                     onChange={(e) =>
@@ -200,8 +199,8 @@ export function InboxPage() {
                     ))}
                   </select>
                 </div>
-                <div className="ffield" style={{ gridColumn: 'span 2' }}>
-                  <span className="lbl">Формулировка</span>
+                <div className="f" style={{ gridColumn: '1 / -1' }}>
+                  <label>Формулировка</label>
                   <input
                     type="text"
                     value={b.text}
@@ -209,8 +208,8 @@ export function InboxPage() {
                   />
                 </div>
                 {b.type === 'task' || b.type === 'note' ? (
-                  <div className="ffield" style={{ gridColumn: 'span 2' }}>
-                    <span className="lbl">Проект</span>
+                  <div className="f" style={{ gridColumn: '1 / -1' }}>
+                    <label>Проект</label>
                     <select
                       value={b.projectId ?? ''}
                       onChange={(e) => patch(index, { projectId: e.target.value || null })}
@@ -225,8 +224,8 @@ export function InboxPage() {
                   </div>
                 ) : null}
                 {b.type === 'reminder' ? (
-                  <div className="ffield">
-                    <span className="lbl">Когда</span>
+                  <div className="f">
+                    <label>Когда</label>
                     <input
                       type="date"
                       value={b.remindAt ?? ''}
@@ -237,6 +236,7 @@ export function InboxPage() {
               </div>
               {b.type === 'menu' ? (
                 <MenuParamFields
+                  className="inbox-fields"
                   value={{
                     menuCategory: b.menuCategory ?? MENU_DEFAULTS.category,
                     energy: b.energy ?? MENU_DEFAULTS.energy,
@@ -283,12 +283,14 @@ export function InboxPage() {
 function InboxCard({
   text,
   source,
+  createdAt,
   projects,
   onSave,
   onDelete,
 }: {
   text: string;
   source: string;
+  createdAt: string;
   projects: { id: string; title: string; directionName: string }[];
   onSave: (proposal: Omit<InboxProposal, 'inboxItemId'> & { inboxItemId: string }) => void;
   onDelete: () => void;
@@ -300,27 +302,48 @@ function InboxCard({
   const [menu, setMenu] = useState<MenuParamsValue>(menuParamsDefaults);
 
   return (
-    <div className="inbox-item">
-      <div className="inbox-txt">{text}</div>
-      <div className="row-sub" style={{ marginTop: 6 }}>
-        <span className="tag" style={source === 'telegram' ? { color: 'var(--tg)' } : undefined}>
+    <div className="inbox-card">
+      <div className="top">
+        <span className="text">{text}</span>
+        <span className="when mono">
+          {humanDate(createdAt.slice(0, 10), createdAt.slice(0, 10))}
+        </span>
+      </div>
+
+      <div className="meta">
+        <span className={`badge${source === 'telegram' ? ' is-tg' : ''}`}>
           {source === 'telegram' ? 'Telegram' : 'приложение'}
         </span>
       </div>
-      <div className="inbox-grid">
-        <div className="ffield">
-          <span className="lbl">Тип</span>
-          <select value={type} onChange={(e) => setType(e.target.value as InboxProposal['type'])}>
-            {TYPES.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </select>
+
+      {/* тип выбирается чипами: список из восьми пунктов в select не читается */}
+      <div className="controls">
+        {TYPES.map(([v, l]) => (
+          <button
+            key={v}
+            type="button"
+            className={`sel${type === v ? ' is-active' : ''}`}
+            aria-pressed={type === v}
+            onClick={() => setType(v)}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div className="inbox-fields">
+        <div className="f" style={{ gridColumn: '1 / -1' }}>
+          <label htmlFor={`text-${text}`}>Формулировка</label>
+          <input
+            id={`text-${text}`}
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
         </div>
         {type === 'task' || type === 'note' ? (
-          <div className="ffield">
-            <span className="lbl">Проект — определяет направление</span>
+          <div className="f" style={{ gridColumn: '1 / -1' }}>
+            <label>Проект — определяет направление</label>
             <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
               <option value="">— выбери проект —</option>
               {projects.map((p) => (
@@ -332,26 +355,25 @@ function InboxCard({
           </div>
         ) : null}
         {type === 'reminder' ? (
-          <div className="ffield">
-            <span className="lbl">Когда напомнить</span>
+          <div className="f">
+            <label>Когда напомнить</label>
             <input type="date" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
           </div>
         ) : null}
-        <div className="ffield" style={{ gridColumn: '1/-1' }}>
-          <span className="lbl">Формулировка</span>
-          <input type="text" value={value} onChange={(e) => setValue(e.target.value)} />
-        </div>
       </div>
+
       {type === 'menu' ? (
         <MenuParamFields
+          className="inbox-fields"
           value={menu}
           onChange={(changes) => setMenu((prev) => ({ ...prev, ...changes }))}
         />
       ) : null}
-      <div style={{ display: 'flex', gap: 7, marginTop: 14, flexWrap: 'wrap' }}>
-        <Button
-          size="sm"
-          variant="primary"
+
+      <div className="controls" style={{ marginTop: 10 }}>
+        <button
+          type="button"
+          className="apply"
           onClick={() =>
             onSave({
               inboxItemId: '',
@@ -364,11 +386,11 @@ function InboxCard({
             })
           }
         >
-          Сохранить
-        </Button>
-        <Button size="sm" variant="ghost" danger onClick={onDelete}>
+          Применить
+        </button>
+        <button type="button" className="del" onClick={onDelete}>
           Удалить
-        </Button>
+        </button>
       </div>
     </div>
   );

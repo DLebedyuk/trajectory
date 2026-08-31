@@ -50,7 +50,8 @@ describe('идея меню во входящих', () => {
     renderWithProviders(<InboxPage />);
 
     await screen.findByText(ITEM.originalText);
-    await user.selectOptions(screen.getAllByRole('combobox')[0]!, 'menu');
+    // тип выбирается чипом, а не выпадающим списком
+    await user.click(screen.getByRole('button', { name: 'Идея меню' }));
 
     expect(screen.getByText('Категория')).toBeInTheDocument();
     expect(screen.getByText('Энергия')).toBeInTheDocument();
@@ -64,13 +65,13 @@ describe('идея меню во входящих', () => {
     renderWithProviders(<InboxPage />);
 
     await screen.findByText(ITEM.originalText);
-    await user.selectOptions(screen.getAllByRole('combobox')[0]!, 'menu');
+    await user.click(screen.getByRole('button', { name: 'Идея меню' }));
 
     const selects = screen.getAllByRole('combobox');
-    // порядок полей: тип, энергия, время, стоимость, место
-    await user.selectOptions(selects[1]!, 'low');
-    await user.selectOptions(selects[3]!, 'budget');
-    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    // порядок селекторов меню: энергия, время, стоимость, место
+    await user.selectOptions(selects[0]!, 'low');
+    await user.selectOptions(selects[2]!, 'budget');
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
 
     expect(applied).toHaveBeenCalled();
     const sent = applied.mock.calls.at(-1)?.[0] ?? [];
