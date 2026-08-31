@@ -21,6 +21,8 @@ const fake = {
   revokeAccess: false,
   /** Отказ, не связанный с согласием: выключенный API, квота, сбой. */
   apiError: null as string | null,
+  /** Календарь, на котором ломается загрузка событий: частичный сбой. */
+  failEventsFor: null as string | null,
   calendars: [
     { externalId: 'primary@gmail.com', name: 'Личный', primary: true },
     { externalId: 'work@group.calendar', name: 'Работа', primary: false },
@@ -54,6 +56,7 @@ function makeApi() {
     },
     listEvents: async (_t: string, calendarExternalId: string) => {
       if (fake.revokeAccess) throw new Revoked();
+      if (fake.failEventsFor === calendarExternalId) throw new ApiErr('временный сбой');
       return fake.events.filter((e) => e.calendarExternalId === calendarExternalId);
     },
     revoke: async () => undefined,
@@ -89,6 +92,7 @@ async function connect(refreshToken: string | null = 'refresh-1'): Promise<void>
 beforeEach(async () => {
   fake.revokeAccess = false;
   fake.apiError = null;
+  fake.failEventsFor = null;
   fake.refreshCalls = 0;
   await db.delete(schema.calendarEvents);
   await db.delete(schema.calendars);
@@ -226,6 +230,71 @@ describe('Google Calendar', () => {
     const state = await service.connection(TEST_USER_ID);
     expect(state.lastError).toBeNull();
     expect(state.lastSyncAt).not.toBeNull();
+  });
+
+  it('удалённое в Google событие исчезает и у нас', async () => {
+    await connect();
+    await service.sync(TEST_USER_ID);
+    expect(await db.select().from(schema.calendarEvents)).toHaveLength(1);
+
+    const kept = fake.events;
+    fake.events = [];
+    const result = await service.sync(TEST_USER_ID);
+    fake.events = kept;
+
+    expect(result.removed).toBe(1);
+    expect(await db.select().from(schema.calendarEvents)).toHaveLength(0);
+  });
+
+  it('исчезнувший у Google календарь убирается вместе с событиями', async () => {
+    await connect();
+    await service.sync(TEST_USER_ID);
+    const before = await service.listCalendars(TEST_USER_ID);
+    expect(before).toHaveLength(2);
+
+    const all = fake.calendars;
+    fake.calendars = all.filter((c) => c.externalId !== 'work@group.calendar');
+    await service.sync(TEST_USER_ID);
+    fake.calendars = all;
+
+    const after = await service.listCalendars(TEST_USER_ID);
+    expect(after.map((c) => c.name)).toEqual(['Личный']);
+  });
+
+  /**
+   * Частично провалившийся прогон раньше засчитывался как полностью успешный:
+   * lastError затирался, и человек видел «синхронизировано» поверх неполного
+   * календаря.
+   */
+  it('частичный сбой виден в результате и не затирает ошибку', async () => {
+    await connect();
+    await service.sync(TEST_USER_ID);
+    const list = await service.listCalendars(TEST_USER_ID);
+    const work = list.find((c) => c.name === 'Работа');
+    await service.setEnabled(TEST_USER_ID, work?.id as string, true);
+
+    fake.failEventsFor = 'work@group.calendar';
+    const result = await service.sync(TEST_USER_ID);
+
+    expect(result.partial).toBe(true);
+    expect(result.failed).toContain('Работа');
+    const state = await service.connection(TEST_USER_ID);
+    expect(state.lastError).toMatch(/Работа/);
+    // доступ при этом жив: сбой одного календаря — не повод гасить подключение
+    expect(state.revoked).toBe(false);
+    // событие из рабочего календаря не появилось, но личный не пострадал
+    expect(await db.select().from(schema.calendarEvents)).toHaveLength(1);
+  });
+
+  it('сбойный календарь не теряет уже загруженные события', async () => {
+    await connect();
+    await service.sync(TEST_USER_ID);
+    fake.failEventsFor = 'primary@gmail.com';
+    const result = await service.sync(TEST_USER_ID);
+
+    expect(result.partial).toBe(true);
+    // чистка удалённых работает только для календарей, догрузившихся целиком
+    expect(await db.select().from(schema.calendarEvents)).toHaveLength(1);
   });
 
   it('повторное подключение без нового refresh-токена сохраняет прежний', async () => {

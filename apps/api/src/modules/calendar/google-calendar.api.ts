@@ -89,6 +89,14 @@ export interface GoogleCalendarApi {
 
 export const GOOGLE_CALENDAR_API = Symbol('GOOGLE_CALENDAR_API');
 
+/**
+ * Предохранитель от бесконечной пагинации: если провайдер (или заглушка
+ * в тесте) станет отдавать один и тот же nextPageToken, цикл должен
+ * закончиться, а не съесть память. 20 страниц по 250 — заведомо больше,
+ * чем бывает в окне синхронизации.
+ */
+const MAX_PAGES = 20;
+
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const API = 'https://www.googleapis.com/calendar/v3';
 
@@ -165,12 +173,28 @@ export class RealGoogleCalendarApi implements GoogleCalendarApi {
   }
 
   async listCalendars(accessToken: string): Promise<RemoteCalendar[]> {
-    const data = await this.get<{
-      items?: { id: string; summary: string; primary?: boolean; deleted?: boolean }[];
-    }>(accessToken, `${API}/users/me/calendarList?maxResults=250`);
-    return (data.items ?? [])
-      .filter((c) => !c.deleted)
-      .map((c) => ({ externalId: c.id, name: c.summary || c.id, primary: Boolean(c.primary) }));
+    type Item = { id: string; summary: string; primary?: boolean; deleted?: boolean };
+    const out: RemoteCalendar[] = [];
+    let pageToken: string | undefined;
+    let pages = 0;
+    // страниц может быть больше одной: без этого «пропавшим» считался бы
+    // каждый календарь, не поместившийся в первую сотню
+    do {
+      pages += 1;
+      const url = new URL(`${API}/users/me/calendarList`);
+      url.searchParams.set('maxResults', '250');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+      const data = await this.get<{ items?: Item[]; nextPageToken?: string }>(
+        accessToken,
+        url.toString(),
+      );
+      for (const c of data.items ?? []) {
+        if (c.deleted) continue;
+        out.push({ externalId: c.id, name: c.summary || c.id, primary: Boolean(c.primary) });
+      }
+      pageToken = data.nextPageToken;
+    } while (pageToken && pages < MAX_PAGES);
+    return out;
   }
 
   async listEvents(
@@ -179,26 +203,41 @@ export class RealGoogleCalendarApi implements GoogleCalendarApi {
     range: { from: Date; to: Date },
     timezone: string,
   ): Promise<RemoteEvent[]> {
-    const url = new URL(`${API}/calendars/${encodeURIComponent(calendarExternalId)}/events`);
-    url.searchParams.set('timeMin', range.from.toISOString());
-    url.searchParams.set('timeMax', range.to.toISOString());
-    // разворачиваем повторяющиеся события в отдельные вхождения
-    url.searchParams.set('singleEvents', 'true');
-    url.searchParams.set('orderBy', 'startTime');
-    url.searchParams.set('maxResults', '250');
+    type Item = {
+      id: string;
+      status?: string;
+      summary?: string;
+      start?: { dateTime?: string; date?: string };
+      end?: { dateTime?: string; date?: string };
+    };
 
-    const data = await this.get<{
-      items?: {
-        id: string;
-        status?: string;
-        summary?: string;
-        start?: { dateTime?: string; date?: string };
-        end?: { dateTime?: string; date?: string };
-      }[];
-    }>(accessToken, url.toString());
+    // Все страницы окна, а не первые 250 событий. Неполный список раньше был
+    // просто «меньше данных», а теперь ещё и опасен: недостающие события
+    // считались бы удалёнными в Google и вычищались бы у нас.
+    const items: Item[] = [];
+    let pageToken: string | undefined;
+    let pages = 0;
+    do {
+      pages += 1;
+      const url = new URL(`${API}/calendars/${encodeURIComponent(calendarExternalId)}/events`);
+      url.searchParams.set('timeMin', range.from.toISOString());
+      url.searchParams.set('timeMax', range.to.toISOString());
+      // разворачиваем повторяющиеся события в отдельные вхождения
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
+      url.searchParams.set('maxResults', '250');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+      const data = await this.get<{ items?: Item[]; nextPageToken?: string }>(
+        accessToken,
+        url.toString(),
+      );
+      items.push(...(data.items ?? []));
+      pageToken = data.nextPageToken;
+    } while (pageToken && pages < MAX_PAGES);
 
     const events: RemoteEvent[] = [];
-    for (const item of data.items ?? []) {
+    for (const item of items) {
       if (item.status === 'cancelled') continue;
       const startIso = item.start?.dateTime;
       const startDate = item.start?.date;

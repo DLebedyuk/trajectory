@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte, notInArray } from 'drizzle-orm';
 import { addDaysToDateOnly, todayInTimezone } from '@planner/shared';
 import { DB, type Database } from '../../db/db.module.js';
 import { calendarEvents, calendars, googleCredentials, users } from '../../db/schema.js';
@@ -28,6 +28,19 @@ export interface CalendarConnection {
   lastSyncAt: string | null;
   lastError: string | null;
   encryptionReady: boolean;
+}
+
+/**
+ * Итог синхронизации. partial честно говорит, что часть данных не доехала:
+ * раньше такой прогон засчитывался как полностью успешный, и пользователь
+ * видел «синхронизировано» поверх неполного календаря.
+ */
+export interface SyncResult {
+  calendars: number;
+  events: number;
+  removed: number;
+  partial: boolean;
+  failed: string[];
 }
 
 export interface CalendarView {
@@ -221,7 +234,7 @@ export class CalendarService {
    * Синхронизация. Календари и события сопоставляются по id провайдера, поэтому
    * повторный запуск обновляет записи, а не плодит их.
    */
-  async sync(userId: string): Promise<{ calendars: number; events: number }> {
+  async sync(userId: string): Promise<SyncResult> {
     const token = await this.accessToken(userId);
     const [user] = await this.db.select().from(users).where(eq(users.id, userId));
     const timezone = user?.timezone ?? 'UTC';
@@ -251,6 +264,22 @@ export class CalendarService {
         });
     }
 
+    // Календари, исчезнувшие у провайдера, убираем вместе с их событиями:
+    // список от Google полный (пагинация пройдена), значит их там больше нет,
+    // а показывать вечный кеш удалённого календаря нечестно.
+    const alive = new Set(remoteCalendars.map((c) => c.externalId));
+    const alreadyStored = await this.db
+      .select()
+      .from(calendars)
+      .where(and(eq(calendars.userId, userId), eq(calendars.provider, 'google')));
+    const gone = alreadyStored.filter((c) => c.externalId && !alive.has(c.externalId));
+    if (gone.length > 0) {
+      const goneIds = gone.map((c) => c.id);
+      await this.db.delete(calendarEvents).where(inArray(calendarEvents.calendarId, goneIds));
+      await this.db.delete(calendars).where(inArray(calendars.id, goneIds));
+      this.logger.log(`Убрано календарей, исчезнувших у Google: ${gone.length}`);
+    }
+
     const stored = await this.db
       .select()
       .from(calendars)
@@ -258,12 +287,16 @@ export class CalendarService {
     const enabled = stored.filter((c) => c.enabled && c.externalId);
 
     const today = todayInTimezone(timezone);
+    const fromDate = addDaysToDateOnly(today, -SYNC_DAYS_BACK);
+    const toDate = addDaysToDateOnly(today, SYNC_DAYS_FORWARD);
     const range = {
-      from: new Date(`${addDaysToDateOnly(today, -SYNC_DAYS_BACK)}T00:00:00.000Z`),
-      to: new Date(`${addDaysToDateOnly(today, SYNC_DAYS_FORWARD)}T23:59:59.000Z`),
+      from: new Date(`${fromDate}T00:00:00.000Z`),
+      to: new Date(`${toDate}T23:59:59.000Z`),
     };
 
     let eventCount = 0;
+    let removedCount = 0;
+    const failed: string[] = [];
     // один сломавшийся календарь не должен ронять синхронизацию остальных,
     // но и молчать о нём нельзя — текст доедет до настроек
     let softError: string | null = null;
@@ -277,6 +310,7 @@ export class CalendarService {
         }
         const message = e instanceof Error ? e.message : String(e);
         softError = `Календарь «${cal.name}» не синхронизирован: ${message}`;
+        failed.push(cal.name);
         this.logger.warn(softError);
         continue;
       }
@@ -302,6 +336,23 @@ export class CalendarService {
           });
         eventCount += 1;
       }
+
+      // Событие, удалённое в Google, должно исчезнуть и у нас. Чистим только
+      // окно синхронизации и только после полной загрузки этого календаря:
+      // на оборвавшейся странице «недостающее» означало бы не «удалено».
+      const seen = remoteEvents.map((e) => e.externalId);
+      const stale = await this.db
+        .delete(calendarEvents)
+        .where(
+          and(
+            eq(calendarEvents.calendarId, cal.id),
+            gte(calendarEvents.date, fromDate),
+            lte(calendarEvents.date, toDate),
+            seen.length > 0 ? notInArray(calendarEvents.externalId, seen) : undefined,
+          ),
+        )
+        .returning({ id: calendarEvents.id });
+      removedCount += stale.length;
     }
 
     await this.db
@@ -309,6 +360,12 @@ export class CalendarService {
       .set({ lastSyncAt: new Date(), lastError: softError })
       .where(eq(googleCredentials.userId, userId));
 
-    return { calendars: remoteCalendars.length, events: eventCount };
+    return {
+      calendars: remoteCalendars.length,
+      events: eventCount,
+      removed: removedCount,
+      partial: failed.length > 0,
+      failed,
+    };
   }
 }

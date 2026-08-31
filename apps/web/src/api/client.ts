@@ -185,7 +185,14 @@ export const api = {
     list: () => get<CalendarView[]>('/api/calendar/list'),
     setEnabled: (id: string, enabled: boolean) =>
       post<CalendarView>(`/api/calendar/${id}/enabled`, { enabled }),
-    sync: () => post<{ calendars: number; events: number }>('/api/calendar/sync'),
+    sync: () =>
+      post<{
+        calendars: number;
+        events: number;
+        removed: number;
+        partial: boolean;
+        failed: string[];
+      }>('/api/calendar/sync'),
     disconnect: () => post<{ ok: true }>('/api/calendar/disconnect'),
     /** Согласие на календарь — обычная навигация, не fetch. */
     connectUrl: () => `${BASE}/api/calendar/google/connect`,

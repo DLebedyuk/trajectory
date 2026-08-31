@@ -43,7 +43,14 @@ export function CalendarCard() {
       void qc.invalidateQueries({ queryKey: qk.calendars });
       void qc.invalidateQueries({ queryKey: qk.calendarConnection });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
-      toast.show(`Синхронизировано: ${r.events} ${r.events === 1 ? 'событие' : 'событий'}`);
+      // частичный прогон нельзя показывать как успешный: человек решит,
+      // что видит весь календарь, а часть данных не доехала
+      toast.show(
+        r.partial
+          ? `Синхронизировано частично: не догрузились ${r.failed.join(', ')}`
+          : `Синхронизировано: ${r.events} ${r.events === 1 ? 'событие' : 'событий'}` +
+              (r.removed ? `, убрано удалённых: ${r.removed}` : ''),
+      );
     },
     onError: (e) => toast.show(e instanceof ApiError ? e.message : 'Не удалось синхронизировать'),
   });
