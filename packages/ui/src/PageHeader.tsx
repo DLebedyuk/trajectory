@@ -1,11 +1,24 @@
 import type { ReactNode } from 'react';
 import { IconBack } from './icons.js';
 
+export interface PageHeaderGlyph {
+  /** Буква направления. Иконку не рисуем: буква читается в любом размере. */
+  letter: string;
+  /** Имя CSS-переменной цвета направления, как оно хранится в базе. */
+  color: string;
+}
+
+/**
+ * Шапка страницы: возврат, надзаголовок, значок и заголовок на одной строке,
+ * описание и действия. Вёрстка вынесена в CSS (.page-header) — inline-стили
+ * здесь мешали бы теме и адаптивности.
+ */
 export function PageHeader({
   title,
   subtitle,
   eyebrow,
   icon,
+  glyph,
   actions,
   onBack,
   backLabel = 'Назад',
@@ -13,58 +26,42 @@ export function PageHeader({
   title: string;
   subtitle?: ReactNode;
   eyebrow?: ReactNode;
-  /** Значок перед заголовком — стоит с ним на одной строке. */
+  /** Произвольный значок перед заголовком. */
   icon?: ReactNode;
+  /** Значок направления: буква на его цвете. */
+  glyph?: PageHeaderGlyph;
   actions?: ReactNode;
   onBack?: () => void;
   backLabel?: string;
 }) {
   return (
-    <>
+    <div className="page-header">
       {onBack ? (
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          style={{ marginBottom: 14, paddingLeft: 7 }}
-          onClick={onBack}
-        >
+        <button type="button" className="back" onClick={onBack} aria-label={`Назад: ${backLabel}`}>
           <IconBack />
-          {backLabel}
         </button>
       ) : null}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 20,
-          marginBottom: 20,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ maxWidth: '66ch' }}>
-          {eyebrow}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              marginTop: eyebrow ? 8 : 0,
-            }}
-          >
-            {icon}
-            <h1 style={{ fontSize: 26 }}>{title}</h1>
-          </div>
-          {subtitle ? (
-            <div className="hint" style={{ marginTop: 5, fontSize: 14 }}>
-              {subtitle}
-            </div>
-          ) : null}
-        </div>
-        {actions ? (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{actions}</div>
-        ) : null}
+
+      <div className="titles">
+        {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
+        <h1>
+          {glyph ? (
+            <span
+              className="glyph"
+              style={{ ['--c' as string]: `var(${glyph.color})` }}
+              aria-hidden="true"
+            >
+              {glyph.letter}
+            </span>
+          ) : (
+            icon
+          )}
+          {title}
+        </h1>
+        {subtitle ? <div className="desc">{subtitle}</div> : null}
       </div>
-    </>
+
+      {actions ? <div className="actions">{actions}</div> : null}
+    </div>
   );
 }

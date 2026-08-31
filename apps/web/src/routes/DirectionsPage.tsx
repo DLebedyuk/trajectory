@@ -2,15 +2,28 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Button, FormField, Heatmap, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
-import { DURATION_LABEL, formatLongDate, todayInTimezone } from '@planner/shared';
+import { DURATION_LABEL, formatLongDate, plural, todayInTimezone } from '@planner/shared';
 import { api } from '../api/client.js';
 import { qk, useDashboard, useDirections } from '../api/queries.js';
-import { Glyph } from '../components/Glyph.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 
 /**
- * Направления — широкие горизонтальные плашки: слева карта касаний,
- * справа закреплённые задачи вместе с их проектами.
+ * Палитра направлений. Имена переменных — те же, что хранятся в базе:
+ * цвет выбирает человек, а не код, поэтому новое направление сразу
+ * правильно красит интерфейс, когда попадает в фокус.
+ */
+const PALETTE = [
+  { value: '--d-act', label: 'розовый' },
+  { value: '--d-voice', label: 'золотой' },
+  { value: '--d-vocal', label: 'фиолетовый' },
+  { value: '--d-eng', label: 'бирюзовый' },
+  { value: '--d-phys', label: 'синий' },
+  { value: '--d-neutral', label: 'оливковый' },
+];
+
+/**
+ * Направления — широкие плашки: слева имя и статистика, в середине карта
+ * касаний, справа закреплённые задачи вместе с их проектами.
  */
 export function DirectionsPage() {
   const navigate = useNavigate();
@@ -20,6 +33,7 @@ export function DirectionsPage() {
   const dashboard = useDashboard();
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
+  const [color, setColor] = useState(PALETTE[3]!.value);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -34,7 +48,7 @@ export function DirectionsPage() {
     mutationFn: () =>
       // motto/showMotto — легаси-поля: девизы убраны из интерфейса,
       // данные в БД пока остаются, но новые направления их не показывают
-      api.directions.create({ name, color: '--d-eng', icon: 'spark', showMotto: false }),
+      api.directions.create({ name, color, icon: 'spark', showMotto: false }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.directions });
       toast.show('Направление создано');
@@ -44,7 +58,8 @@ export function DirectionsPage() {
   });
 
   if (directions.isLoading) return <Loading what="Загружаю направления" />;
-  if (directions.isError) return <ErrorBox error={directions.error} />;
+  if (directions.isError)
+    return <ErrorBox error={directions.error} onRetry={() => void directions.refetch()} />;
 
   return (
     <>
@@ -60,7 +75,8 @@ export function DirectionsPage() {
       />
 
       {(directions.data ?? []).map((d, index) => {
-        const heat = perDirection[index * 2]?.data as { days: never[] } | undefined;
+        const heat = perDirection[index * 2]?.data as
+          { days: never[]; total?: number; weekTotal?: number } | undefined;
         const pinned = (perDirection[index * 2 + 1]?.data ?? []) as {
           id: string;
           title: string;
@@ -69,57 +85,79 @@ export function DirectionsPage() {
           estimatedDuration: 'short' | 'medium' | 'long' | null;
         }[];
         const isFocus = dashboard.data?.focus.focusDirectionId === d.id;
-        return (
-          <div className="dirrow" key={d.id}>
-            <button
-              className="dirrow-l"
-              type="button"
-              onClick={() => navigate(`/directions/${d.id}`)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                <Glyph name={d.name} color={d.color} />
-                <span style={{ fontFamily: 'Literata, serif', fontSize: 18 }}>{d.name}</span>
-                {isFocus ? (
-                  <span className="quiet" style={{ marginLeft: 6 }}>
-                    в фокусе
-                  </span>
-                ) : null}
-              </div>
+        const total = heat?.total ?? 0;
 
+        return (
+          <div className="dir-list-row" key={d.id}>
+            <div className="left-cell">
+              <span
+                className="dir-glyph lg"
+                style={{ ['--c' as string]: `var(${d.color})` }}
+                aria-hidden="true"
+              >
+                {d.name.charAt(0)}
+              </span>
+              <div className="info">
+                <div className="nm">
+                  <button type="button" onClick={() => navigate(`/directions/${d.id}`)}>
+                    {d.name}
+                  </button>
+                  {isFocus ? <span className="focus-badge">в фокусе</span> : null}
+                </div>
+                <div className="stats">
+                  {total} {plural(total, 'касание', 'касания', 'касаний')} · за неделю{' '}
+                  {heat?.weekTotal ?? 0}
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="heat-cell scroll-x"
+              aria-label={`Карта касаний направления «${d.name}»`}
+              onClick={() => navigate(`/directions/${d.id}/touches`)}
+            >
               <Heatmap
                 days={heat?.days ?? []}
                 today={today}
                 weeks={26}
-                cell={12}
+                cell={11}
                 gap={3}
                 showWeekdays={false}
               />
             </button>
-            <div className="dirrow-r">
+
+            <div className="pinned-cell">
               {pinned.length > 0 ? (
                 <>
-                  <span className="lbl">Закреплено</span>
                   {pinned.slice(0, 4).map((t) => (
                     <button
                       key={t.id}
                       type="button"
-                      className="dirpin"
+                      className="pt"
                       onClick={() => navigate(`/tasks/${t.id}`)}
                     >
-                      <div className="pc-proj">{t.projectTitle}</div>
-                      <div className="pc-task">{t.title}</div>
-                      <div className="pc-meta">
-                        {t.deadline
-                          ? `до ${formatLongDate(t.deadline)}`
-                          : t.estimatedDuration
-                            ? DURATION_LABEL[t.estimatedDuration]
-                            : ''}
-                      </div>
+                      <i className="dir-dot" style={{ ['--c' as string]: `var(${d.color})` }} />
+                      <span>
+                        {t.title}
+                        <small>
+                          {' '}
+                          · {t.projectTitle}
+                          {t.deadline
+                            ? ` · до ${formatLongDate(t.deadline)}`
+                            : t.estimatedDuration
+                              ? ` · ${DURATION_LABEL[t.estimatedDuration]}`
+                              : ''}
+                        </small>
+                      </span>
                     </button>
                   ))}
+                  {pinned.length > 4 ? (
+                    <span className="more">и ещё {pinned.length - 4}</span>
+                  ) : null}
                 </>
               ) : (
-                <span className="quiet">Ничего не закреплено.</span>
+                <span className="more">Ничего не закреплено.</span>
               )}
             </div>
           </div>
@@ -130,6 +168,7 @@ export function DirectionsPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Новое направление"
+        description="Цвет станет акцентом всего приложения, когда направление окажется в фокусе."
         footer={
           <>
             <Button variant="ghost" onClick={() => setCreateOpen(false)}>
@@ -144,6 +183,23 @@ export function DirectionsPage() {
         <FormField label="Название">
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
         </FormField>
+        <div className="field">
+          <span className="lbl">Цвет</span>
+          <div className="chips">
+            {PALETTE.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                className={`chip${color === c.value ? ' is-active' : ''}`}
+                aria-pressed={color === c.value}
+                onClick={() => setColor(c.value)}
+              >
+                <i className="dir-dot" style={{ ['--c' as string]: `var(${c.value})` }} />
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </Modal>
     </>
   );

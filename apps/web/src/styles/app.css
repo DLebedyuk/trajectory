@@ -2047,3 +2047,73 @@ body {
     flex-wrap: wrap;
   }
 }
+
+/* ============ СПИСОК НАПРАВЛЕНИЙ: производные ============ */
+.dir-list-row .left-cell .info .nm button {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.dir-list-row .left-cell .info .nm button:hover {
+  color: var(--accent);
+}
+.dir-list-row .heat-cell {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.dir-list-row .pinned-cell .pt {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  align-items: baseline;
+}
+.dir-list-row .pinned-cell .pt:hover span {
+  color: var(--accent);
+}
+@media (max-width: 1080px) {
+  .dir-list-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+}
+
+/* карта касаний и последние касания рядом, на узком — друг под другом */
+.dir-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .dir-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.dir-split .today-links button {
+  font: inherit;
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line-strong);
+}
+.dir-split .today-links button:hover {
+  color: var(--accent);
+}
+.dir-split .today-links {
+  display: flex;
+  gap: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 12px;
+}
+.touch-item + .touch-item {
+  margin-top: 10px;
+}
+.dir-project-card {
+  text-align: left;
+  width: 100%;
+}
