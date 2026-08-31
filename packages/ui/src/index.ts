@@ -6,6 +6,5 @@ export * from './FormField.js';
 export * from './EmptyState.js';
 export * from './PageHeader.js';
 export * from './Heatmap.js';
-export * from './ProjectTaskCard.js';
 export * from './Toast.js';
 export * from './icons.js';

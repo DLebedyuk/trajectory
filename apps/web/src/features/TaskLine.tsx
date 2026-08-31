@@ -1,10 +1,13 @@
-import { Checkbox, IconClock, IconPin, IconPinFilled } from '@planner/ui';
+import { IconPin, IconPinFilled } from '@planner/ui';
 import { DURATION_LABEL, formatLongDate } from '@planner/shared';
 import type { Task } from '@planner/contracts';
 
 /**
  * Строка задачи в проекте. Никаких меток «обязательная» или «бэклог» —
  * все незавершённые задачи равноправны, выделяется только активная.
+ *
+ * Активность и закрепление — разные вещи и показываются по-разному:
+ * активная задача подсвечена целиком, закреплённая помечена булавкой.
  */
 export function TaskLine({
   task,
@@ -22,47 +25,35 @@ export function TaskLine({
   onTogglePin: () => void;
 }) {
   const done = task.checklist.filter((c) => c.completed).length;
+  const isDone = task.status === 'done';
+
+  const meta = [
+    task.deadline
+      ? `до ${formatLongDate(task.deadline)}${task.exactTime ? `, ${task.exactTime}` : ''}`
+      : null,
+    task.estimatedDuration ? DURATION_LABEL[task.estimatedDuration] : null,
+    task.checklist.length > 0 ? `${done} из ${task.checklist.length}` : null,
+  ].filter(Boolean);
+
   return (
     <div
-      className="tline"
-      data-active={isActive}
-      style={{ ['--tc' as string]: `var(${directionColor})` }}
+      className={`task-row${isActive ? ' is-active' : ''}`}
+      style={{ ['--c' as string]: `var(${directionColor})` }}
     >
-      <Checkbox
-        checked={task.status === 'done'}
-        onChange={onComplete}
-        label={`Выполнить: ${task.title}`}
-      />
-      <button type="button" className="tline-main" onClick={onOpen}>
-        <div className="tline-title">
-          {task.title}
-          {isActive ? (
-            <span className="quiet" style={{ marginLeft: 5 }}>
-              сейчас
-            </span>
-          ) : null}
-        </div>
-        <div className="tline-meta">
-          {task.deadline ? (
-            <i>
-              <IconClock />
-              до {formatLongDate(task.deadline)}
-              {task.exactTime ? `, ${task.exactTime}` : ''}
-            </i>
-          ) : null}
-          {task.estimatedDuration ? <i>{DURATION_LABEL[task.estimatedDuration]}</i> : null}
-          {task.checklist.length > 0 ? (
-            <i>
-              {done} из {task.checklist.length}
-            </i>
-          ) : null}
-        </div>
-      </button>
       <button
         type="button"
-        className="pinbtn"
-        data-on={task.pinned}
-        aria-label={task.pinned ? 'Открепить' : 'Закрепить'}
+        className={`check${isDone ? ' done' : ''}`}
+        aria-label={isDone ? `Вернуть в работу: ${task.title}` : `Выполнить: ${task.title}`}
+        onClick={onComplete}
+      />
+      <button type="button" className={`tname${isDone ? ' done' : ''}`} onClick={onOpen}>
+        {task.title}
+      </button>
+      {meta.length > 0 ? <span className="tmeta">{meta.join(' · ')}</span> : null}
+      <button
+        type="button"
+        className={`pin${task.pinned ? ' is-pinned' : ''}`}
+        aria-label={task.pinned ? `Открепить: ${task.title}` : `Закрепить: ${task.title}`}
         title={task.pinned ? 'Открепить' : 'Закрепить'}
         onClick={onTogglePin}
       >

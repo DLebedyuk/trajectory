@@ -926,3 +926,19 @@ select {
   align-items: center;
   gap: 6px;
 }
+/* строка задачи: кнопки внутри не должны выглядеть кнопками */
+.task-row .check,
+.task-row .tname,
+.task-row .pin {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+.task-row .check {
+  border-radius: 50%;
+}
+.task-row .tname {
+  min-width: 0;
+}

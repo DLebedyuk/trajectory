@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './render.js';
 import { makeTask } from './fixtures.js';
 import { TaskLine } from '../features/TaskLine.js';
-import { ProjectTaskCard } from '@planner/ui';
 
 describe('закрепление задачи', () => {
   it('кнопка закрепления меняет доступное имя', async () => {
@@ -22,7 +21,7 @@ describe('закрепление задачи', () => {
     );
 
     const user = userEvent.setup();
-    const pinButton = screen.getByRole('button', { name: 'Закрепить' });
+    const pinButton = screen.getByRole('button', { name: /^Закрепить: / });
     await user.click(pinButton);
     expect(onTogglePin).toHaveBeenCalledTimes(1);
 
@@ -36,27 +35,7 @@ describe('закрепление задачи', () => {
         onTogglePin={onTogglePin}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Открепить' })).toBeInTheDocument();
-  });
-
-  it('закреплённая карточка показывает проект вместе с задачей', () => {
-    renderWithProviders(
-      <ProjectTaskCard
-        projectTitle="Подготовить демо для сайта"
-        taskTitle="Перезаписать рекламный ролик №1"
-        directionName="Озвучка"
-        directionColor="--d-voice"
-        meta="около часа"
-        onOpen={() => undefined}
-        onComplete={() => undefined}
-        onUnpin={() => undefined}
-      />,
-    );
-
-    expect(screen.getByText('Подготовить демо для сайта')).toBeInTheDocument();
-    expect(screen.getByText('Перезаписать рекламный ролик №1')).toBeInTheDocument();
-    expect(screen.getByText('Озвучка')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Открепить' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Открепить: / })).toBeInTheDocument();
   });
 
   it('в задаче без меток «обязательная» и «бэклог»', () => {
