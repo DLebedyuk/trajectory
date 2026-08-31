@@ -1,14 +1,16 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import { useState } from 'react';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { Route, Routes } from 'react-router-dom';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { vi } from 'vitest';
 import { renderWithProviders } from './render.js';
 import { makeTask } from './fixtures.js';
 
-/** Поведение задаётся обычной функцией — см. комментарий в direction-archive.test.tsx. */
+/**
+ * Поведение задаётся обычной функцией, а не vi.fn: обёртка мока подписывается
+ * на возвращённый промис и делает отклонение «необработанным», из-за чего
+ * тест на ошибку падает мимо собственных проверок.
+ */
 let listBehaviour: () => Promise<unknown> = async () => [];
-let listCalls = 0;
 const reopened: string[] = [];
 
 vi.mock('../api/client.js', async () => {
@@ -16,11 +18,11 @@ vi.mock('../api/client.js', async () => {
   return {
     ...actual,
     api: {
+      ...actual.api,
+      dashboard: async () => ({ today: '2026-08-29' }),
+      projects: { get: async () => ({ id: 'proj-1', title: 'Подготовить монолог Офелии' }) },
       tasks: {
-        listByProject: () => {
-          listCalls += 1;
-          return listBehaviour();
-        },
+        listByProject: () => listBehaviour(),
         reopen: async (id: string) => {
           reopened.push(id);
           return {};
@@ -30,23 +32,7 @@ vi.mock('../api/client.js', async () => {
   };
 });
 
-const { ProjectArchiveModal } = await import('../features/ProjectArchiveModal.js');
-
-function Host() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button onClick={() => setOpen(true)}>Архив</button>
-      <ProjectArchiveModal
-        projectId="proj-1"
-        projectTitle="Подготовить монолог Офелии"
-        today="2026-08-29"
-        open={open}
-        onOpenChange={setOpen}
-      />
-    </>
-  );
-}
+const { ProjectArchivePage } = await import('../routes/ArchivePage.js');
 
 const doneTask = makeTask({
   id: 'done-1',
@@ -55,58 +41,42 @@ const doneTask = makeTask({
   completedAt: '2026-08-27T10:00:00.000Z',
 });
 
+function render() {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/projects/:projectId/archive" element={<ProjectArchivePage />} />
+    </Routes>,
+    '/projects/proj-1/archive',
+  );
+}
+
 describe('архив проекта', () => {
   beforeEach(() => {
-    listCalls = 0;
     reopened.length = 0;
     listBehaviour = async () => [doneTask];
   });
 
-  it('открывается и показывает завершённые задачи проекта', async () => {
-    renderWithProviders(<Host />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Архив' }));
-    expect(await screen.findByText('Выбрать редакцию перевода')).toBeInTheDocument();
-  });
-
-  it('до открытия ничего не запрашивает', async () => {
-    renderWithProviders(<Host />);
-    expect(listCalls).toBe(0);
-  });
-
-  it('работает после повторного открытия и закрытия', async () => {
-    renderWithProviders(<Host />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole('button', { name: 'Архив' }));
-    await screen.findByText('Выбрать редакцию перевода');
-    await user.click(screen.getByRole('button', { name: 'Закрыть' }));
-
-    await user.click(screen.getByRole('button', { name: 'Архив' }));
+  it('показывает завершённые задачи проекта', async () => {
+    render();
     expect(await screen.findByText('Выбрать редакцию перевода')).toBeInTheDocument();
   });
 
   it('пустой архив объясняет себя', async () => {
     listBehaviour = async () => [];
-    renderWithProviders(<Host />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Архив' }));
-    expect(await screen.findByText(/пока ничего не завершено/)).toBeInTheDocument();
+    render();
+    expect(await screen.findByText(/пока ничего не завершено/i)).toBeInTheDocument();
   });
 
   it('при ошибке предлагает повторить', async () => {
     listBehaviour = () => Promise.reject(new Error('сеть недоступна'));
-    renderWithProviders(<Host />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Архив' }));
-    expect(await screen.findByText('Не удалось загрузить архив.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Повторить' })).toBeInTheDocument();
+    render();
+    expect(await screen.findByRole('button', { name: /повторить/i })).toBeInTheDocument();
   });
 
   it('возвращает задачу в работу', async () => {
-    renderWithProviders(<Host />);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Архив' }));
+    render();
     await screen.findByText('Выбрать редакцию перевода');
-    await user.click(screen.getByRole('button', { name: 'Вернуть' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Вернуть' }));
     expect(reopened).toEqual(['done-1']);
   });
 });

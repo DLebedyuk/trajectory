@@ -11,11 +11,7 @@ import { makeDashboard, makeFocus, makeTask } from './fixtures.js';
  * из-за чего тест на ошибку падает мимо собственных проверок.
  */
 let archiveBehaviour: () => Promise<unknown> = async () => [];
-let archiveCalls = 0;
-const doneByDirection = (): Promise<unknown> => {
-  archiveCalls += 1;
-  return archiveBehaviour();
-};
+const doneByDirection = (): Promise<unknown> => archiveBehaviour();
 
 const direction = {
   id: 'dir-act',
@@ -37,6 +33,7 @@ vi.mock('../api/client.js', async () => {
   return {
     ...actual,
     api: {
+      ...actual.api,
       dashboard: async () => makeDashboard({ focus: makeFocus() }),
       directions: { get: async () => direction, list: async () => [] },
       projects: { listByDirection: async () => [] },
@@ -48,8 +45,9 @@ vi.mock('../api/client.js', async () => {
 });
 
 const { DirectionPage } = await import('../routes/DirectionPage.js');
+const { DirectionArchivePage } = await import('../routes/ArchivePage.js');
 
-function render() {
+function renderDirection() {
   return renderWithProviders(
     <Routes>
       <Route path="/directions/:directionId" element={<DirectionPage />} />
@@ -58,19 +56,41 @@ function render() {
   );
 }
 
+function renderArchive() {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/directions/:directionId/archive" element={<DirectionArchivePage />} />
+    </Routes>,
+    '/directions/dir-act/archive',
+  );
+}
+
 describe('страница направления', () => {
   beforeEach(() => {
-    archiveCalls = 0;
     archiveBehaviour = async () => [];
   });
 
   it('не показывает девиз направления', async () => {
-    render();
+    renderDirection();
     await screen.findByText('Актёрство');
     expect(screen.queryByText(/Легаси-девиз/)).not.toBeInTheDocument();
   });
 
-  it('архив показывает завершённые задачи с названием проекта', async () => {
+  it('архив открывается ссылкой, а не модалкой', async () => {
+    renderDirection();
+    await screen.findByText('Актёрство');
+    expect(screen.getByRole('button', { name: 'Архив' })).toBeInTheDocument();
+    // модалки на странице больше нет: содержимое живёт на своей странице
+    expect(screen.queryByText(/Архив направления/)).not.toBeInTheDocument();
+  });
+});
+
+describe('страница архива направления', () => {
+  beforeEach(() => {
+    archiveBehaviour = async () => [];
+  });
+
+  it('показывает завершённые задачи с названием проекта', async () => {
     archiveBehaviour = async () => [
       makeTask({
         id: 'done-1',
@@ -80,45 +100,36 @@ describe('страница направления', () => {
         projectTitle: 'Подготовить монолог Офелии',
       }),
     ];
-    render();
-    const user = userEvent.setup();
-
-    await screen.findByText('Актёрство');
-    await user.click(screen.getByRole('button', { name: 'Архив' }));
+    renderArchive();
 
     expect(await screen.findByText('Выбрать редакцию перевода')).toBeInTheDocument();
     expect(screen.getByText('Подготовить монолог Офелии')).toBeInTheDocument();
   });
 
   it('у пустого архива понятное состояние, а не пустота', async () => {
-    render();
-    const user = userEvent.setup();
-
-    await screen.findByText('Актёрство');
-    await user.click(screen.getByRole('button', { name: 'Архив' }));
-
-    expect(await screen.findByText(/Здесь появятся завершённые задачи/)).toBeInTheDocument();
+    renderArchive();
+    expect(await screen.findByText(/Пока ничего не завершено/i)).toBeInTheDocument();
   });
 
   it('при ошибке предлагает повторить, а не молчит', async () => {
     archiveBehaviour = () => Promise.reject(new Error('сеть недоступна'));
-    render();
-    const user = userEvent.setup();
-
-    await screen.findByText('Актёрство');
-    await user.click(screen.getByRole('button', { name: 'Архив' }));
-
-    expect(await screen.findByText('Не удалось загрузить архив.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Повторить' })).toBeInTheDocument();
+    renderArchive();
+    expect(await screen.findByRole('button', { name: /повторить/i })).toBeInTheDocument();
   });
 
-  it('архив запрашивается только при открытии', async () => {
-    render();
-    await screen.findByText('Актёрство');
-    expect(archiveCalls).toBe(0);
+  it('открывается повторно без поломок', async () => {
+    archiveBehaviour = async () => [
+      makeTask({ id: 'done-1', title: 'Выбрать редакцию перевода', status: 'done' }),
+    ];
+    const first = renderArchive();
+    expect(await screen.findByText('Выбрать редакцию перевода')).toBeInTheDocument();
+    first.unmount();
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Архив' }));
-    await screen.findByText(/Здесь появятся завершённые задачи/);
-    expect(archiveCalls).toBe(1);
+    renderArchive();
+    expect(await screen.findByText('Выбрать редакцию перевода')).toBeInTheDocument();
   });
 });
+
+// на странице архива нет действий, кроме перехода к задаче — клики проверяются
+// в архиве проекта, где есть «Вернуть»
+void userEvent;

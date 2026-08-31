@@ -81,7 +81,8 @@ export function TouchesPage() {
   });
 
   if (touches.isLoading) return <Loading what="Загружаю касания" />;
-  if (touches.isError) return <ErrorBox error={touches.error} />;
+  if (touches.isError)
+    return <ErrorBox error={touches.error} onRetry={() => void touches.refetch()} />;
 
   const list = touches.data ?? [];
   // сервер отдаёт по убыванию даты — сохраняем порядок, просто склеиваем дни

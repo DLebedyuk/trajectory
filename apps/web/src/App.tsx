@@ -17,6 +17,7 @@ import { InboxPage } from './routes/InboxPage.js';
 import { SettingsPage } from './routes/SettingsPage.js';
 import { ActivityPage } from './routes/ActivityPage.js';
 import { TouchesPage } from './routes/TouchesPage.js';
+import { DirectionArchivePage, ProjectArchivePage } from './routes/ArchivePage.js';
 
 export function App() {
   const status = useQuery({ queryKey: qk.authStatus, queryFn: api.auth.status, retry: false });
@@ -34,6 +35,8 @@ export function App() {
         <Route path="/directions" element={<DirectionsPage />} />
         <Route path="/directions/:directionId" element={<DirectionPage />} />
         <Route path="/directions/:directionId/touches" element={<TouchesPage />} />
+        <Route path="/directions/:directionId/archive" element={<DirectionArchivePage />} />
+        <Route path="/projects/:projectId/archive" element={<ProjectArchivePage />} />
         <Route path="/touches" element={<TouchesPage />} />
         <Route path="/projects/:projectId" element={<ProjectPage />} />
         <Route path="/tasks/:taskId" element={<TaskPage />} />

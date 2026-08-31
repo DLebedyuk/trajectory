@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, FormField, IconPause, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
-import { formatLongDate, todayInTimezone } from '@planner/shared';
+import { formatLongDate } from '@planner/shared';
 import type { TaskFilter } from '@planner/contracts';
 import { api } from '../api/client.js';
 import {
@@ -18,7 +18,6 @@ import {
 } from '../api/queries.js';
 import { TaskLine } from '../features/TaskLine.js';
 import { ProjectSettingsModal } from '../features/ProjectSettingsModal.js';
-import { ProjectArchiveModal } from '../features/ProjectArchiveModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 import { useUiStore } from '../store/ui.js';
 
@@ -48,13 +47,11 @@ export function ProjectPage() {
   const [taskOpen, setTaskOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [deadline, setDeadline] = useState('');
   const [duration, setDuration] = useState('');
   const [note, setNote] = useState('');
 
-  const today = dashboard.data?.today ?? todayInTimezone('UTC');
   const activeTaskId = dashboard.data?.focus.activeTaskId ?? null;
   // Активная задача — глобальное состояние; в списке она просто подсвечена.
   // Проектный «Следующий шаг» из интерфейса убран, модель в API и БД осталась.
@@ -146,7 +143,7 @@ export function ProjectPage() {
             <Button size="sm" onClick={() => setSettingsOpen(true)}>
               Настройки
             </Button>
-            <Button size="sm" onClick={() => setArchiveOpen(true)}>
+            <Button size="sm" onClick={() => navigate(`/projects/${projectId}/archive`)}>
               Архив
             </Button>
             {p.status === 'active' ? (
@@ -263,14 +260,6 @@ export function ProjectPage() {
           </div>
         </aside>
       </div>
-
-      <ProjectArchiveModal
-        projectId={projectId}
-        projectTitle={p.title}
-        today={today}
-        open={archiveOpen}
-        onOpenChange={setArchiveOpen}
-      />
 
       <ProjectSettingsModal
         project={p}

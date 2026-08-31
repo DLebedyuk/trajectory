@@ -26,7 +26,6 @@ import { ErrorBox, Loading } from '../components/Loading.js';
 import { TouchModal } from '../features/TouchModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DirectionSettingsModal } from '../features/DirectionSettingsModal.js';
-import { DirectionArchiveModal } from '../features/DirectionArchiveModal.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 
 /** Страница направления. Задачи здесь не показываются — только проекты. */
@@ -50,7 +49,6 @@ export function DirectionPage() {
   const [showPaused, setShowPaused] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -128,7 +126,7 @@ export function DirectionPage() {
             <Button size="sm" onClick={() => setSettingsOpen(true)}>
               Настройки
             </Button>
-            <Button size="sm" onClick={() => setArchiveOpen(true)}>
+            <Button size="sm" onClick={() => navigate(`/directions/${directionId}/archive`)}>
               Архив
             </Button>
             <Button
@@ -295,14 +293,6 @@ export function DirectionPage() {
         today={today}
       />
       <DayTouchesModal date={day} directionId={directionId} onClose={() => setDay(null)} />
-
-      <DirectionArchiveModal
-        directionId={directionId}
-        directionName={d.name}
-        today={today}
-        open={archiveOpen}
-        onOpenChange={setArchiveOpen}
-      />
 
       <DirectionSettingsModal
         direction={d}
