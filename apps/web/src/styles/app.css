@@ -2138,3 +2138,14 @@ body {
 .touch-item .info {
   min-width: 0;
 }
+.row-del {
+  color: var(--text-3);
+  padding: 6px;
+  border-radius: 7px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.row-del:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}

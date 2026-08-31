@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, EmptyState, IconPlus, PageHeader, useToast } from '@planner/ui';
+import { Button, EmptyState, IconPlus, IconTrash, PageHeader, useToast } from '@planner/ui';
 import { formatLongDate, plural, todayInTimezone } from '@planner/shared';
 import type { TouchWithContext } from '@planner/contracts';
 import { api } from '../api/client.js';
@@ -45,9 +45,17 @@ function DayGroup({
             {/* комментарий — то, ради чего человек его писал; раньше он никуда не выводился */}
             {t.comment ? <p className="hint touch-comment">{t.comment}</p> : null}
           </div>
-          <Button size="sm" variant="ghost" danger onClick={() => onRemove(t.id)}>
-            Удалить
-          </Button>
+          {/* удаление — редкое и опасное действие: значок в стороне,
+              а не кнопка вровень с содержимым */}
+          <button
+            type="button"
+            className="row-del"
+            aria-label={`Удалить касание: ${t.title}`}
+            title="Удалить"
+            onClick={() => onRemove(t.id)}
+          >
+            <IconTrash />
+          </button>
         </div>
       ))}
     </div>
