@@ -54,6 +54,36 @@ describe('связывание Telegram по одноразовому коду',
     expect(status.username).toBe('daria');
   });
 
+  /**
+   * Переезд в другой Telegram: старый чат обязан перестать работать, иначе
+   * он продолжит класть напоминания в аккаунт, из которого человек ушёл.
+   */
+  it('новая привязка заменяет прежнюю, а не добавляется к ней', async () => {
+    const first = await service.issueCode(TEST_USER_ID);
+    await service.redeemCode(first.code, {
+      telegramUserId: '777',
+      chatId: '777',
+      username: 'старый',
+    });
+
+    const second = await service.issueCode(TEST_USER_ID);
+    await service.redeemCode(second.code, {
+      telegramUserId: '888',
+      chatId: '888',
+      username: 'новый',
+    });
+
+    const rows = await db
+      .select()
+      .from(schema.telegramAccounts)
+      .where(eq(schema.telegramAccounts.userId, TEST_USER_ID));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.telegramUserId).toBe('888');
+
+    const status = await service.status(TEST_USER_ID);
+    expect(status.username).toBe('новый');
+  });
+
   it('повторно использовать код нельзя', async () => {
     const { code } = await service.issueCode(TEST_USER_ID);
     await service.redeemCode(code, chat);

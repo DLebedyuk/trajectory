@@ -247,7 +247,19 @@ export class TasksService {
   }
 
   async reopen(userId: string, id: string): Promise<Task> {
-    await this.assertExists(userId, id);
+    const existing = await this.assertExists(userId, id);
+    // задачу нельзя оживить внутри завершённого проекта: она станет открытой
+    // задачей архива — видимой в счётчиках и недоступной в интерфейсе
+    const [project] = await this.db
+      .select({ status: projects.status })
+      .from(projects)
+      .where(and(eq(projects.userId, userId), eq(projects.id, existing.projectId)));
+    if (project?.status === 'archived') {
+      throw ApiException.conflict(
+        'project_archived',
+        'Проект завершён. Сначала верните проект из архива.',
+      );
+    }
     const [row] = await this.db
       .update(tasks)
       .set({ status: 'open', completedAt: null, updatedAt: new Date() })

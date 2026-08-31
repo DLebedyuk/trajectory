@@ -27,7 +27,19 @@ export const createProjectSchema = z.object({
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
-export const updateProjectSchema = createProjectSchema.partial();
+/**
+ * Статус здесь намеренно отсутствует. Завершение и возврат проекта — это не
+ * правка поля: вместе со статусом закрываются задачи, снимается фокус,
+ * пишется дата завершения. Через общий PATCH всё это обходилось, и проект
+ * оказывался «завершённым» с живыми открытыми задачами внутри.
+ * Статус меняется только через /archive и /restore.
+ */
+export const updateProjectSchema = createProjectSchema
+  .partial()
+  .omit({ status: true })
+  // strict, а не strip: попытка сменить статус этой ручкой должна быть видимой
+  // ошибкой, а не молча выброшенным полем
+  .strict();
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 
 /** Проект + признаки «есть активная задача» / «сколько закреплено» для сортировки по весу. */

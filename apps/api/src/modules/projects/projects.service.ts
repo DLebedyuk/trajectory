@@ -130,7 +130,8 @@ export class ProjectsService {
           ? { desiredOutcome: input.desiredOutcome ?? null }
           : {}),
         ...(input.directionId !== undefined ? { directionId: input.directionId } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
+        // статуса здесь нет намеренно: завершение и возврат идут через
+        // archive/restore, вместе с каскадом по задачам и снятием фокуса
         ...(input.deadline !== undefined ? { deadline: input.deadline ?? null } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         updatedAt: new Date(),

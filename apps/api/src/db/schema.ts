@@ -97,16 +97,24 @@ export const userFocus = pgTable('user_focus', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const telegramAccounts = pgTable('telegram_accounts', {
-  telegramUserId: varchar('telegram_user_id', { length: 40 }).primaryKey(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  chatId: varchar('chat_id', { length: 40 }).notNull(),
-  /** Как подписан в Telegram — чтобы в настройках было видно, что подключено. */
-  telegramUsername: varchar('telegram_username', { length: 64 }),
-  createdAt: now(),
-});
+export const telegramAccounts = pgTable(
+  'telegram_accounts',
+  {
+    telegramUserId: varchar('telegram_user_id', { length: 40 }).primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    chatId: varchar('chat_id', { length: 40 }).notNull(),
+    /** Как подписан в Telegram — чтобы в настройках было видно, что подключено. */
+    telegramUsername: varchar('telegram_username', { length: 64 }),
+    createdAt: now(),
+  },
+  (t) => ({
+    // у одного пользователя ровно один действующий Telegram: иначе старый чат
+    // остаётся живым и продолжает класть записи в аккаунт после переезда
+    userIdx: uniqueIndex('telegram_accounts_user_idx').on(t.userId),
+  }),
+);
 
 /**
  * Одноразовый код связывания. Пользователь получает его в приложении и

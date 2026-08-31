@@ -43,6 +43,13 @@
       "when": 1788117128914,
       "tag": "0005_quick_ezekiel",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788204989089,
+      "tag": "0006_sloppy_spirit",
+      "breakpoints": true
     }
   ]
 }

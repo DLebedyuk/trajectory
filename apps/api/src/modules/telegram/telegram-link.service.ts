@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, isNull, lt } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt, ne } from 'drizzle-orm';
 import { DB, type Database } from '../../db/db.module.js';
 import { telegramAccounts, telegramLinkCodes } from '../../db/schema.js';
 import { env } from '../../config/env.js';
@@ -91,23 +91,35 @@ export class TelegramLinkService {
       throw ApiException.validation('Код не подходит: он уже использован или устарел.');
     }
 
-    // один аккаунт Telegram привязан к одному пользователю: повторная привязка перезаписывает
-    await this.db
-      .insert(telegramAccounts)
-      .values({
-        telegramUserId: telegram.telegramUserId,
-        userId: row.userId,
-        chatId: telegram.chatId,
-        telegramUsername: telegram.username ?? null,
-      })
-      .onConflictDoUpdate({
-        target: telegramAccounts.telegramUserId,
-        set: {
+    // Привязка заменяется целиком и в одной транзакции: у пользователя должен
+    // остаться ровно один действующий Telegram. Иначе старый чат продолжает
+    // жить и класть напоминания в аккаунт, из которого человек уже «ушёл».
+    await this.db.transaction(async (tx) => {
+      await tx
+        .delete(telegramAccounts)
+        .where(
+          and(
+            eq(telegramAccounts.userId, row.userId),
+            ne(telegramAccounts.telegramUserId, telegram.telegramUserId),
+          ),
+        );
+      await tx
+        .insert(telegramAccounts)
+        .values({
+          telegramUserId: telegram.telegramUserId,
           userId: row.userId,
           chatId: telegram.chatId,
           telegramUsername: telegram.username ?? null,
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: telegramAccounts.telegramUserId,
+          set: {
+            userId: row.userId,
+            chatId: telegram.chatId,
+            telegramUsername: telegram.username ?? null,
+          },
+        });
+    });
 
     await this.purgeExpired();
     return { userId: row.userId };
