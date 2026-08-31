@@ -1,7 +1,24 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, FormField, IconPause, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
+import {
+  Button,
+  FormField,
+  IconPause,
+  IconPlus,
+  IconTrash,
+  Modal,
+  PageHeader,
+  useToast,
+} from '@planner/ui';
+
+/** Фильтр по примерному времени — те же значения, что у задачи. */
+const DURATIONS = [
+  { value: 'all', label: 'любое' },
+  { value: 'short', label: '15 минут' },
+  { value: 'medium', label: 'около часа' },
+  { value: 'long', label: 'несколько часов' },
+];
 import { formatLongDate } from '@planner/shared';
 import type { TaskFilter } from '@planner/contracts';
 import { api } from '../api/client.js';
@@ -110,32 +127,31 @@ export function ProjectPage() {
   });
 
   if (project.isLoading) return <Loading what="Загружаю проект" />;
-  if (project.isError) return <ErrorBox error={project.error} />;
+  if (project.isError)
+    return <ErrorBox error={project.error} onRetry={() => void project.refetch()} />;
   const p = project.data;
   if (!p) return null;
 
   const color = direction.data?.color ?? '--d-eng';
   const openTasks = tasks.data ?? [];
 
+  const statusBadge =
+    p.status === 'paused' ? 'на паузе' : p.status === 'archived' ? 'завершён' : null;
+
   return (
-    <>
+    <div className="proj-page-content">
       <PageHeader
         onBack={() => navigate(`/directions/${p.directionId}`)}
         backLabel={`К направлению${direction.data ? ` «${direction.data.name}»` : ''}`}
         title={p.title}
+        eyebrow={direction.data?.name}
         subtitle={
           <>
             {p.desiredOutcome}
-            {p.deadline ? (
-              <div className="quiet" style={{ marginTop: 9 }}>
-                Срок: {formatLongDate(p.deadline)}
-              </div>
-            ) : null}
-            {p.status === 'paused' ? (
-              <div className="quiet" style={{ marginTop: 9 }}>
-                Проект на паузе.
-              </div>
-            ) : null}
+            <span className="proj-meta">
+              {p.deadline ? <span className="mono">срок {formatLongDate(p.deadline)}</span> : null}
+              {statusBadge ? <span className="badge">{statusBadge}</span> : null}
+            </span>
           </>
         }
         actions={
@@ -165,41 +181,40 @@ export function ProjectPage() {
         }
       />
 
-      <div className="two">
-        <div className="stack">
+      <div className="two-col">
+        <div>
           <div className="card">
-            <div className="card-h">
-              <h3 style={{ fontSize: 16 }}>Задачи</h3>
+            <h4>
+              Задачи
               <Button size="sm" onClick={() => setTaskOpen(true)}>
                 <IconPlus />
                 Новая задача
               </Button>
-            </div>
+            </h4>
 
-            <div className="filterbar">
-              <label>
-                Примерное время
-                <select
-                  aria-label="Примерное время"
-                  value={filterState.estimatedDuration}
-                  onChange={(e) => setFilter({ estimatedDuration: e.target.value })}
+            <div className="proj-filters">
+              <span className="lbl">Время</span>
+              {DURATIONS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  className={`chip${filterState.estimatedDuration === d.value ? ' is-active' : ''}`}
+                  aria-pressed={filterState.estimatedDuration === d.value}
+                  onClick={() => setFilter({ estimatedDuration: d.value })}
                 >
-                  <option value="all">любое</option>
-                  <option value="short">до 15 минут</option>
-                  <option value="medium">около часа</option>
-                  <option value="long">несколько часов</option>
-                </select>
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={filterState.withDeadlineOnly}
-                  onChange={(e) => setFilter({ withDeadlineOnly: e.target.checked })}
-                />
-                Только с дедлайном
-              </label>
-              <label style={{ marginLeft: 'auto' }}>
-                Порядок
+                  {d.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                className={`chip${filterState.withDeadlineOnly ? ' is-active' : ''}`}
+                aria-pressed={filterState.withDeadlineOnly}
+                onClick={() => setFilter({ withDeadlineOnly: !filterState.withDeadlineOnly })}
+              >
+                только со сроком
+              </button>
+              <label className="sort">
+                Порядок{' '}
                 <select
                   aria-label="Порядок"
                   value={filterState.sort}
@@ -234,24 +249,29 @@ export function ProjectPage() {
           </div>
         </div>
 
-        <aside className="side">
+        {/* заметки справа на десктопе, под задачами — на узком экране */}
+        <aside className="right-col">
           <div className="card">
-            <div className="card-h">
-              <h3 style={{ fontSize: 16 }}>Заметки</h3>
+            <h4>
+              Заметки
               <Button size="sm" variant="ghost" onClick={() => setNoteOpen(true)}>
                 <IconPlus />
                 Заметка
               </Button>
-            </div>
+            </h4>
             {p.notes.length > 0 ? (
               p.notes.map((n, i) => (
-                <div className="row" key={`${n}-${i}`}>
-                  <div className="row-main" style={{ fontSize: 13.5 }}>
-                    {n}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => removeNote.mutate(i)}>
-                    Удалить
-                  </Button>
+                <div className="note-row" key={`${n}-${i}`}>
+                  <span>{n}</span>
+                  <button
+                    type="button"
+                    className="row-del"
+                    aria-label={`Удалить заметку: ${n}`}
+                    title="Удалить"
+                    onClick={() => removeNote.mutate(i)}
+                  >
+                    <IconTrash />
+                  </button>
                 </div>
               ))
             ) : (
@@ -321,6 +341,6 @@ export function ProjectPage() {
           <input type="text" value={note} onChange={(e) => setNote(e.target.value)} />
         </FormField>
       </Modal>
-    </>
+    </div>
   );
 }

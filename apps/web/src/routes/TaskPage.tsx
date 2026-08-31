@@ -3,12 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
-  Checkbox,
   FormField,
   IconCheck,
   IconPin,
   IconPinFilled,
   IconPlus,
+  IconTrash,
   Modal,
   PageHeader,
   useToast,
@@ -117,7 +117,7 @@ export function TaskPage() {
   });
 
   if (task.isLoading) return <Loading what="Загружаю задачу" />;
-  if (task.isError) return <ErrorBox error={task.error} />;
+  if (task.isError) return <ErrorBox error={task.error} onRetry={() => void task.refetch()} />;
   const t = task.data;
   if (!t) return null;
   const isActive = dashboard.data?.focus.activeTaskId === t.id;
@@ -129,17 +129,18 @@ export function TaskPage() {
         backLabel={`К проекту «${t.projectTitle}»`}
         title={t.title}
         eyebrow={
-          <div className="quiet">
+          <span className="crumbs">
             <button type="button" onClick={() => navigate(`/directions/${t.directionId}`)}>
               {t.directionName}
             </button>
-            {' · '}
+            <span className="sep">→</span>
             <button type="button" onClick={() => navigate(`/projects/${t.projectId}`)}>
               {t.projectTitle}
             </button>
-          </div>
+            {isActive ? <span className="focus-state active">активная</span> : null}
+            {t.pinned ? <span className="focus-state pinned">закреплена</span> : null}
+          </span>
         }
-        subtitle={isActive ? <span className="quiet">Сейчас активна.</span> : undefined}
         actions={
           <>
             <Button size="sm" onClick={() => togglePin.mutate({ taskId: t.id, pinned: t.pinned })}>
@@ -169,80 +170,130 @@ export function TaskPage() {
         }
       />
 
-      <div style={{ maxWidth: 720 }}>
+      <div>
         <div className="card">
-          <FormField label="Название">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </FormField>
-          <div className="cols3">
-            <FormField label="Дедлайн">
-              <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-            </FormField>
-            <FormField label="Точное время">
-              <input type="time" value={exactTime} onChange={(e) => setExactTime(e.target.value)} />
-            </FormField>
-            <FormField label="Примерно займёт">
-              <select value={duration} onChange={(e) => setDuration(e.target.value)}>
+          <div className="task-fields">
+            <div className="field full">
+              <label htmlFor="task-title">Название</label>
+              <input
+                id="task-title"
+                className="val"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="task-deadline">Дедлайн</label>
+              <input
+                id="task-deadline"
+                className="val"
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="task-time">Точное время</label>
+              <input
+                id="task-time"
+                className="val"
+                type="time"
+                value={exactTime}
+                onChange={(e) => setExactTime(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="task-duration">Примерно займёт</label>
+              <select
+                id="task-duration"
+                className="val"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+              >
                 <option value="">не знаю</option>
                 <option value="short">15 минут</option>
                 <option value="medium">около часа</option>
                 <option value="long">несколько часов</option>
               </select>
-            </FormField>
+            </div>
+            <div className="field">
+              <label htmlFor="task-remind">Напоминание</label>
+              <input
+                id="task-remind"
+                className="val"
+                type="date"
+                value={remindAt}
+                onChange={(e) => setRemindAt(e.target.value)}
+              />
+            </div>
+            <div className="field full">
+              <label htmlFor="task-comment">Комментарий</label>
+              <textarea
+                id="task-comment"
+                className="val"
+                rows={3}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+            </div>
           </div>
-          <FormField label="Напоминание" hint="Пусто — уведомления не будет.">
-            <input type="date" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
-          </FormField>
-          <FormField label="Комментарий">
-            <textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} />
-          </FormField>
-          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => save.mutate()}
-              disabled={save.isPending}
-            >
+          <div className="task-save">
+            <Button variant="primary" onClick={() => save.mutate()} disabled={save.isPending}>
               Сохранить
             </Button>
-            <Button size="sm" variant="ghost" danger onClick={() => remove.mutate()}>
-              Удалить задачу
-            </Button>
+            <span className="hint">Пустое напоминание — уведомления не будет.</span>
           </div>
         </div>
 
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-h">
-            <h3 style={{ fontSize: 16 }}>Чек-лист</h3>
+        <div className="card task-checklist">
+          <h4>
+            Чек-лист
             <Button size="sm" variant="ghost" onClick={() => setItemOpen(true)}>
               <IconPlus />
               Пункт
             </Button>
-          </div>
+          </h4>
           {t.checklist.length > 0 ? (
             t.checklist.map((c) => (
-              <div className="row" key={c.id} style={{ padding: '8px 0' }}>
-                <Checkbox
-                  checked={c.completed}
-                  onChange={() => toggleItem.mutate({ itemId: c.id, completed: c.completed })}
-                  label={`Пункт: ${c.text}`}
+              <div className="task-row" key={c.id}>
+                <button
+                  type="button"
+                  className={`check${c.completed ? ' done' : ''}`}
+                  aria-label={`Пункт: ${c.text}`}
+                  aria-pressed={c.completed}
+                  onClick={() => toggleItem.mutate({ itemId: c.id, completed: c.completed })}
                 />
-                <div className="row-main">
-                  <div
-                    className={c.completed ? 'row-title done-strike' : 'row-title'}
-                    style={{ fontWeight: 400 }}
-                  >
-                    {c.text}
-                  </div>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => removeItem.mutate(c.id)}>
-                  Удалить
-                </Button>
+                <span className={`tname${c.completed ? ' done' : ''}`}>{c.text}</span>
+                <button
+                  type="button"
+                  className="row-del"
+                  aria-label={`Удалить пункт: ${c.text}`}
+                  title="Удалить"
+                  onClick={() => removeItem.mutate(c.id)}
+                >
+                  <IconTrash />
+                </button>
               </div>
             ))
           ) : (
             <p className="hint">Пунктов нет. Чек-лист — часть одной задачи.</p>
           )}
+        </div>
+
+        {/*
+          Удаление задачи стоит отдельно от всего остального: рядом с
+          «Сохранить» его слишком легко нажать по инерции.
+        */}
+        <div className="card danger-zone">
+          <div>
+            <b>Удалить задачу</b>
+            <p className="hint">Насовсем, вместе с чек-листом. Отменить будет нечем.</p>
+          </div>
+          <Button variant="ghost" danger onClick={() => remove.mutate()}>
+            <IconTrash />
+            Удалить
+          </Button>
         </div>
       </div>
 
