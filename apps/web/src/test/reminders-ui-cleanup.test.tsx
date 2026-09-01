@@ -2,14 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from './render.js';
+import type { Reminder } from '@planner/contracts';
 import { makeDashboard } from './fixtures.js';
 
-const reminder = {
+const reminder: Reminder = {
   id: 'rem-1',
   userId: 'user-1',
   text: 'Забрать посылку',
   scheduledDate: '2026-08-27',
   scheduledTime: '12:00',
+  timezone: 'Europe/Moscow',
   repeatRule: null,
   deliveryMode: 'digest',
   missedBehavior: 'none',
@@ -17,7 +19,7 @@ const reminder = {
   source: 'telegram',
   comment: null,
   status: 'active',
-  completedAt: null,
+  closedAt: null,
   createdAt: '2026-08-27T09:00:00.000Z',
   updatedAt: '2026-08-27T09:00:00.000Z',
 };

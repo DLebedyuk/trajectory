@@ -1,23 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from './render.js';
+import type { Reminder } from '@planner/contracts';
 import { makeDashboard } from './fixtures.js';
 
-const reminder = (over: Record<string, unknown>) => ({
+const iso = '2026-08-27T09:00:00.000Z';
+
+const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   id: 'rem-1',
   userId: 'user-1',
   text: 'Полить цветы',
   scheduledDate: '2026-08-27',
   scheduledTime: null,
+  timezone: 'Europe/Moscow',
   repeatRule: null,
   deliveryMode: 'digest',
   missedBehavior: 'none',
-  source: 'app',
+  source: 'web',
   comment: null,
   status: 'active',
-  completedAt: null,
-  createdAt: '2026-08-27T09:00:00.000Z',
-  updatedAt: '2026-08-27T09:00:00.000Z',
+  createdAt: iso,
+  closedAt: null,
+  updatedAt: iso,
   ...over,
 });
 
@@ -29,7 +33,7 @@ vi.mock('../api/client.js', async () => {
       dashboard: async () =>
         makeDashboard({
           todayReminders: [
-            reminder({}),
+            reminder(),
             reminder({ id: 'rem-2', text: 'Позвонить педагогу', scheduledTime: '18:00' }),
           ],
         }),

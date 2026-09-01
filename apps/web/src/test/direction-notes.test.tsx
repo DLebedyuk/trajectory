@@ -5,7 +5,7 @@ import { Route, Routes } from 'react-router-dom';
 import { renderWithProviders } from './render.js';
 import { makeDashboard, makeFocus } from './fixtures.js';
 
-const update = vi.fn(async () => direction);
+const update = vi.fn(async (_id: string, _input: { notes: string[] }) => direction);
 
 const direction = {
   id: 'dir-act',
@@ -32,7 +32,7 @@ vi.mock('../api/client.js', async () => {
       directions: {
         get: async () => direction,
         list: async () => [],
-        update: (id: string, input: unknown) => update(id as never, input as never),
+        update: (id: string, input: { notes: string[] }) => update(id, input),
       },
       projects: { listByDirection: async () => [] },
       touches: { list: async () => [], heatmap: async () => ({ days: [], total: 0 }) },
