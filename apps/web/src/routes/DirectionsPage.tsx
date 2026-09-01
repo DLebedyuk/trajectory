@@ -48,7 +48,7 @@ export function DirectionsPage() {
     mutationFn: () =>
       // motto/showMotto — легаси-поля: девизы убраны из интерфейса,
       // данные в БД пока остаются, но новые направления их не показывают
-      api.directions.create({ name, color, icon: 'spark', showMotto: false }),
+      api.directions.create({ name, color, icon: 'spark', showMotto: false, notes: [] }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.directions });
       toast.show('Направление создано');
@@ -88,7 +88,13 @@ export function DirectionsPage() {
         const total = heat?.total ?? 0;
 
         return (
-          <div className="dir-list-row" key={d.id}>
+          /*
+            Кликается вся плашка целиком, включая карту касаний: человек
+            воспринимает её как одну карточку направления. Клавиатурная
+            точка входа остаётся на кнопке с названием — вложенных кнопок
+            в разметке нет, поэтому карта здесь просто div.
+          */
+          <div className="dir-list-row" key={d.id} onClick={() => navigate(`/directions/${d.id}`)}>
             <div className="left-cell">
               <span
                 className="dir-glyph lg"
@@ -111,12 +117,7 @@ export function DirectionsPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              className="heat-cell scroll-x"
-              aria-label={`Карта касаний направления «${d.name}»`}
-              onClick={() => navigate(`/directions/${d.id}/touches`)}
-            >
+            <div className="map-cell scroll-x">
               <Heatmap
                 days={heat?.days ?? []}
                 today={today}
@@ -125,7 +126,7 @@ export function DirectionsPage() {
                 gap={3}
                 showWeekdays={false}
               />
-            </button>
+            </div>
 
             <div className="pinned-cell">
               {pinned.length > 0 ? (
@@ -135,7 +136,11 @@ export function DirectionsPage() {
                       key={t.id}
                       type="button"
                       className="pt"
-                      onClick={() => navigate(`/tasks/${t.id}`)}
+                      onClick={(e) => {
+                        // иначе клик уйдёт наверх и вместо задачи откроется направление
+                        e.stopPropagation();
+                        navigate(`/tasks/${t.id}`);
+                      }}
                     >
                       <i className="dir-dot" style={{ ['--c' as string]: `var(${d.color})` }} />
                       <span>
