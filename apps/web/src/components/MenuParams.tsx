@@ -9,9 +9,12 @@ import {
   type MenuPlace,
 } from '@planner/contracts';
 
-/** Параметры возможности меню в том виде, в каком их правит человек. */
+/**
+ * Параметры возможности меню в том виде, в каком их правит человек.
+ * Категории здесь нет: на карточке она не показывается, а значит и спрашивать
+ * её незачем — в базе остаётся значение по умолчанию.
+ */
 export interface MenuParamsValue {
-  menuCategory: string;
   energy: MenuEnergy;
   estimatedTime: MenuEstimatedTime;
   cost: MenuCost;
@@ -26,7 +29,6 @@ export interface MenuParamsValue {
  * во входящих вообще defaults'ами базы.
  */
 export const menuParamsDefaults = (): MenuParamsValue => ({
-  menuCategory: MENU_DEFAULTS.category,
   energy: MENU_DEFAULTS.energy,
   estimatedTime: MENU_DEFAULTS.estimatedTime,
   cost: MENU_DEFAULTS.cost,
@@ -76,14 +78,6 @@ export function MenuParamFields({
 }) {
   return (
     <div className={className} style={{ marginTop: 0 }}>
-      <div className="ffield">
-        <span className="lbl">{MENU_FIELD_LABELS.category}</span>
-        <input
-          type="text"
-          value={value.menuCategory}
-          onChange={(e) => onChange({ menuCategory: e.target.value })}
-        />
-      </div>
       <Select
         label={MENU_FIELD_LABELS.energy}
         value={value.energy}

@@ -79,6 +79,15 @@ export type UpdateMenuItemInput = z.infer<typeof updateMenuItemSchema>;
 
 export const menuFilterSchema = z.object({
   category: z.string().optional(),
+  /**
+   * Попробованность. Приходит строкой из query, поэтому 'true'/'false'
+   * приводим сами: z.coerce.boolean() считает истиной любую непустую строку,
+   * то есть и 'false' тоже.
+   */
+  tried: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional(),
   energy: menuEnergy.optional(),
   estimatedTime: menuEstimatedTime.optional(),
   cost: menuCost.optional(),

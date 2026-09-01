@@ -238,7 +238,6 @@ export function InboxPage() {
                 <MenuParamFields
                   className="inbox-fields"
                   value={{
-                    menuCategory: b.menuCategory ?? MENU_DEFAULTS.category,
                     energy: b.energy ?? MENU_DEFAULTS.energy,
                     estimatedTime: b.estimatedTime ?? MENU_DEFAULTS.estimatedTime,
                     cost: b.cost ?? MENU_DEFAULTS.cost,

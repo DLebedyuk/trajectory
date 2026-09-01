@@ -26,15 +26,14 @@ const TIME = MENU_LABELS.estimatedTime;
 const COST = MENU_LABELS.cost;
 const PLACE = MENU_LABELS.place;
 const COMPANY = MENU_LABELS.company;
+// фильтр по попробованности: значения уезжают в query строками
+const TRIED = { false: 'ещё нет', true: 'уже да' };
 
 export function MenuPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const [filter, setFilter] = useState<Record<string, string | undefined>>({});
   const menu = useMenu(filter);
-  // полный список нужен, чтобы собрать набор категорий: отфильтрованный
-  // показал бы только те, что уже прошли фильтр, и список бы схлопывался
-  const allItems = useMenu({});
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [params, setParams] = useState<MenuParamsValue>(() => ({
@@ -46,7 +45,7 @@ export function MenuPage() {
     mutationFn: () =>
       api.menu.create({
         title,
-        category: params.menuCategory,
+        category: MENU_DEFAULTS.category,
         energy: params.energy,
         estimatedTime: params.estimatedTime,
         // раньше cost и place были зашиты в код и человек их не видел
@@ -81,16 +80,11 @@ export function MenuPage() {
   const setF = (key: string, value: string) =>
     setFilter((prev) => ({ ...prev, [key]: prev[key] === value ? undefined : value }));
 
-  // категории — свободный текст, поэтому набор берём из того, что реально есть
-  const categories = Object.fromEntries(
-    [...new Set((allItems.data ?? []).map((m) => m.category))].sort().map((c) => [c, c]),
-  );
-
   const group = (key: string, options: Record<string, string>) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <span className="lbl">
-        {key === 'category'
-          ? 'Категория'
+        {key === 'tried'
+          ? 'Пробовала'
           : key === 'energy'
             ? 'Энергия'
             : key === 'estimatedTime'
@@ -131,7 +125,7 @@ export function MenuPage() {
       />
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
-        {Object.keys(categories).length > 1 ? group('category', categories) : null}
+        {group('tried', TRIED)}
         {group('energy', ENERGY)}
         {group('estimatedTime', TIME)}
         {group('cost', COST)}
@@ -149,23 +143,8 @@ export function MenuPage() {
         <div className="menu-ideas">
           {(menu.data ?? []).map((m) => (
             <div className={`menu-idea${m.tried ? ' is-tried' : ''}`} key={m.id}>
-              <div className="top">
-                {/*
-                  Категория — свободное поле возможности; у всего, что заведено
-                  быстро или пришло из входящих, там стоит значение по умолчанию
-                  «другое». Метка кликается и фильтрует список — раньше она
-                  выглядела как кнопка, но ничего не делала.
-                */}
-                <button
-                  type="button"
-                  className={`cat${filter.category === m.category ? ' is-active' : ''}`}
-                  aria-pressed={filter.category === m.category}
-                  title={`Показать только «${m.category}»`}
-                  onClick={() => setF('category', m.category)}
-                >
-                  {m.category}
-                </button>
-              </div>
+              {/* метки категории на карточке больше нет: она ничего не
+                  говорила о самой возможности и почти всегда была «другое» */}
               <div className="ttl">{m.title}</div>
               {m.comment ? <p className="hint">{m.comment}</p> : null}
               <div className="params">

@@ -41,6 +41,7 @@ export class MenuService {
     if (filter.cost) conditions.push(eq(menuItems.cost, filter.cost));
     if (filter.place) conditions.push(eq(menuItems.place, filter.place));
     if (filter.company) conditions.push(eq(menuItems.company, filter.company));
+    if (filter.tried !== undefined) conditions.push(eq(menuItems.tried, filter.tried));
     const rows = await this.db
       .select()
       .from(menuItems)

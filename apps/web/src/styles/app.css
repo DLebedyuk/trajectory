@@ -1428,29 +1428,6 @@
   border-radius: 11px;
   padding: 14px;
 }
-.menu-idea .top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-.menu-idea .top .cat {
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-3);
-  font-weight: 700;
-  margin-left: auto;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.menu-idea .top .cat:hover,
-.menu-idea .top .cat.is-active {
-  color: var(--accent);
-}
 .menu-idea .ttl {
   font-size: 14px;
   color: var(--text);

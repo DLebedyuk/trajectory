@@ -45,7 +45,7 @@ const { InboxPage } = await import('../routes/InboxPage.js');
  * Раньше их не было вовсе, и база молча подставляла свои значения.
  */
 describe('идея меню во входящих', () => {
-  it('показывает категорию и четыре параметра', async () => {
+  it('показывает четыре параметра и не спрашивает категорию', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InboxPage />);
 
@@ -53,7 +53,9 @@ describe('идея меню во входящих', () => {
     // тип выбирается чипом, а не выпадающим списком
     await user.click(screen.getByRole('button', { name: 'Идея меню' }));
 
-    expect(screen.getByText('Категория')).toBeInTheDocument();
+    // категории здесь нет: на карточке меню она не показывается,
+    // значит и спрашивать её незачем
+    expect(screen.queryByText('Категория')).not.toBeInTheDocument();
     expect(screen.getByText('Энергия')).toBeInTheDocument();
     expect(screen.getByText('Время')).toBeInTheDocument();
     expect(screen.getByText('Стоимость')).toBeInTheDocument();
@@ -78,6 +80,5 @@ describe('идея меню во входящих', () => {
     expect(sent[0]?.type).toBe('menu');
     expect(sent[0]?.energy).toBe('low');
     expect(sent[0]?.cost).toBe('budget');
-    expect(sent[0]?.menuCategory).toBe('другое');
   });
 });
