@@ -114,7 +114,9 @@ export function RemindersPage() {
    */
   const card = (r: Reminder) => (
     <div
-      className={`rem-card${r.repeatRule ? ' is-regular' : ''}${r.source === 'telegram' ? ' is-tg' : ''}`}
+      // источник (telegram/app) по-прежнему хранится в базе, но в интерфейсе
+      // не показывается: человеку важно само напоминание, а не откуда оно пришло
+      className={`rem-card${r.repeatRule ? ' is-regular' : ''}`}
       key={r.id}
     >
       <div className="top">
@@ -144,8 +146,6 @@ export function RemindersPage() {
                 : 'каждый месяц'}
           </span>
         ) : null}
-        {/* источник виден всегда: напоминание из Telegram живёт в общем списке */}
-        {r.source === 'telegram' ? <span className="badge is-tg">Telegram</span> : null}
         <span className="badge">{MISS[r.missedBehavior]}</span>
       </div>
 
@@ -205,10 +205,6 @@ export function RemindersPage() {
         subtitle="Внешняя память. Не задачи и не проекты — мелочь, которую не нужно держать в голове."
         actions={
           <>
-            {/* напоминания приходят из Telegram — кнопка на случай задержки */}
-            <Button size="sm" variant="ghost" onClick={() => void reminders.refetch()}>
-              Обновить
-            </Button>
             <Button size="sm" onClick={() => navigate('/reminders/archive')}>
               <IconArchive />
               Архив
@@ -231,7 +227,6 @@ export function RemindersPage() {
         {section('Сегодня', todayList, 'Сегодня ничего не ждёт.')}
         {section('Ближайшие', soon, 'Впереди пусто.')}
         {section('Регулярные', repeating, 'Регулярных нет.')}
-        <p className="hint">Выполненные напоминания уходят в архив и лежат там семь дней.</p>
       </div>
 
       <ReminderModal open={modalOpen} onOpenChange={setModalOpen} today={today} editing={editing} />

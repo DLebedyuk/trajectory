@@ -24,7 +24,7 @@ export function RemindersArchivePage() {
         onBack={() => navigate('/reminders')}
         backLabel="Напоминания"
         title="Архив напоминаний"
-        subtitle="Последние семь дней. Дальше приложение ничего не хранит на виду."
+        subtitle="Выполненные напоминания уходят в архив и лежат там семь дней. Дальше приложение ничего не хранит на виду."
       />
 
       {list.length === 0 ? (
