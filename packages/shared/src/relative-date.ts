@@ -54,6 +54,7 @@ const MONTHS: Record<string, number> = {
   декабря: 11,
 };
 const NUMBER_WORDS: Record<string, number> = { две: 2, два: 2, три: 3, четыре: 4 };
+const MONTH_NAMES = Object.keys(MONTHS).join('|');
 
 interface Cut {
   index: number;
@@ -79,7 +80,14 @@ export function parseRelativePhrase(raw: string, today: string): ParsedPhrase {
   let time: string | null = null;
   let ambiguousWeekday: string | null = null;
 
-  const timeMatch = low.match(/(^|\s)в\s+(\d{1,2})(?::(\d{2}))?(\s|$)/);
+  /*
+    «в 5» — это время, но «в 5 сентября» — дата. Без этой проверки фраза
+    «напомни в 5 сентября купить билеты» давала и правильную дату, и время
+    05:00: напоминание превращалось в отдельное уведомление в пять утра.
+  */
+  const timeMatch = low.match(
+    new RegExp(`(^|\\s)в\\s+(\\d{1,2})(?::(\\d{2}))?(?!\\s+(?:${MONTH_NAMES}))(\\s|$)`),
+  );
   if (timeMatch) {
     const hh = Number(timeMatch[2]);
     if (hh <= 23) {
@@ -112,12 +120,12 @@ export function parseRelativePhrase(raw: string, today: string): ParsedPhrase {
     else date = addDaysToDateOnly(today, count);
     cut(m);
   } else if (
-    (m = low.match(
-      /(\d{1,2})\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/,
-    ))
+    // «в» перед датой отрезаем вместе с ней: иначе от «в 5 сентября»
+    // в тексте напоминания оставался болтающийся предлог
+    (m = low.match(new RegExp(`(^|\\s)(?:в\\s+)?(\\d{1,2})\\s+(${MONTH_NAMES})`)))
   ) {
-    const day = Number(m[1]);
-    const month = MONTHS[m[2] as string] as number;
+    const day = Number(m[2]);
+    const month = MONTHS[m[3] as string] as number;
     const base = fromDateOnly(today);
     let candidate = new Date(Date.UTC(base.getUTCFullYear(), month, day));
     if (candidate < base) candidate = new Date(Date.UTC(base.getUTCFullYear() + 1, month, day));

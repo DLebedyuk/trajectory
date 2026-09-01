@@ -61,6 +61,22 @@ describe('parseRelativePhrase', () => {
     expect(r.date).toBeNull();
   });
 
+  it('«в 5 сентября» — это дата, а не пять утра', () => {
+    // фраза давала и правильную дату, и время 05:00: напоминание превращалось
+    // в отдельное уведомление посреди ночи
+    const r = parseRelativePhrase('напомни в 5 сентября купить билеты', TODAY);
+    expect(r.date).toBe('2026-09-05');
+    expect(r.time).toBeNull();
+    // предлог отрезается вместе с датой, а не остаётся в тексте
+    expect(r.text).toBe('Купить билеты');
+  });
+
+  it('«в 10» рядом с днём всё ещё время', () => {
+    const r = parseRelativePhrase('напомни завтра в 10 позвонить маме', TODAY);
+    expect(r.time).toBe('10:00');
+    expect(r.text).toBe('Позвонить маме');
+  });
+
   it('не принимает 25 часов за время', () => {
     const r = parseRelativePhrase('напомни в 25 сделать что-то', TODAY);
     expect(r.time).toBeNull();
