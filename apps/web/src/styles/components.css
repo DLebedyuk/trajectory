@@ -579,3 +579,45 @@ button.heat-cell[data-filled='true']:hover {
     gap: 12px;
   }
 }
+
+/*
+  Строка выбора внутри модалки: задача, проект. В презентации таких экранов
+  не было, а без стилей это были голые кнопки браузера.
+*/
+.pick-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 11px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.modal .pick-row:first-of-type {
+  margin-top: 14px;
+}
+
+.pick-row:hover {
+  border-color: var(--accent);
+}
+
+.pick-row.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pick-row .ttl {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pick-row .meta {
+  font-size: 11px;
+  color: var(--text-3);
+}

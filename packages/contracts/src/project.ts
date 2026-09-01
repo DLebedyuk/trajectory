@@ -11,6 +11,12 @@ export const projectSchema = z.object({
   deadline: dateOnly.nullable(),
   sortOrder: z.number().int(),
   notes: z.array(z.string()),
+  /**
+   * Закреплённый проект направления. В направлении он может быть только
+   * один; закрепление меняется отдельными ручками /pin и /unpin, а не
+   * общим PATCH — по той же причине, что и статус.
+   */
+  pinned: z.boolean(),
   createdAt: z.string().datetime(),
   completedAt: z.string().datetime().nullable(),
   updatedAt: z.string().datetime(),

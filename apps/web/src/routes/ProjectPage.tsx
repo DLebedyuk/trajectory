@@ -222,7 +222,7 @@ export function ProjectPage() {
                 >
                   <option value="manual">вручную</option>
                   <option value="deadline">сначала ближайшие</option>
-                  <option value="pinned">сначала закреплённые</option>
+                  <option value="pinned">сначала важные</option>
                 </select>
               </label>
             </div>

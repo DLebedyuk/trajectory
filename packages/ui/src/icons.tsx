@@ -59,8 +59,10 @@ export const IconPin = (p: SVGProps<SVGSVGElement>) => (
     <path d="M7 7.2V12.3" />
   </svg>
 );
+// единственная залитая иконка набора: класс .ic задаёт размер, поэтому она
+// тоже идёт через base — без него svg остаётся 0×0 и булавка не видна
 export const IconPinFilled = (p: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 14 14" fill="currentColor" {...p}>
+  <svg viewBox="0 0 14 14" {...base(p)} fill="currentColor" stroke="none">
     <path d="M5.1 1.7h3.8l-.6 3.3 2.3 2.2H3.4l2.3-2.2z" />
     <path d="M6.5 7.2h1V12.5h-1z" />
   </svg>

@@ -132,7 +132,8 @@ export interface DashboardData {
   /** Просроченное — отдельным списком, чтобы не открывать день хвостом. */
   overdueTasks: TaskWithContext[];
   todayReminders: Reminder[];
-  pinnedTasks: TaskWithContext[];
+  /** Закреплённый проект направления в фокусе. Один или ни одного. */
+  pinnedProject: Project | null;
   pinnedMedia: MediaItem[];
   heatmap: Heatmap;
 }
@@ -224,9 +225,12 @@ export const api = {
   projects: {
     listByDirection: (directionId: string) =>
       get<ProjectWithFlags[]>('/api/projects', { directionId }),
+    pinned: () => get<Project[]>('/api/projects/pinned'),
     get: (id: string) => get<Project>(`/api/projects/${id}`),
     create: (input: CreateProjectInput) => post<Project>('/api/projects', input),
     update: (id: string, input: UpdateProjectInput) => patch<Project>(`/api/projects/${id}`, input),
+    pin: (id: string) => post<Project>(`/api/projects/${id}/pin`),
+    unpin: (id: string) => post<Project>(`/api/projects/${id}/unpin`),
     pause: (id: string) => post<Project>(`/api/projects/${id}/pause`),
     resume: (id: string) => post<Project>(`/api/projects/${id}/resume`),
     complete: (id: string) => post<Project>(`/api/projects/${id}/complete`),

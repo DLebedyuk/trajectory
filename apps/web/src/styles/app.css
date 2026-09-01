@@ -976,6 +976,41 @@
   font-style: italic;
   line-height: 1.5;
 }
+/* имя — кнопка, поэтому сбрасываем оформление браузера */
+.dir-project-card .nm {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dir-project-card .top {
+  gap: 8px;
+}
+.dir-project-card .stats {
+  margin-left: auto;
+}
+/* закрепление проекта: булавка рядом с именем, как у задачи внутри проекта */
+.dir-project-card .pin {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-3);
+  display: inline-flex;
+  cursor: pointer;
+}
+.dir-project-card .pin:hover,
+.dir-project-card .pin.is-pinned {
+  color: var(--accent);
+}
+/* закреплённый проект: полоса направления слева остаётся, добавляется рамка */
+.dir-project-card.is-pinned {
+  border-color: var(--accent);
+  border-left-color: var(--c);
+}
 .dir-project-card.is-paused {
   border-left-style: dashed;
   opacity: 0.75;

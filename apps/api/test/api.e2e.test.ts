@@ -115,7 +115,7 @@ describe('вертикальный срез: направление → прое
     await api.post(`/api/tasks/${taskId}/activate`);
   });
 
-  it('6-7. закрепление показывает связку «проект → задача»', async () => {
+  it('6-7. важная задача показывает связку «проект → задача»', async () => {
     await api.post(`/api/tasks/${secondTaskId}/pin`);
     const pinned = await api.get('/api/tasks/pinned');
     expect(pinned.body).toHaveLength(1);
@@ -124,15 +124,18 @@ describe('вертикальный срез: направление → прое
     expect(pinned.body[0].directionName).toBe('Озвучка');
   });
 
-  it('активная задача не дублируется в закреплённых на главной', async () => {
+  it('на главной показывается закреплённый проект направления в фокусе', async () => {
+    // важные задачи — дело проекта, на главную они не выносятся
     await api.post(`/api/tasks/${taskId}/pin`);
+    await api.post(`/api/projects/${projectId}/pin`);
+    await api.put('/api/focus/direction').send({ directionId, onConflict: 'keepTask' });
+
     const dashboard = await api.get('/api/dashboard');
-    const ids = dashboard.body.pinnedTasks.map((t: { id: string }) => t.id);
-    expect(ids).not.toContain(taskId);
-    expect(ids).toContain(secondTaskId);
+    expect(dashboard.body.pinnedProject?.id).toBe(projectId);
+    expect(dashboard.body.pinnedTasks).toBeUndefined();
   });
 
-  it('8-9. выполнение активной задачи убирает её из активного и закреплённого', async () => {
+  it('8-9. выполнение активной задачи убирает её из активного и из важных', async () => {
     const res = await api.post(`/api/tasks/${taskId}/complete`);
     expect(res.body.status).toBe('done');
     expect(res.body.pinned).toBe(false);

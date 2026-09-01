@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './render.js';
-import { makeDashboard, makeFocus, makeTask } from './fixtures.js';
+import { makeDashboard, makeFocus } from './fixtures.js';
 
 const activate = vi.fn();
 const dashboard = vi.fn();
@@ -54,20 +54,13 @@ describe('выбор активной задачи', () => {
     expect(screen.getByText('активная')).toBeInTheDocument();
   });
 
-  it('не дублирует активную задачу в блоке закреплённого', async () => {
-    dashboard.mockResolvedValue(
-      makeDashboard({
-        pinnedTasks: [
-          makeTask({ id: 'task-2', title: 'Перезаписать рекламный ролик №1', pinned: true }),
-        ],
-      }),
-    );
+  it('не дублирует активную задачу на главной', async () => {
+    dashboard.mockResolvedValue(makeDashboard());
     renderWithProviders(<HomePage />);
 
     await screen.findByText('Записать блок narration');
     // активная задача встречается ровно один раз — только в блоке фокуса
     expect(screen.getAllByText('Записать блок narration')).toHaveLength(1);
-    expect(screen.getByText('Перезаписать рекламный ролик №1')).toBeInTheDocument();
   });
 
   it('состояние «без фокуса» не выглядит ошибкой', async () => {

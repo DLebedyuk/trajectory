@@ -138,14 +138,14 @@ export function TaskPage() {
               {t.projectTitle}
             </button>
             {isActive ? <span className="focus-state active">активная</span> : null}
-            {t.pinned ? <span className="focus-state pinned">закреплена</span> : null}
+            {t.pinned ? <span className="focus-state pinned">важная</span> : null}
           </span>
         }
         actions={
           <>
             <Button size="sm" onClick={() => togglePin.mutate({ taskId: t.id, pinned: t.pinned })}>
               {t.pinned ? <IconPinFilled /> : <IconPin />}
-              {t.pinned ? 'Открепить' : 'Закрепить'}
+              {t.pinned ? 'Снять отметку' : 'Отметить важной'}
             </Button>
             {isActive ? (
               <Button size="sm" variant="ghost" onClick={() => clearActive.mutate()}>

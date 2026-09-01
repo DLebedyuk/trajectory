@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Heatmap, IconBell, IconPlus, Modal, useToast } from '@planner/ui';
-import { DURATION_LABEL, formatLongDate, humanDate, plural } from '@planner/shared';
+import { formatLongDate, humanDate, plural } from '@planner/shared';
 import { api } from '../api/client.js';
 import {
   invalidateFocusScope,
@@ -10,12 +10,12 @@ import {
   useCompleteTask,
   useDashboard,
   useDirections,
-  useTogglePin,
 } from '../api/queries.js';
 import { TodayBlock } from '../features/TodayBlock.js';
 import { SoftRemindersCard } from '../features/SoftRemindersCard.js';
 import { FocusCard } from '../features/FocusCard.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
+import { PickPinnedProjectModal } from '../features/PickPinnedProjectModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 import { TouchModal } from '../features/TouchModal.js';
@@ -30,15 +30,14 @@ export function HomePage() {
   const dashboard = useDashboard();
   const directions = useDirections();
   const completeTask = useCompleteTask();
-  const togglePin = useTogglePin();
 
   const [pickOpen, setPickOpen] = useState(false);
-  const [pickMode, setPickMode] = useState<'active' | 'pin'>('active');
   const [dirOpen, setDirOpen] = useState(false);
   const [day, setDay] = useState<string | null>(null);
   const [touchOpen, setTouchOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const [thoughtOpen, setThoughtOpen] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
 
   const setActive = useMutation({
     mutationFn: (taskId: string) => api.tasks.activate(taskId),
@@ -108,13 +107,12 @@ export function HomePage() {
 
           <FocusCard
             focus={data.focus}
+            pinnedProject={data.pinnedProject}
+            onOpenPinned={() => setPinOpen(true)}
             onComplete={() =>
               data.focus.activeTaskId && completeTask.mutate(data.focus.activeTaskId)
             }
-            onPickTask={() => {
-              setPickMode('active');
-              setPickOpen(true);
-            }}
+            onPickTask={() => setPickOpen(true)}
             onClearActive={() => clearActive.mutate()}
             onChangeDirection={() => setDirOpen(true)}
             onClearFocus={() => setDirection.mutate({ directionId: null, onConflict: 'clearTask' })}
@@ -156,62 +154,6 @@ export function HomePage() {
             reminders={data.todayReminders}
             onComplete={(id) => completeReminder.mutate(id)}
           />
-
-          <div className="card">
-            <h4>
-              Закреплённое
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setPickMode('pin');
-                  setPickOpen(true);
-                }}
-              >
-                <IconPlus />
-                Закрепить
-              </Button>
-            </h4>
-            {data.pinnedTasks.length === 0 ? (
-              <p className="hint">Закреплённых задач пока нет.</p>
-            ) : (
-              data.pinnedTasks.map((t) => (
-                <div className="pinned-row" key={t.id}>
-                  <button
-                    type="button"
-                    className="check"
-                    aria-label={`Выполнить: ${t.title}`}
-                    onClick={() => completeTask.mutate(t.id)}
-                  />
-                  <Link className="info" to={`/tasks/${t.id}`}>
-                    <span className="proj">{t.projectTitle}</span>
-                    <span className="ttl">{t.title}</span>
-                    <span className="meta">
-                      <i
-                        className="dir-dot"
-                        style={{ ['--c' as string]: `var(${t.directionColor})` }}
-                      />
-                      {t.directionName}
-                      {t.deadline
-                        ? ` · до ${formatLongDate(t.deadline)}`
-                        : t.estimatedDuration
-                          ? ` · ${DURATION_LABEL[t.estimatedDuration]}`
-                          : ''}
-                    </span>
-                  </Link>
-                  <button
-                    type="button"
-                    className="pin-off"
-                    aria-label={`Открепить: ${t.title}`}
-                    title="Открепить"
-                    onClick={() => togglePin.mutate({ taskId: t.id, pinned: true })}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
 
           {data.pinnedMedia.length > 0 ? (
             <div className="card">
@@ -255,13 +197,8 @@ export function HomePage() {
       <PickTaskModal
         open={pickOpen}
         onOpenChange={setPickOpen}
-        mode={pickMode}
-        excludeTaskId={pickMode === 'active' ? data.focus.activeTaskId : null}
-        onPick={(taskId) =>
-          pickMode === 'active'
-            ? setActive.mutate(taskId)
-            : togglePin.mutate({ taskId, pinned: false })
-        }
+        excludeTaskId={data.focus.activeTaskId}
+        onPick={(taskId) => setActive.mutate(taskId)}
       />
 
       <Modal
@@ -299,6 +236,16 @@ export function HomePage() {
           </div>
         </div>
       </Modal>
+
+      {data.focus.direction ? (
+        <PickPinnedProjectModal
+          open={pinOpen}
+          onOpenChange={setPinOpen}
+          directionId={data.focus.direction.id}
+          directionName={data.focus.direction.name}
+          pinnedProjectId={data.pinnedProject?.id ?? null}
+        />
+      ) : null}
 
       {conflictModal}
 

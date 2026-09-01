@@ -64,6 +64,13 @@
       "when": 1788253916305,
       "tag": "0008_direction_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788254913010,
+      "tag": "0009_project_pinned",
+      "breakpoints": true
     }
   ]
 }

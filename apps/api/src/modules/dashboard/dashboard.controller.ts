@@ -10,10 +10,12 @@ import { TasksService } from '../tasks/tasks.service.js';
 import { RemindersService } from '../reminders/reminders.service.js';
 import { MediaService } from '../media/media.service.js';
 import { TouchesService } from '../touches/touches.service.js';
+import { ProjectsService } from '../projects/projects.service.js';
 
 /**
- * Один запрос для главной страницы: «Сегодня», фокус, закреплённое,
- * карта касаний и закреплённые книги. Экономит десяток round-trip.
+ * Один запрос для главной страницы: «Сегодня», фокус, закреплённый проект
+ * направления в фокусе, карта касаний и закреплённые книги.
+ * Экономит десяток round-trip.
  */
 @ApiTags('dashboard')
 @UseGuards(AuthGuard)
@@ -26,6 +28,7 @@ export class DashboardController {
     @Inject(RemindersService) private readonly reminders: RemindersService,
     @Inject(MediaService) private readonly media: MediaService,
     @Inject(TouchesService) private readonly touches: TouchesService,
+    @Inject(ProjectsService) private readonly projects: ProjectsService,
   ) {}
 
   @Get()
@@ -45,9 +48,16 @@ export class DashboardController {
       ],
     );
 
-    const pinnedTasks = (await this.tasks.listPinned(userId)).filter(
-      (t) => t.id !== focus.activeTaskId,
-    );
+    /*
+      Закреплённый проект — один на направление, а на главной показывается
+      тот, что принадлежит направлению в фокусе. Меняется фокус — меняется
+      и проект; отдельной «главной» сущности приложение не хранит.
+    */
+    const pinnedProject = focus.focusDirectionId
+      ? ((await this.projects.listPinned(userId)).find(
+          (p) => p.directionId === focus.focusDirectionId,
+        ) ?? null)
+      : null;
 
     // События подключённых календарей. Пока это моковые данные из seed —
     // реальная синхронизация с Google и Яндексом требует OAuth и бэкенда.
@@ -78,7 +88,7 @@ export class DashboardController {
       dueTasks,
       overdueTasks,
       todayReminders,
-      pinnedTasks,
+      pinnedProject,
       pinnedMedia,
       heatmap,
     };

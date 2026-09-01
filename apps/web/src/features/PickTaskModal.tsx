@@ -5,19 +5,17 @@ import { api } from '../api/client.js';
 import { qk } from '../api/queries.js';
 
 /**
- * Выбор задачи (активной или для закрепления). Задачи всегда показываются
- * сгруппированными по проекту — без проекта задача не существует.
+ * Выбор активной задачи. Задачи всегда показываются сгруппированными по
+ * проекту — без проекта задача не существует.
  */
 export function PickTaskModal({
   open,
   onOpenChange,
-  mode,
   excludeTaskId,
   onPick,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  mode: 'active' | 'pin';
   excludeTaskId?: string | null;
   onPick: (taskId: string) => void;
 }) {
@@ -51,24 +49,18 @@ export function PickTaskModal({
       (tasks.data ?? [])
         .map((g) => ({
           ...g,
-          tasks: g.tasks.filter(
-            (t) => t.id !== excludeTaskId && (mode === 'pin' ? !t.pinned : true),
-          ),
+          tasks: g.tasks.filter((t) => t.id !== excludeTaskId),
         }))
         .filter((g) => g.tasks.length > 0),
-    [tasks.data, excludeTaskId, mode],
+    [tasks.data, excludeTaskId],
   );
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title={mode === 'pin' ? 'Что закрепить' : 'Что сделать активным'}
-      description={
-        mode === 'pin'
-          ? 'Закрепление — просто стикер перед глазами. Ни срока, ни обязательства.'
-          : 'Активной может быть только одна задача. Предыдущая останется обычной открытой задачей.'
-      }
+      title="Что сделать активным"
+      description="Активной может быть только одна задача. Предыдущая останется обычной открытой задачей."
       footer={
         <Button variant="ghost" onClick={() => onOpenChange(false)}>
           Закрыть
@@ -108,14 +100,13 @@ export function PickTaskModal({
                 <button
                   key={t.id}
                   type="button"
-                  className="dirpin"
-                  style={{ marginBottom: 5 }}
+                  className="pick-row"
                   onClick={() => {
                     onPick(t.id);
                     onOpenChange(false);
                   }}
                 >
-                  {t.title}
+                  <span className="ttl">{t.title}</span>
                 </button>
               ))}
             </div>

@@ -38,14 +38,14 @@ vi.mock('../api/client.js', async () => {
           weekTotal: 1,
         }),
       },
-      tasks: {
+      projects: {
         pinned: async () => [
           {
-            id: 'task-9',
-            title: 'Разобрать монолог',
-            projectTitle: 'Показ',
+            id: 'project-9',
+            directionId: 'dir-act',
+            title: 'Показ отрывка',
             deadline: null,
-            estimatedDuration: 'short',
+            pinned: true,
           },
         ],
       },
@@ -61,7 +61,7 @@ const renderList = () =>
       <Route path="/directions" element={<DirectionsPage />} />
       <Route path="/directions/:directionId" element={<div>страница направления</div>} />
       <Route path="/directions/:directionId/touches" element={<div>все касания</div>} />
-      <Route path="/tasks/:taskId" element={<div>страница задачи</div>} />
+      <Route path="/projects/:projectId" element={<div>страница проекта</div>} />
     </Routes>,
     '/directions',
   );
@@ -95,13 +95,13 @@ describe('список направлений: куда ведёт клик', ()
     expect(await screen.findByText('страница направления')).toBeInTheDocument();
   });
 
-  it('закреплённая задача внутри плашки по-прежнему ведёт к себе', async () => {
+  it('закреплённый проект внутри плашки ведёт к себе, а не к направлению', async () => {
     renderList();
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /Разобрать монолог/ }));
+    await user.click(await screen.findByRole('button', { name: /Показ отрывка/ }));
 
-    expect(await screen.findByText('страница задачи')).toBeInTheDocument();
+    expect(await screen.findByText('страница проекта')).toBeInTheDocument();
     expect(screen.queryByText('страница направления')).not.toBeInTheDocument();
   });
 });

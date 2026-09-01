@@ -28,6 +28,15 @@ export class ProjectsController {
     return this.service.listByDirection(userId, directionId);
   }
 
+  /*
+    Стоит выше :id — иначе Nest примет слово «pinned» за идентификатор
+    проекта и вернёт 404.
+  */
+  @Get('pinned')
+  listPinned(@CurrentUser() userId: string) {
+    return this.service.listPinned(userId);
+  }
+
   @Get(':id')
   get(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.service.get(userId, id);
@@ -55,6 +64,18 @@ export class ProjectsController {
   @Post(':id/resume')
   resume(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.service.resume(userId, id);
+  }
+
+  // закрепление отдельными ручками, а не полем в PATCH: закрепить один
+  // проект — значит снять закрепление с другого, это не правка поля
+  @Post(':id/pin')
+  pin(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.service.setPinned(userId, id, true);
+  }
+
+  @Post(':id/unpin')
+  unpin(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.service.setPinned(userId, id, false);
   }
 
   @Post(':id/complete')

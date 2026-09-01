@@ -5,8 +5,13 @@ import { renderWithProviders } from './render.js';
 import { makeTask } from './fixtures.js';
 import { TaskLine } from '../features/TaskLine.js';
 
-describe('закрепление задачи', () => {
-  it('кнопка закрепления меняет доступное имя', async () => {
+/**
+ * Внутри проекта задача помечается важной. Слово «закрепить» отдано
+ * проектам: закреплённый проект в направлении один, а важных задач
+ * сколько угодно — это разные вещи и называться должны по-разному.
+ */
+describe('важная задача', () => {
+  it('кнопка важности меняет доступное имя', async () => {
     const onTogglePin = vi.fn();
     const task = makeTask({ pinned: false });
     const { rerender } = renderWithProviders(
@@ -21,7 +26,7 @@ describe('закрепление задачи', () => {
     );
 
     const user = userEvent.setup();
-    const pinButton = screen.getByRole('button', { name: /^Закрепить: / });
+    const pinButton = screen.getByRole('button', { name: /^Отметить важной: / });
     await user.click(pinButton);
     expect(onTogglePin).toHaveBeenCalledTimes(1);
 
@@ -35,7 +40,7 @@ describe('закрепление задачи', () => {
         onTogglePin={onTogglePin}
       />,
     );
-    expect(screen.getByRole('button', { name: /^Открепить: / })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Снять отметку «важная»: / })).toBeInTheDocument();
   });
 
   it('в задаче без меток «обязательная» и «бэклог»', () => {

@@ -19,6 +19,7 @@ export const qk = {
   tasks: (projectId: string, filter?: TaskFilter) => ['tasks', projectId, filter ?? {}] as const,
   task: (id: string) => ['task', id] as const,
   pinnedTasks: (directionId?: string) => ['pinnedTasks', directionId ?? 'all'] as const,
+  pinnedProjects: ['pinnedProjects'] as const,
   doneTasks: (directionId: string) => ['doneTasks', directionId] as const,
   touches: (query: unknown) => ['touches', query] as const,
   heatmap: (weeks: number, directionId?: string) =>
@@ -44,6 +45,7 @@ export function invalidateFocusScope(qc: QueryClient, projectId?: string): void 
     void qc.invalidateQueries({ queryKey: ['tasks'] });
   }
   void qc.invalidateQueries({ queryKey: ['projects'] });
+  void qc.invalidateQueries({ queryKey: qk.pinnedProjects });
 }
 
 /**
@@ -100,6 +102,8 @@ export const useTask = (id: string) =>
   useQuery({ queryKey: qk.task(id), queryFn: () => api.tasks.get(id), enabled: Boolean(id) });
 export const usePinnedTasks = (directionId?: string) =>
   useQuery({ queryKey: qk.pinnedTasks(directionId), queryFn: () => api.tasks.pinned(directionId) });
+export const usePinnedProjects = () =>
+  useQuery({ queryKey: qk.pinnedProjects, queryFn: api.projects.pinned });
 export const useHeatmap = (weeks: number, directionId?: string) =>
   useQuery({
     queryKey: qk.heatmap(weeks, directionId),
@@ -143,6 +147,21 @@ export function useTogglePin() {
     onSuccess: (_data, vars) => {
       invalidateFocusScope(qc);
       void qc.invalidateQueries({ queryKey: qk.task(vars.taskId) });
+    },
+  });
+}
+
+/**
+ * Закрепление проекта. В направлении закреплённый проект один: сервер сам
+ * снимает предыдущий, поэтому обновляем весь связанный кэш целиком.
+ */
+export function useToggleProjectPin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, pinned }: { projectId: string; pinned: boolean }) =>
+      pinned ? api.projects.unpin(projectId) : api.projects.pin(projectId),
+    onSuccess: (_data, vars) => {
+      invalidateFocusScope(qc, vars.projectId);
     },
   });
 }

@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Button, FormField, Heatmap, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
-import { DURATION_LABEL, formatLongDate, plural, todayInTimezone } from '@planner/shared';
+import { formatLongDate, plural, todayInTimezone } from '@planner/shared';
 import { api } from '../api/client.js';
-import { qk, useDashboard, useDirections } from '../api/queries.js';
+import { qk, useDashboard, useDirections, usePinnedProjects } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 
 /**
@@ -23,7 +23,7 @@ const PALETTE = [
 
 /**
  * Направления — широкие плашки: слева имя и статистика, в середине карта
- * касаний, справа закреплённые задачи вместе с их проектами.
+ * касаний, справа закреплённый проект направления.
  */
 export function DirectionsPage() {
   const navigate = useNavigate();
@@ -37,12 +37,15 @@ export function DirectionsPage() {
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
-  const perDirection = useQueries({
-    queries: (directions.data ?? []).flatMap((d) => [
-      { queryKey: qk.heatmap(26, d.id), queryFn: () => api.touches.heatmap(26, d.id) },
-      { queryKey: qk.pinnedTasks(d.id), queryFn: () => api.tasks.pinned(d.id) },
-    ]),
+  // карта касаний — на каждое направление свой запрос; закреплённые проекты
+  // приезжают одним списком, по одному на направление
+  const heatmaps = useQueries({
+    queries: (directions.data ?? []).map((d) => ({
+      queryKey: qk.heatmap(26, d.id),
+      queryFn: () => api.touches.heatmap(26, d.id),
+    })),
   });
+  const pinnedProjects = usePinnedProjects();
 
   const create = useMutation({
     mutationFn: () =>
@@ -75,15 +78,9 @@ export function DirectionsPage() {
       />
 
       {(directions.data ?? []).map((d, index) => {
-        const heat = perDirection[index * 2]?.data as
+        const heat = heatmaps[index]?.data as
           { days: never[]; total?: number; weekTotal?: number } | undefined;
-        const pinned = (perDirection[index * 2 + 1]?.data ?? []) as {
-          id: string;
-          title: string;
-          projectTitle: string;
-          deadline: string | null;
-          estimatedDuration: 'short' | 'medium' | 'long' | null;
-        }[];
+        const pinned = (pinnedProjects.data ?? []).find((p) => p.directionId === d.id) ?? null;
         const isFocus = dashboard.data?.focus.focusDirectionId === d.id;
         const total = heat?.total ?? 0;
 
@@ -128,39 +125,28 @@ export function DirectionsPage() {
               />
             </div>
 
+            {/* закреплённый проект направления — он же показывается на главной,
+                когда это направление в фокусе */}
             <div className="pinned-cell">
-              {pinned.length > 0 ? (
-                <>
-                  {pinned.slice(0, 4).map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className="pt"
-                      onClick={(e) => {
-                        // иначе клик уйдёт наверх и вместо задачи откроется направление
-                        e.stopPropagation();
-                        navigate(`/tasks/${t.id}`);
-                      }}
-                    >
-                      <i className="dir-dot" style={{ ['--c' as string]: `var(${d.color})` }} />
-                      <span>
-                        {t.title}
-                        <small>
-                          {' '}
-                          · {t.projectTitle}
-                          {t.deadline
-                            ? ` · до ${formatLongDate(t.deadline)}`
-                            : t.estimatedDuration
-                              ? ` · ${DURATION_LABEL[t.estimatedDuration]}`
-                              : ''}
-                        </small>
-                      </span>
-                    </button>
-                  ))}
-                  {pinned.length > 4 ? (
-                    <span className="more">и ещё {pinned.length - 4}</span>
-                  ) : null}
-                </>
+              <span className="lbl">Закреплённый проект</span>
+              {pinned ? (
+                <button
+                  type="button"
+                  className="pt"
+                  onClick={(e) => {
+                    // иначе клик уйдёт наверх и вместо проекта откроется направление
+                    e.stopPropagation();
+                    navigate(`/projects/${pinned.id}`);
+                  }}
+                >
+                  <i className="dir-dot" style={{ ['--c' as string]: `var(${d.color})` }} />
+                  <span>
+                    {pinned.title}
+                    {pinned.deadline ? (
+                      <small> · до {formatLongDate(pinned.deadline)}</small>
+                    ) : null}
+                  </span>
+                </button>
               ) : (
                 <span className="more">Ничего не закреплено.</span>
               )}

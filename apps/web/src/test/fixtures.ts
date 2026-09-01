@@ -1,5 +1,5 @@
 import type { DashboardData } from '../api/client.js';
-import type { Focus, TaskWithContext } from '@planner/contracts';
+import type { Focus, Project, TaskWithContext } from '@planner/contracts';
 
 const iso = '2026-08-27T09:00:00.000Z';
 
@@ -49,6 +49,23 @@ export const makeFocus = (over: Partial<Focus> = {}): Focus => ({
   ...over,
 });
 
+export const makeProject = (over: Partial<Project> = {}): Project => ({
+  id: 'project-1',
+  userId: 'user-1',
+  directionId: 'dir-voice',
+  title: 'Подготовить демо для сайта',
+  desiredOutcome: null,
+  status: 'active',
+  deadline: null,
+  sortOrder: 0,
+  notes: [],
+  pinned: true,
+  createdAt: iso,
+  completedAt: null,
+  updatedAt: iso,
+  ...over,
+});
+
 export const makeDashboard = (over: Partial<DashboardData> = {}): DashboardData => ({
   today: '2026-08-27',
   timezone: 'Europe/Moscow',
@@ -57,14 +74,7 @@ export const makeDashboard = (over: Partial<DashboardData> = {}): DashboardData 
   dueTasks: [],
   overdueTasks: [],
   todayReminders: [],
-  pinnedTasks: [
-    makeTask({
-      id: 'task-2',
-      title: 'Перезаписать рекламный ролик №1',
-      pinned: true,
-      projectTitle: 'Подготовить демо для сайта',
-    }),
-  ],
+  pinnedProject: makeProject(),
   pinnedMedia: [],
   heatmap: { from: '2026-03-02', to: '2026-08-27', days: [], weekTotal: 4, total: 40 },
   ...over,

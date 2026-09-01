@@ -5,6 +5,8 @@ import {
   Button,
   FormField,
   Heatmap,
+  IconPin,
+  IconPinFilled,
   IconPlus,
   IconTrash,
   Modal,
@@ -19,6 +21,7 @@ import {
   useDirection,
   useHeatmap,
   useProjects,
+  useToggleProjectPin,
   useTouches,
 } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
@@ -100,6 +103,7 @@ export function DirectionPage() {
   // 'ask' — сервер вернёт 409, если активна задача из другого направления,
   // и пользователь сам решит, что делать. Молча снимать задачу нельзя.
   const { setDirection, conflictModal } = useFocusDirection();
+  const togglePin = useToggleProjectPin();
 
   if (direction.isLoading) return <Loading what="Загружаю направление" />;
   if (direction.isError)
@@ -115,26 +119,55 @@ export function DirectionPage() {
   const isFocus = dashboard.data?.focus.focusDirectionId === directionId;
   const dirColor = `var(${d.color})`;
 
+  /*
+    Карточка проекта — div, а не button: внутри живёт кнопка закрепления,
+    а кнопка в кнопке недопустима. Клик по карточке открывает проект.
+  */
   const projectCard = (p: (typeof list)[number], modifier?: 'is-paused' | 'is-completed') => (
-    <button
+    <div
       key={p.id}
-      type="button"
-      className={`dir-project-card${modifier ? ` ${modifier}` : ''}`}
+      className={`dir-project-card${modifier ? ` ${modifier}` : ''}${p.pinned ? ' is-pinned' : ''}`}
       style={{ ['--c' as string]: dirColor }}
       onClick={() => navigate(`/projects/${p.id}`)}
     >
       <span className="top">
-        <span className="nm">{p.title}</span>
+        <button type="button" className="nm" onClick={() => navigate(`/projects/${p.id}`)}>
+          {p.title}
+        </button>
+        {p.status === 'active' ? (
+          <button
+            type="button"
+            className={`pin${p.pinned ? ' is-pinned' : ''}`}
+            aria-label={p.pinned ? `Открепить проект: ${p.title}` : `Закрепить проект: ${p.title}`}
+            title={
+              p.pinned
+                ? 'Открепить'
+                : 'Закрепить — в направлении закреплённым может быть только один проект'
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePin.mutate(
+                { projectId: p.id, pinned: p.pinned },
+                {
+                  onSuccess: () =>
+                    toast.show(p.pinned ? 'Закрепление снято' : `Закреплён: ${p.title}`),
+                },
+              );
+            }}
+          >
+            {p.pinned ? <IconPinFilled /> : <IconPin />}
+          </button>
+        ) : null}
         <span className="stats">
           {p.openTaskCount
             ? `${p.openTaskCount} ${plural(p.openTaskCount, 'задача', 'задачи', 'задач')}`
             : 'без открытых задач'}
-          {p.pinnedCount ? ` · закреплено ${p.pinnedCount}` : ''}
+          {p.pinnedCount ? ` · важных ${p.pinnedCount}` : ''}
           {p.deadline ? ` · срок ${formatLongDate(p.deadline)}` : ''}
         </span>
       </span>
       {p.desiredOutcome ? <span className="goal">{p.desiredOutcome}</span> : null}
-    </button>
+    </div>
   );
 
   return (

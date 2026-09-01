@@ -1,0 +1,2 @@
+ALTER TABLE "projects" ADD COLUMN "pinned" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "projects_pinned_direction_uidx" ON "projects" USING btree ("direction_id") WHERE "projects"."pinned";
