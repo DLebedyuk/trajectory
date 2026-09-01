@@ -36,6 +36,11 @@ export type MediaKind = z.infer<typeof mediaKind>;
 export const inboxStatus = z.enum(['new', 'processed', 'deleted']);
 export type InboxStatus = z.infer<typeof inboxStatus>;
 
+/**
+ * Во что можно превратить входящую запись. Типа «заметка в проект» здесь
+ * больше нет: заметка не создаёт ничего, что потом можно найти или закрыть,
+ * и запись просто растворялась в чужом проекте.
+ */
 export const inboxProposedType = z.enum([
   'task',
   'project',
@@ -43,7 +48,6 @@ export const inboxProposedType = z.enum([
   'menu',
   'book',
   'film',
-  'note',
   'keep',
 ]);
 export type InboxProposedType = z.infer<typeof inboxProposedType>;

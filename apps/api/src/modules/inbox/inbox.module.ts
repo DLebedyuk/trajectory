@@ -4,6 +4,11 @@ import { InboxService } from './inbox.service.js';
 import { AI_PROVIDER, MockAiProvider, type AiProvider } from './ai.provider.js';
 import { OpenAiProvider } from './openai.provider.js';
 import { env } from '../../config/env.js';
+import { RemindersModule } from '../reminders/reminders.module.js';
+import { TasksModule } from '../tasks/tasks.module.js';
+import { ProjectsModule } from '../projects/projects.module.js';
+import { MenuModule } from '../menu/menu.module.js';
+import { MediaModule } from '../media/media.module.js';
 
 /**
  * Какой разбор входящих использовать. Без ключа остаёмся на mock: локальная
@@ -31,6 +36,9 @@ const aiProviderFactory = {
 };
 
 @Module({
+  // разбор входящих создаёт задачи, проекты, напоминания и записи полки
+  // через их собственные сервисы — второй копии правил быть не должно
+  imports: [RemindersModule, TasksModule, ProjectsModule, MenuModule, MediaModule],
   controllers: [InboxController],
   providers: [InboxService, MockAiProvider, OpenAiProvider, aiProviderFactory],
   exports: [InboxService],

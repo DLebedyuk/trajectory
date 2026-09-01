@@ -12,19 +12,41 @@ process.env.NODE_ENV = 'test';
 let client: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle>;
 let schema: typeof import('../src/db/schema.js');
-let InboxService: typeof import('../src/modules/inbox/inbox.service.js').InboxService;
-let MockAiProvider: typeof import('../src/modules/inbox/ai.provider.js').MockAiProvider;
+type InboxServiceType = import('../src/modules/inbox/inbox.service.js').InboxService;
 
-let service: InstanceType<typeof InboxService>;
+let service: InboxServiceType;
+
+/**
+ * Разбор входящих создаёт задачи, проекты, напоминания и записи полки через
+ * их сервисы — собираем настоящие, а не заглушки: смысл теста в том, что
+ * правила создания одни и те же и в приложении, и во входящих.
+ */
+async function buildInboxService(db: unknown) {
+  const { InboxService } = await import('../src/modules/inbox/inbox.service.js');
+  const { MockAiProvider } = await import('../src/modules/inbox/ai.provider.js');
+  const { RemindersService } = await import('../src/modules/reminders/reminders.service.js');
+  const { TasksService } = await import('../src/modules/tasks/tasks.service.js');
+  const { FocusService } = await import('../src/modules/focus/focus.service.js');
+  const { ProjectsService } = await import('../src/modules/projects/projects.service.js');
+  const { MenuService } = await import('../src/modules/menu/menu.service.js');
+  const { MediaService } = await import('../src/modules/media/media.service.js');
+  return new InboxService(
+    db as never,
+    new MockAiProvider() as never,
+    new RemindersService(db as never) as never,
+    new TasksService(db as never, new FocusService(db as never) as never) as never,
+    new ProjectsService(db as never) as never,
+    new MenuService(db as never) as never,
+    new MediaService(db as never) as never,
+  );
+}
 
 beforeAll(async () => {
   await prepareDatabase();
   schema = await import('../src/db/schema.js');
   client = postgres(TEST_DB_URL, { max: 2 });
   db = drizzle(client, { schema });
-  ({ InboxService } = await import('../src/modules/inbox/inbox.service.js'));
-  ({ MockAiProvider } = await import('../src/modules/inbox/ai.provider.js'));
-  service = new InboxService(db as never, new MockAiProvider() as never);
+  service = (await buildInboxService(db)) as InboxServiceType;
 }, 60_000);
 
 afterAll(async () => {

@@ -33,11 +33,24 @@ beforeAll(async () => {
   const { RemindersService } = await import('../src/modules/reminders/reminders.service.js');
   const { InboxService } = await import('../src/modules/inbox/inbox.service.js');
   const { MockAiProvider } = await import('../src/modules/inbox/ai.provider.js');
+  const { TasksService } = await import('../src/modules/tasks/tasks.service.js');
+  const { FocusService } = await import('../src/modules/focus/focus.service.js');
+  const { ProjectsService } = await import('../src/modules/projects/projects.service.js');
+  const { MenuService } = await import('../src/modules/menu/menu.service.js');
+  const { MediaService } = await import('../src/modules/media/media.service.js');
   const { TelegramLinkService } = await import('../src/modules/telegram/telegram-link.service.js');
   const { TelegramService } = await import('../src/modules/telegram/telegram.service.js');
 
   reminders = new RemindersService(db as never);
-  inbox = new InboxService(db as never, new MockAiProvider() as never);
+  inbox = new InboxService(
+    db as never,
+    new MockAiProvider() as never,
+    reminders as never,
+    new TasksService(db as never, new FocusService(db as never) as never) as never,
+    new ProjectsService(db as never) as never,
+    new MenuService(db as never) as never,
+    new MediaService(db as never) as never,
+  );
   link = new TelegramLinkService(db as never);
   // маршрутизатор уведомлений в этом тесте не участвует: проверяем путь записи
   telegram = new TelegramService(

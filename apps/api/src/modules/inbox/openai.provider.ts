@@ -11,7 +11,7 @@ import { MockAiProvider, type AiParseContext, type AiProvider } from './ai.provi
  */
 const aiItemSchema = z.object({
   inboxItemId: z.string(),
-  type: z.enum(['task', 'project', 'reminder', 'menu', 'book', 'film', 'note', 'keep']),
+  type: z.enum(['task', 'project', 'reminder', 'menu', 'book', 'film', 'keep']),
   text: z.string().min(1).max(500),
   projectId: z.string().nullable(),
   deadline: z
@@ -22,6 +22,11 @@ const aiItemSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
+  remindTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .nullable()
+    .optional(),
   estimatedDuration: z.enum(['short', 'medium', 'long']).nullable(),
   comment: z.string().max(2000).nullable(),
   note: z.string().max(500).nullable(),
@@ -51,16 +56,16 @@ const SYSTEM_PROMPT = `Ты помогаешь разбирать входящи
 - "menu" — приятное и необязательное, без срока: сходить на выставку, попробовать
   ресторан, погулять, съездить куда-то.
 - "book" — что почитать. "film" — что посмотреть.
-- "note" — мысль или наблюдение по существующему проекту, её надо дописать
-  в заметки этого проекта. Требует projectId.
 - "keep" — непонятно, к чему отнести. Запись останется во входящих.
 
 ЖЁСТКИЕ ПРАВИЛА:
-1. НЕ ВЫДУМЫВАЙ ДАТЫ. deadline и remindAt заполняй, только если дата явно названа
-   в тексте («в пятницу», «3 сентября», «завтра»). Во всех остальных случаях — null.
+1. НЕ ВЫДУМЫВАЙ ДАТЫ И ВРЕМЯ. deadline, remindAt и remindTime заполняй, только если
+   они явно названы в тексте («в пятницу», «3 сентября», «завтра», «в 10:30»).
+   Во всех остальных случаях — null.
 2. projectId бери ТОЛЬКО из списка projects, который тебе дан. Если подходящего нет
-   или ты не уверена — ставь null и НЕ используй типы "task" и "note": возьми "keep".
+   или ты не уверена — ставь null и НЕ используй тип "task": возьми "keep".
    Не придумывай идентификаторы.
+   Направление для типа "project" не выбирай вообще — его называет человек.
 3. text — короткая формулировка на русском, без слов «надо», «не забыть», «напомни».
    Сохраняй смысл и имена собственные из оригинала.
 4. Не придумывай подробностей, которых нет в тексте.
@@ -71,18 +76,19 @@ const SYSTEM_PROMPT = `Ты помогаешь разбирать входящи
 {"items": [
   {
     "inboxItemId": "id записи ровно как в запросе",
-    "type": "task" | "project" | "reminder" | "menu" | "book" | "film" | "note" | "keep",
+    "type": "task" | "project" | "reminder" | "menu" | "book" | "film" | "keep",
     "text": "формулировка, до 500 символов",
     "projectId": "id из списка projects" | null,
     "deadline": "YYYY-MM-DD" | null,
     "remindAt": "YYYY-MM-DD" | null,
+    "remindTime": "HH:MM" | null,
     "estimatedDuration": "short" | "medium" | "long" | null,
     "comment": "уточнение из текста, до 2000 символов" | null,
     "note": "почему ты предложила именно это, до 500 символов" | null
   }
 ]}
 
-Все девять полей обязательны в каждом элементе. Если значения нет — пиши null,
+Все десять полей обязательны в каждом элементе. Если значения нет — пиши null,
 а не пропускай поле. Никакого текста вне JSON.
 
 ТОЛЬКО для type "menu" можно дополнительно добавить пять полей — человек всё
@@ -101,10 +107,10 @@ const SYSTEM_PROMPT = `Ты помогаешь разбирать входящи
 Ответ:
 {"items":[
   {"inboxItemId":"i1","type":"reminder","text":"Оплатить микрофон","projectId":null,
-   "deadline":null,"remindAt":"2026-09-04","estimatedDuration":"short",
+   "deadline":null,"remindAt":"2026-09-04","remindTime":null,"estimatedDuration":"short",
    "comment":null,"note":"«до пятницы» — ближайшая пятница от 1 сентября"},
   {"inboxItemId":"i2","type":"menu","text":"Пушкинский музей","projectId":null,
-   "deadline":null,"remindAt":null,"estimatedDuration":"long",
+   "deadline":null,"remindAt":null,"remindTime":null,"estimatedDuration":"long",
    "comment":null,"note":"Приятное и без срока"}
 ]}`;
 
@@ -254,6 +260,7 @@ export class OpenAiProvider implements AiProvider {
         projectId,
         deadline: a.deadline,
         remindAt: a.remindAt,
+        remindTime: a.remindTime ?? null,
         comment: a.comment,
         // параметры меню имеют смысл только для меню: в задаче они лишний шум
         menuCategory: a.type === 'menu' ? (a.menuCategory ?? null) : null,

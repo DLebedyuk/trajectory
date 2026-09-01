@@ -77,7 +77,9 @@ export class MockAiProvider implements AiProvider {
         type: 'reminder',
         text: this.clean(parsed.text),
         remindAt: parsed.date,
-        deliveryMode: parsed.time ? 'alert' : 'digest',
+        // время из фразы теряться не должно: без него напоминание молча
+        // уезжало в дневную сводку, даже когда час был назван прямо
+        remindTime: parsed.time,
         note: parsed.date
           ? `Дата взята из текста.`
           : 'Даты в тексте нет — придумывать не буду, выбери сама.',

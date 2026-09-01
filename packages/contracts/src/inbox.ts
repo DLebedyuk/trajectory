@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dateOnly, inboxProposedType, inboxStatus, uuid } from './common.js';
+import { dateOnly, inboxProposedType, inboxStatus, timeOfDay, uuid } from './common.js';
 import { deliveryMode } from './common.js';
 import { menuCost, menuEnergy, menuEstimatedTime, menuPlace } from './menu.js';
 
@@ -27,9 +27,17 @@ export const inboxProposalSchema = z
     inboxItemId: uuid,
     type: inboxProposedType,
     text: z.string().min(1).max(500),
+    /** Для типа «задача»: проект, а через него и направление. */
     projectId: uuid.nullish(),
+    /** Для типа «проект»: направление, в котором он заводится. */
+    directionId: uuid.nullish(),
     deadline: dateOnly.nullish(),
     remindAt: dateOnly.nullish(),
+    /**
+     * Время напоминания. Без него любое напоминание из входящих попадало
+     * в дневную сводку, даже если во фразе время было названо.
+     */
+    remindTime: timeOfDay.nullish(),
     deliveryMode: deliveryMode.nullish(),
     comment: z.string().max(2000).nullish(),
     note: z.string().max(500).nullish(),

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import type {
   ApplyInboxResult,
   CreateInboxItemInput,
@@ -9,19 +9,15 @@ import type {
 import { MENU_DEFAULTS } from '@planner/contracts';
 import { todayInTimezone } from '@planner/shared';
 import { DB, type Database } from '../../db/db.module.js';
-import {
-  directions,
-  inboxItems,
-  mediaItems,
-  menuItems,
-  projects,
-  reminders,
-  tasks,
-  users,
-} from '../../db/schema.js';
+import { directions, inboxItems, projects, users } from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { iso, isoRequired } from '../../common/mappers.js';
 import { AI_PROVIDER, type AiProvider } from './ai.provider.js';
+import { RemindersService } from '../reminders/reminders.service.js';
+import { TasksService } from '../tasks/tasks.service.js';
+import { ProjectsService } from '../projects/projects.service.js';
+import { MenuService } from '../menu/menu.service.js';
+import { MediaService } from '../media/media.service.js';
 
 type Row = typeof inboxItems.$inferSelect;
 
@@ -36,11 +32,19 @@ const toItem = (r: Row): InboxItem => ({
   processedAt: iso(r.processedAt),
 });
 
+/** Причина, по которой запись осталась во входящих. */
+class SkipReason extends Error {}
+
 @Injectable()
 export class InboxService {
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
+    @Inject(RemindersService) private readonly reminders: RemindersService,
+    @Inject(TasksService) private readonly tasks: TasksService,
+    @Inject(ProjectsService) private readonly projects: ProjectsService,
+    @Inject(MenuService) private readonly menu: MenuService,
+    @Inject(MediaService) private readonly media: MediaService,
   ) {}
 
   async list(userId: string): Promise<InboxItem[]> {
@@ -93,7 +97,16 @@ export class InboxService {
     );
   }
 
-  /** Применение подтверждённых предложений. Ничего не применяется без явного выбора. */
+  /**
+   * Применение подтверждённых предложений. Ничего не применяется без явного
+   * выбора.
+   *
+   * Каждый тип уходит в свой сервис, а не в db.insert напрямую. Раньше здесь
+   * лежала вторая копия правил создания, и она успела разойтись с первой:
+   * напоминание из входящих не смотрело на настройку «если пропущено» и всегда
+   * ложилось в дневную сводку, задача считала себе sortOrder вручную, а проект
+   * заводился в первом попавшемся направлении.
+   */
   async apply(userId: string, proposals: InboxProposal[]): Promise<ApplyInboxResult> {
     const skipped: ApplyInboxResult['skipped'] = [];
     let applied = 0;
@@ -109,123 +122,7 @@ export class InboxService {
       }
 
       try {
-        switch (p.type) {
-          case 'keep':
-            skipped.push({ inboxItemId: p.inboxItemId, reason: 'Оставлено во входящих' });
-            continue;
-          case 'reminder': {
-            if (!p.remindAt) {
-              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Не выбрана дата напоминания' });
-              continue;
-            }
-            const [user] = await this.db.select().from(users).where(eq(users.id, userId));
-            await this.db.insert(reminders).values({
-              userId,
-              text: p.text,
-              scheduledDate: p.remindAt,
-              scheduledTime: null,
-              timezone: user?.timezone ?? 'UTC',
-              deliveryMode: p.deliveryMode ?? 'digest',
-              source: item.source === 'telegram' ? 'telegram' : 'web',
-              comment: p.comment ?? null,
-            });
-            break;
-          }
-          case 'task': {
-            if (!p.projectId) {
-              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Не выбран проект' });
-              continue;
-            }
-            const [project] = await this.db
-              .select({ id: projects.id, status: projects.status })
-              .from(projects)
-              .where(and(eq(projects.userId, userId), eq(projects.id, p.projectId)));
-            if (!project) {
-              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Проект не найден' });
-              continue;
-            }
-            if (project.status === 'archived') {
-              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Проект завершён' });
-              continue;
-            }
-            const [{ value } = { value: 0 }] = await this.db
-              .select({ value: sql<number>`coalesce(max(${tasks.sortOrder}), -1) + 1` })
-              .from(tasks)
-              .where(and(eq(tasks.userId, userId), eq(tasks.projectId, p.projectId)));
-            await this.db.insert(tasks).values({
-              userId,
-              projectId: p.projectId,
-              title: p.text,
-              deadline: p.deadline ?? null,
-              comment: p.comment ?? null,
-              sortOrder: Number(value),
-            });
-            break;
-          }
-          case 'project': {
-            const [dir] = await this.db
-              .select({ id: directions.id })
-              .from(directions)
-              .where(eq(directions.userId, userId))
-              .limit(1);
-            if (!dir) {
-              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Нет ни одного направления' });
-              continue;
-            }
-            await this.db.insert(projects).values({
-              userId,
-              directionId: dir.id,
-              title: p.text,
-              desiredOutcome: p.comment ?? null,
-              status: 'paused',
-            });
-            break;
-          }
-          case 'menu':
-            // раньше здесь были только title и comment, а energy/cost/place/
-            // category молча брались из defaults базы — человек их не выбирал
-            // и не видел. Теперь применяем ровно то, что он подтвердил.
-            await this.db.insert(menuItems).values({
-              userId,
-              title: p.text,
-              comment: p.comment ?? null,
-              category: p.menuCategory ?? MENU_DEFAULTS.category,
-              energy: p.energy ?? MENU_DEFAULTS.energy,
-              estimatedTime: p.estimatedTime ?? MENU_DEFAULTS.estimatedTime,
-              cost: p.cost ?? MENU_DEFAULTS.cost,
-              place: p.place ?? MENU_DEFAULTS.place,
-            });
-            break;
-          case 'book':
-          case 'film':
-            await this.db.insert(mediaItems).values({
-              userId,
-              kind: p.type,
-              title: p.text,
-              coverEmoji: p.type === 'book' ? '📗' : '🎬',
-              comment: p.comment ?? null,
-            });
-            break;
-          case 'note': {
-            if (!p.projectId) {
-              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Не выбран проект' });
-              continue;
-            }
-            const [project] = await this.db
-              .select()
-              .from(projects)
-              .where(and(eq(projects.userId, userId), eq(projects.id, p.projectId)));
-            if (!project) {
-              skipped.push({ inboxItemId: p.inboxItemId, reason: 'Проект не найден' });
-              continue;
-            }
-            await this.db
-              .update(projects)
-              .set({ notes: [...(project.notes ?? []), p.text], updatedAt: new Date() })
-              .where(eq(projects.id, p.projectId));
-            break;
-          }
-        }
+        await this.applyOne(userId, p, item.source === 'telegram' ? 'telegram' : 'web');
         await this.db
           .update(inboxItems)
           .set({ status: 'processed', proposedType: p.type, processedAt: new Date() })
@@ -240,5 +137,97 @@ export class InboxService {
     }
 
     return { applied, skipped };
+  }
+
+  private async applyOne(
+    userId: string,
+    p: InboxProposal,
+    source: 'web' | 'telegram',
+  ): Promise<void> {
+    switch (p.type) {
+      case 'keep':
+        throw new SkipReason('Оставлено во входящих');
+
+      case 'reminder': {
+        if (!p.remindAt) throw new SkipReason('Не выбрана дата напоминания');
+        // deliveryMode и missedBehavior считает сервис: со временем —
+        // отдельное уведомление, без времени — дневная сводка, а поведение
+        // при пропуске берётся из настроек человека
+        await this.reminders.create(userId, {
+          text: p.text,
+          scheduledDate: p.remindAt,
+          scheduledTime: p.remindTime ?? null,
+          ...(p.deliveryMode ? { deliveryMode: p.deliveryMode } : {}),
+          source,
+          comment: p.comment ?? null,
+        });
+        return;
+      }
+
+      case 'task': {
+        if (!p.projectId) throw new SkipReason('Не выбран проект');
+        const project = await this.projects
+          .get(userId, p.projectId)
+          .catch(() => Promise.reject(new SkipReason('Проект не найден')));
+        if (project.status === 'archived') throw new SkipReason('Проект завершён');
+        await this.tasks.create(userId, {
+          projectId: p.projectId,
+          title: p.text,
+          deadline: p.deadline ?? null,
+          // дата напоминания задачи — та же, что у предложения: иначе
+          // «напомнить» из формулировки просто терялось
+          remindAt: p.remindAt ?? null,
+          comment: p.comment ?? null,
+          pinned: false,
+        });
+        return;
+      }
+
+      case 'project': {
+        if (!p.directionId) throw new SkipReason('Не выбрано направление');
+        const [dir] = await this.db
+          .select({ id: directions.id })
+          .from(directions)
+          .where(and(eq(directions.userId, userId), eq(directions.id, p.directionId)));
+        if (!dir) throw new SkipReason('Направление не найдено');
+        // проект из входящих заводится живым: «на паузе» означало бы, что
+        // человек его уже отложил, а он только что решил его начать
+        await this.projects.create(userId, {
+          directionId: p.directionId,
+          title: p.text,
+          desiredOutcome: p.comment ?? null,
+          status: 'active',
+          notes: [],
+        });
+        return;
+      }
+
+      case 'menu':
+        await this.menu.create(userId, {
+          title: p.text,
+          comment: p.comment ?? null,
+          category: p.menuCategory ?? MENU_DEFAULTS.category,
+          energy: p.energy ?? MENU_DEFAULTS.energy,
+          estimatedTime: p.estimatedTime ?? MENU_DEFAULTS.estimatedTime,
+          cost: p.cost ?? MENU_DEFAULTS.cost,
+          place: p.place ?? MENU_DEFAULTS.place,
+          company: MENU_DEFAULTS.company,
+          tried: false,
+        });
+        return;
+
+      case 'book':
+      case 'film':
+        await this.media.create(userId, {
+          kind: p.type,
+          title: p.text,
+          coverEmoji: p.type === 'book' ? '📗' : '🎬',
+          comment: p.comment ?? null,
+          status: 'want',
+          pinned: false,
+          rating: 0,
+        });
+        return;
+    }
   }
 }

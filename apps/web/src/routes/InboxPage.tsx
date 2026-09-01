@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Button, EmptyState, IconPlus, IconSpark, Modal, PageHeader, useToast } from '@planner/ui';
 import type { InboxProposal } from '@planner/contracts';
@@ -13,6 +13,29 @@ import {
   type MenuParamsValue,
 } from '../components/MenuParams.js';
 
+/**
+ * Поле разбора. Подпись связана с полем через id: без этого её не найдёт
+ * ни скринридер, ни тест — а строк тут много и все они похожи.
+ */
+function Field({
+  label,
+  id,
+  wide = false,
+  children,
+}: {
+  label: string;
+  id: string;
+  wide?: boolean;
+  children: (id: string) => ReactNode;
+}) {
+  return (
+    <div className="f" style={wide ? { gridColumn: '1 / -1' } : undefined}>
+      <label htmlFor={id}>{label}</label>
+      {children(id)}
+    </div>
+  );
+}
+
 const TYPES: [InboxProposal['type'], string][] = [
   ['task', 'Задача'],
   ['project', 'Проект'],
@@ -20,7 +43,6 @@ const TYPES: [InboxProposal['type'], string][] = [
   ['menu', 'Идея меню'],
   ['book', 'Книга'],
   ['film', 'Фильм или сериал'],
-  ['note', 'Заметка в проект'],
   ['keep', 'Оставить во входящих'],
 ];
 
@@ -139,6 +161,7 @@ export function InboxPage() {
                 title: p.title,
                 directionName: directionName(p.directionId),
               }))}
+              directions={(directions.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
               onSave={(proposal) => applyOne.mutate({ ...proposal, inboxItemId: item.id })}
               onDelete={() => remove.mutate(item.id)}
             />
@@ -184,54 +207,98 @@ export function InboxPage() {
                 </span>
               </label>
               <div className="inbox-fields">
-                <div className="f">
-                  <label>Тип</label>
-                  <select
-                    value={b.type}
-                    onChange={(e) =>
-                      patch(index, { type: e.target.value as InboxProposal['type'] })
-                    }
-                  >
-                    {TYPES.map(([v, l]) => (
-                      <option key={v} value={v}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="f" style={{ gridColumn: '1 / -1' }}>
-                  <label>Формулировка</label>
-                  <input
-                    type="text"
-                    value={b.text}
-                    onChange={(e) => patch(index, { text: e.target.value })}
-                  />
-                </div>
-                {b.type === 'task' || b.type === 'note' ? (
-                  <div className="f" style={{ gridColumn: '1 / -1' }}>
-                    <label>Проект</label>
+                <Field label="Тип" id={`ai-type-${b.inboxItemId}`}>
+                  {(id) => (
                     <select
-                      value={b.projectId ?? ''}
-                      onChange={(e) => patch(index, { projectId: e.target.value || null })}
+                      id={id}
+                      value={b.type}
+                      onChange={(e) =>
+                        patch(index, { type: e.target.value as InboxProposal['type'] })
+                      }
                     >
-                      <option value="">— выбрать —</option>
-                      {projects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {directionName(p.directionId)} · {p.title}
+                      {TYPES.map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
                         </option>
                       ))}
                     </select>
-                  </div>
+                  )}
+                </Field>
+                <Field label="Формулировка" id={`ai-text-${b.inboxItemId}`} wide>
+                  {(id) => (
+                    <input
+                      id={id}
+                      type="text"
+                      value={b.text}
+                      onChange={(e) => patch(index, { text: e.target.value })}
+                    />
+                  )}
+                </Field>
+                {b.type === 'task' ? (
+                  <Field
+                    label="Проект — он же задаёт направление"
+                    id={`ai-project-${b.inboxItemId}`}
+                    wide
+                  >
+                    {(id) => (
+                      <select
+                        id={id}
+                        value={b.projectId ?? ''}
+                        onChange={(e) => patch(index, { projectId: e.target.value || null })}
+                      >
+                        <option value="">— выбрать —</option>
+                        {projects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {directionName(p.directionId)} · {p.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </Field>
+                ) : null}
+                {/* проект заводится внутри направления, и выбрать его должен
+                    человек: раньше сервер молча брал первое попавшееся */}
+                {b.type === 'project' ? (
+                  <Field label="Направление" id={`ai-direction-${b.inboxItemId}`} wide>
+                    {(id) => (
+                      <select
+                        id={id}
+                        value={b.directionId ?? ''}
+                        onChange={(e) => patch(index, { directionId: e.target.value || null })}
+                      >
+                        <option value="">— выбрать —</option>
+                        {(directions.data ?? []).map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </Field>
                 ) : null}
                 {b.type === 'reminder' ? (
-                  <div className="f">
-                    <label>Когда</label>
-                    <input
-                      type="date"
-                      value={b.remindAt ?? ''}
-                      onChange={(e) => patch(index, { remindAt: e.target.value || null })}
-                    />
-                  </div>
+                  <>
+                    <Field label="Когда" id={`ai-date-${b.inboxItemId}`}>
+                      {(id) => (
+                        <input
+                          id={id}
+                          type="date"
+                          value={b.remindAt ?? ''}
+                          onChange={(e) => patch(index, { remindAt: e.target.value || null })}
+                        />
+                      )}
+                    </Field>
+                    <Field label="Во сколько — если время важно" id={`ai-time-${b.inboxItemId}`}>
+                      {(id) => (
+                        <input
+                          id={id}
+                          type="time"
+                          value={b.remindTime ?? ''}
+                          onChange={(e) => patch(index, { remindTime: e.target.value || null })}
+                        />
+                      )}
+                    </Field>
+                  </>
                 ) : null}
               </div>
               {b.type === 'menu' ? (
@@ -284,6 +351,7 @@ function InboxCard({
   source,
   createdAt,
   projects,
+  directions,
   onSave,
   onDelete,
 }: {
@@ -291,13 +359,16 @@ function InboxCard({
   source: string;
   createdAt: string;
   projects: { id: string; title: string; directionName: string }[];
+  directions: { id: string; name: string }[];
   onSave: (proposal: Omit<InboxProposal, 'inboxItemId'> & { inboxItemId: string }) => void;
   onDelete: () => void;
 }) {
   const [type, setType] = useState<InboxProposal['type']>('keep');
   const [value, setValue] = useState(text);
   const [projectId, setProjectId] = useState('');
+  const [directionId, setDirectionId] = useState('');
   const [remindAt, setRemindAt] = useState('');
+  const [remindTime, setRemindTime] = useState('');
   const [menu, setMenu] = useState<MenuParamsValue>(menuParamsDefaults);
 
   return (
@@ -315,7 +386,7 @@ function InboxCard({
         </span>
       </div>
 
-      {/* тип выбирается чипами: список из восьми пунктов в select не читается */}
+      {/* тип выбирается чипами: длинный список в select не читается */}
       <div className="controls">
         {TYPES.map(([v, l]) => (
           <button
@@ -331,33 +402,64 @@ function InboxCard({
       </div>
 
       <div className="inbox-fields">
-        <div className="f" style={{ gridColumn: '1 / -1' }}>
-          <label htmlFor={`text-${text}`}>Формулировка</label>
-          <input
-            id={`text-${text}`}
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </div>
-        {type === 'task' || type === 'note' ? (
-          <div className="f" style={{ gridColumn: '1 / -1' }}>
-            <label>Проект — определяет направление</label>
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-              <option value="">— выбери проект —</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.directionName} · {p.title}
-                </option>
-              ))}
-            </select>
-          </div>
+        <Field label="Формулировка" id={`text-${text}`} wide>
+          {(id) => (
+            <input id={id} type="text" value={value} onChange={(e) => setValue(e.target.value)} />
+          )}
+        </Field>
+        {type === 'task' ? (
+          <Field label="Проект — определяет направление" id={`project-${text}`} wide>
+            {(id) => (
+              <select id={id} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                <option value="">— выбери проект —</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.directionName} · {p.title}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        ) : null}
+        {/* проект живёт внутри направления, и выбрать его должен человек:
+            раньше сервер молча брал первое попавшееся */}
+        {type === 'project' ? (
+          <Field label="Направление — в нём заведётся проект" id={`direction-${text}`} wide>
+            {(id) => (
+              <select id={id} value={directionId} onChange={(e) => setDirectionId(e.target.value)}>
+                <option value="">— выбери направление —</option>
+                {directions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
         ) : null}
         {type === 'reminder' ? (
-          <div className="f">
-            <label>Когда напомнить</label>
-            <input type="date" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
-          </div>
+          <>
+            <Field label="Когда напомнить" id={`date-${text}`}>
+              {(id) => (
+                <input
+                  id={id}
+                  type="date"
+                  value={remindAt}
+                  onChange={(e) => setRemindAt(e.target.value)}
+                />
+              )}
+            </Field>
+            <Field label="Во сколько — если время важно" id={`time-${text}`}>
+              {(id) => (
+                <input
+                  id={id}
+                  type="time"
+                  value={remindTime}
+                  onChange={(e) => setRemindTime(e.target.value)}
+                />
+              )}
+            </Field>
+          </>
         ) : null}
       </div>
 
@@ -379,7 +481,9 @@ function InboxCard({
               type,
               text: value,
               projectId: projectId || null,
+              directionId: directionId || null,
               remindAt: remindAt || null,
+              remindTime: remindTime || null,
               // параметры меню уходят только для меню — иначе это лишние поля
               ...(type === 'menu' ? menu : {}),
             })
