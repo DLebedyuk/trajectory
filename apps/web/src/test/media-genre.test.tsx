@@ -81,6 +81,19 @@ describe('жанры на полке', () => {
     expect(screen.queryByText('Внутренняя игра в теннис')).not.toBeInTheDocument();
   });
 
+  it('счётчики вкладок считают только выбранный жанр', async () => {
+    renderWithProviders(<MediaPage />, '/media');
+    const user = userEvent.setup();
+
+    await screen.findByText('Внутренняя игра в теннис');
+    const allTab = () => screen.getByRole('tab', { name: /Всё/ });
+    expect(allTab().textContent).toContain('2');
+
+    await user.click(screen.getByRole('button', { name: 'научпоп' }));
+    // вкладка обещала «Всё 2», а под ней лежала одна книга
+    expect(allTab().textContent).toContain('1');
+  });
+
   it('«без жанра» показывает то, чему жанр не проставлен', async () => {
     renderWithProviders(<MediaPage />, '/media');
     const user = userEvent.setup();

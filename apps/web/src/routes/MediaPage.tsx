@@ -113,12 +113,14 @@ export function MediaPage() {
   const all = (media.data ?? []).filter((m) =>
     tab === 'book' ? m.kind === 'book' : m.kind !== 'book',
   );
-  const shelf = all.filter(
+  // жанр фильтрует и карточки, и счётчики на вкладках: иначе вкладка обещала
+  // «Всё 5», а под ней лежала одна книга
+  const byGenre = all.filter(
     (m) =>
-      (statusTab === null || m.status === statusTab) &&
-      (category === 'all' ||
-        (category === 'none' ? m.categoryId === null : m.categoryId === category)),
+      category === 'all' ||
+      (category === 'none' ? m.categoryId === null : m.categoryId === category),
   );
+  const shelf = byGenre.filter((m) => statusTab === null || m.status === statusTab);
   /*
     Раньше набор жанров собирался только из того, что уже стоит на полке:
     пока ни одной книге жанр не проставлен, весь фильтр просто не появлялся.
@@ -263,7 +265,7 @@ export function MediaPage() {
         <>
           <div className="media-tabs" role="tablist">
             {STATUS_TABS.map((t) => {
-              const count = all.filter((m) => (t.value ? m.status === t.value : true)).length;
+              const count = byGenre.filter((m) => (t.value ? m.status === t.value : true)).length;
               return (
                 <button
                   key={t.value ?? 'all'}
