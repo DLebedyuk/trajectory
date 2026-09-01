@@ -32,6 +32,9 @@ export function MenuPage() {
   const toast = useToast();
   const [filter, setFilter] = useState<Record<string, string | undefined>>({});
   const menu = useMenu(filter);
+  // полный список нужен, чтобы собрать набор категорий: отфильтрованный
+  // показал бы только те, что уже прошли фильтр, и список бы схлопывался
+  const allItems = useMenu({});
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [params, setParams] = useState<MenuParamsValue>(() => ({
@@ -78,18 +81,25 @@ export function MenuPage() {
   const setF = (key: string, value: string) =>
     setFilter((prev) => ({ ...prev, [key]: prev[key] === value ? undefined : value }));
 
+  // категории — свободный текст, поэтому набор берём из того, что реально есть
+  const categories = Object.fromEntries(
+    [...new Set((allItems.data ?? []).map((m) => m.category))].sort().map((c) => [c, c]),
+  );
+
   const group = (key: string, options: Record<string, string>) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <span className="lbl">
-        {key === 'energy'
-          ? 'Энергия'
-          : key === 'estimatedTime'
-            ? 'Время'
-            : key === 'cost'
-              ? 'Стоимость'
-              : key === 'place'
-                ? 'Место'
-                : 'Компания'}
+        {key === 'category'
+          ? 'Категория'
+          : key === 'energy'
+            ? 'Энергия'
+            : key === 'estimatedTime'
+              ? 'Время'
+              : key === 'cost'
+                ? 'Стоимость'
+                : key === 'place'
+                  ? 'Место'
+                  : 'Компания'}
       </span>
       <div className="chips">
         {Object.entries(options).map(([value, label]) => (
@@ -121,6 +131,7 @@ export function MenuPage() {
       />
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+        {Object.keys(categories).length > 1 ? group('category', categories) : null}
         {group('energy', ENERGY)}
         {group('estimatedTime', TIME)}
         {group('cost', COST)}
@@ -139,7 +150,21 @@ export function MenuPage() {
           {(menu.data ?? []).map((m) => (
             <div className={`menu-idea${m.tried ? ' is-tried' : ''}`} key={m.id}>
               <div className="top">
-                <span className="cat">{m.category}</span>
+                {/*
+                  Категория — свободное поле возможности; у всего, что заведено
+                  быстро или пришло из входящих, там стоит значение по умолчанию
+                  «другое». Метка кликается и фильтрует список — раньше она
+                  выглядела как кнопка, но ничего не делала.
+                */}
+                <button
+                  type="button"
+                  className={`cat${filter.category === m.category ? ' is-active' : ''}`}
+                  aria-pressed={filter.category === m.category}
+                  title={`Показать только «${m.category}»`}
+                  onClick={() => setF('category', m.category)}
+                >
+                  {m.category}
+                </button>
               </div>
               <div className="ttl">{m.title}</div>
               {m.comment ? <p className="hint">{m.comment}</p> : null}
