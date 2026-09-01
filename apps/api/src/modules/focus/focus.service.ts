@@ -90,6 +90,7 @@ export class FocusService {
             motto: d.motto,
             showMotto: d.showMotto,
             sortOrder: d.sortOrder,
+            notes: d.notes,
             archivedAt: iso(d.archivedAt),
             createdAt: isoRequired(d.createdAt),
             updatedAt: isoRequired(d.updatedAt),

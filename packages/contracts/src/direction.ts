@@ -11,6 +11,7 @@ export const directionSchema = z.object({
   motto: z.string().max(300).nullable(),
   showMotto: z.boolean(),
   sortOrder: z.number().int(),
+  notes: z.array(z.string().max(2000)),
   archivedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -24,6 +25,7 @@ export const createDirectionSchema = z.object({
   icon: z.string().min(1).max(40).default('spark'),
   motto: z.string().max(300).nullish(),
   showMotto: z.boolean().default(true),
+  notes: z.array(z.string().max(2000)).default([]),
 });
 export type CreateDirectionInput = z.infer<typeof createDirectionSchema>;
 

@@ -22,6 +22,7 @@ const direction = {
   icon: 'mask',
   motto: 'Легаси-девиз, которого не должно быть видно',
   showMotto: true,
+  notes: [],
   sortOrder: 0,
   archivedAt: null,
   createdAt: '2026-08-27T09:00:00.000Z',

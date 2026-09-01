@@ -40,6 +40,7 @@ export const makeFocus = (over: Partial<Focus> = {}): Focus => ({
     motto: null,
     showMotto: false,
     sortOrder: 0,
+    notes: [],
     archivedAt: null,
     createdAt: iso,
     updatedAt: iso,

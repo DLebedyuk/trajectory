@@ -23,6 +23,7 @@ const toDirection = (r: Row): Direction => ({
   motto: r.motto,
   showMotto: r.showMotto,
   sortOrder: r.sortOrder,
+  notes: r.notes,
   archivedAt: iso(r.archivedAt),
   createdAt: isoRequired(r.createdAt),
   updatedAt: isoRequired(r.updatedAt),
@@ -86,6 +87,7 @@ export class DirectionsService {
         icon: input.icon,
         motto: input.motto ?? null,
         showMotto: input.showMotto,
+        notes: input.notes,
         sortOrder: Number(value),
       })
       .returning();
@@ -103,6 +105,7 @@ export class DirectionsService {
         ...(input.icon !== undefined ? { icon: input.icon } : {}),
         ...(input.motto !== undefined ? { motto: input.motto ?? null } : {}),
         ...(input.showMotto !== undefined ? { showMotto: input.showMotto } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(directions.userId, userId), eq(directions.id, id)))

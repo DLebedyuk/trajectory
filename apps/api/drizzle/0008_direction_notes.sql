@@ -1,0 +1,1 @@
+ALTER TABLE "directions" ADD COLUMN "notes" jsonb DEFAULT '[]'::jsonb NOT NULL;

@@ -150,6 +150,9 @@ export const directions = pgTable(
     motto: varchar('motto', { length: 300 }),
     showMotto: boolean('show_motto').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
+    // заметки направления — то же поле, что у проекта: короткие записи,
+    // которые не тянут на задачу, но должны лежать рядом с направлением
+    notes: jsonb('notes').$type<string[]>().notNull().default([]),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: now(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

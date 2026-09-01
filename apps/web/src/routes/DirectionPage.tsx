@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, FormField, Heatmap, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
+import {
+  Button,
+  FormField,
+  Heatmap,
+  IconPlus,
+  IconTrash,
+  Modal,
+  PageHeader,
+  useToast,
+} from '@planner/ui';
 import { formatLongDate, humanDate, plural, todayInTimezone } from '@planner/shared';
 import { api } from '../api/client.js';
 import {
@@ -39,6 +48,8 @@ export function DirectionPage() {
   const [showPaused, setShowPaused] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState('');
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -57,6 +68,32 @@ export function DirectionPage() {
       setTitle('');
       setOutcome('');
       setProjectOpen(false);
+    },
+  });
+
+  /*
+    Заметки направления устроены так же, как заметки проекта: список строк
+    целиком отправляется в update. Отдельного эндпоинта нет намеренно —
+    заметок мало, а порядок и удаление по индексу так остаются простыми.
+  */
+  const addNote = useMutation({
+    mutationFn: () =>
+      api.directions.update(directionId, { notes: [...(direction.data?.notes ?? []), note] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.direction(directionId) });
+      void qc.invalidateQueries({ queryKey: qk.directions });
+      setNote('');
+      setNoteOpen(false);
+    },
+  });
+  const removeNote = useMutation({
+    mutationFn: (index: number) =>
+      api.directions.update(directionId, {
+        notes: (direction.data?.notes ?? []).filter((_, i) => i !== index),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.direction(directionId) });
+      void qc.invalidateQueries({ queryKey: qk.directions });
     },
   });
 
@@ -181,57 +218,93 @@ export function DirectionPage() {
       </div>
 
       {/* Проекты — отдельная секция, а не продолжение карточки с картой касаний */}
-      <section className="dir-projects-section" aria-label="Проекты направления">
-        <div className="section-title">
-          Проекты
-          <Button size="sm" onClick={() => setProjectOpen(true)}>
-            <IconPlus />
-            Новый проект
-          </Button>
-        </div>
-
-        {active.map((p) => projectCard(p))}
-
-        {list.length === 0 ? (
-          <div className="card">
-            <p className="hint">Проектов пока нет. Направление живёт и без них.</p>
+      <div className="two-col">
+        <section className="dir-projects-section" aria-label="Проекты направления">
+          <div className="section-title">
+            Проекты
+            <Button size="sm" onClick={() => setProjectOpen(true)}>
+              <IconPlus />
+              Новый проект
+            </Button>
           </div>
-        ) : null}
 
-        {paused.length > 0 ? (
-          <>
-            <button
-              type="button"
-              className="dir-collapsed"
-              aria-expanded={showPaused}
-              onClick={() => setShowPaused((v) => !v)}
-            >
-              <span className="lbl">На паузе</span>
-              <span className="ct">
-                {paused.length} · {showPaused ? 'свернуть' : 'показать'}
-              </span>
-            </button>
-            {showPaused ? paused.map((p) => projectCard(p, 'is-paused')) : null}
-          </>
-        ) : null}
+          {active.map((p) => projectCard(p))}
 
-        {archived.length > 0 ? (
-          <>
-            <button
-              type="button"
-              className="dir-collapsed"
-              aria-expanded={showArchive}
-              onClick={() => setShowArchive((v) => !v)}
-            >
-              <span className="lbl">Завершённые проекты</span>
-              <span className="ct">
-                {archived.length} · {showArchive ? 'свернуть' : 'показать'}
-              </span>
-            </button>
-            {showArchive ? archived.map((p) => projectCard(p, 'is-completed')) : null}
-          </>
-        ) : null}
-      </section>
+          {list.length === 0 ? (
+            <div className="card">
+              <p className="hint">Проектов пока нет. Направление живёт и без них.</p>
+            </div>
+          ) : null}
+
+          {paused.length > 0 ? (
+            <>
+              <button
+                type="button"
+                className="dir-collapsed"
+                aria-expanded={showPaused}
+                onClick={() => setShowPaused((v) => !v)}
+              >
+                <span className="lbl">На паузе</span>
+                <span className="ct">
+                  {paused.length} · {showPaused ? 'свернуть' : 'показать'}
+                </span>
+              </button>
+              {showPaused ? paused.map((p) => projectCard(p, 'is-paused')) : null}
+            </>
+          ) : null}
+
+          {archived.length > 0 ? (
+            <>
+              <button
+                type="button"
+                className="dir-collapsed"
+                aria-expanded={showArchive}
+                onClick={() => setShowArchive((v) => !v)}
+              >
+                <span className="lbl">Завершённые проекты</span>
+                <span className="ct">
+                  {archived.length} · {showArchive ? 'свернуть' : 'показать'}
+                </span>
+              </button>
+              {showArchive ? archived.map((p) => projectCard(p, 'is-completed')) : null}
+            </>
+          ) : null}
+        </section>
+
+        {/* Заметки направления — тот же блок, что внутри проекта, только уровнем выше */}
+        <aside className="right-col">
+          <div className="card">
+            <h4>
+              Заметки
+              <Button size="sm" variant="ghost" onClick={() => setNoteOpen(true)}>
+                <IconPlus />
+                Заметка
+              </Button>
+            </h4>
+            {(d.notes ?? []).length > 0 ? (
+              (d.notes ?? []).map((n, i) => (
+                <div className="note-row" key={`${n}-${i}`}>
+                  <span>{n}</span>
+                  <button
+                    type="button"
+                    className="row-del"
+                    aria-label={`Удалить заметку: ${n}`}
+                    title="Удалить"
+                    onClick={() => removeNote.mutate(i)}
+                  >
+                    <IconTrash />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="hint">
+                Заметок нет. Сюда удобно складывать то, что относится ко всему направлению, а не к
+                одному проекту.
+              </p>
+            )}
+          </div>
+        </aside>
+      </div>
 
       <TouchModal
         open={touchOpen}
@@ -249,6 +322,27 @@ export function DirectionPage() {
       />
 
       {conflictModal}
+
+      <Modal
+        open={noteOpen}
+        onOpenChange={setNoteOpen}
+        title="Новая заметка"
+        description="Заметка направления. Ни срока, ни напоминания у неё нет."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setNoteOpen(false)}>
+              Отмена
+            </Button>
+            <Button variant="primary" disabled={!note.trim()} onClick={() => addNote.mutate()}>
+              Сохранить
+            </Button>
+          </>
+        }
+      >
+        <FormField label="Текст">
+          <input type="text" value={note} onChange={(e) => setNote(e.target.value)} />
+        </FormField>
+      </Modal>
 
       <Modal
         open={projectOpen}
