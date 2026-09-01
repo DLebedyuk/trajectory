@@ -115,7 +115,7 @@ export function Heatmap({
                         key={date}
                         className="heat-cell"
                         data-future={future}
-                        data-filled={false}
+                        data-filled={filled}
                         data-date={date}
                         title={title}
                         style={{ width: cell, height: cell, background: background(data) }}

@@ -154,7 +154,8 @@
 .scrim {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--ink) 34%, transparent);
+  /* --ink больше нет: подложка строится из текущего текстового цвета темы */
+  background: rgba(33, 31, 42, 0.5);
   backdrop-filter: blur(3px);
   z-index: 60;
   animation: fade 0.16s ease;
@@ -233,6 +234,33 @@
 .heat-col {
   display: flex;
   flex-direction: column;
+}
+
+/*
+  Ячейка карты. Обводка нужна не для красоты: цвет заливки приходит инлайном
+  из данных, и без рамки пустые дни исчезают совсем, а заполненные сливаются
+  в пятно — по карте становится нечитаемо, сколько было касаний.
+*/
+.heat-cell {
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--heat-empty);
+  padding: 0;
+  transition: transform 0.1s;
+}
+
+.heat-cell[data-future='true'] {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+button.heat-cell[data-filled='true'] {
+  cursor: pointer;
+}
+
+button.heat-cell[data-filled='true']:hover {
+  transform: scale(1.35);
 }
 
 .heat-months {

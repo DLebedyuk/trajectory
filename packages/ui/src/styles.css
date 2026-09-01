@@ -765,12 +765,29 @@ select {
   justify-content: center;
 }
 .modal {
+  /*
+    В презентации модалка была нарисована внутри флекс-подложки, поэтому
+    позиционирования у неё не было вовсе. В приложении это Radix Dialog:
+    содержимое рендерится в портал и без fixed уезжает в конец страницы —
+    экран оставался просто затемнённым.
+  */
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 61;
   background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--shadow);
-  width: 100%;
+  width: calc(100% - 32px);
   max-width: 560px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   padding: 24px;
+}
+.modal.lg {
+  max-width: 780px;
 }
 .modal.lg {
   max-width: 780px;
