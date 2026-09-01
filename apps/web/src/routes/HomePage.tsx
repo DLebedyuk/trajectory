@@ -13,6 +13,7 @@ import {
   useTogglePin,
 } from '../api/queries.js';
 import { TodayBlock } from '../features/TodayBlock.js';
+import { SoftRemindersCard } from '../features/SoftRemindersCard.js';
 import { FocusCard } from '../features/FocusCard.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
@@ -151,6 +152,11 @@ export function HomePage() {
         </div>
 
         <aside className="right-col">
+          <SoftRemindersCard
+            reminders={data.todayReminders}
+            onComplete={(id) => completeReminder.mutate(id)}
+          />
+
           <div className="card">
             <h4>
               Закреплённое

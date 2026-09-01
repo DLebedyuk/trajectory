@@ -21,9 +21,11 @@ function Check({ label, onDone }: { label: string; onDone: () => void }) {
 }
 
 /**
- * «Сегодня» — единственное место, где сходятся события календаря, задачи со
- * сроком, напоминания с точным временем и без него. Просроченное свёрнуто:
- * оно должно быть доступно, но не должно давить сверху каждый день.
+ * «Сегодня» — лента дня по времени: события календаря, задачи со сроком и
+ * напоминания с точным временем. Напоминания без времени во времени не
+ * стоят, поэтому живут отдельной плашкой справа (SoftRemindersCard).
+ * Просроченное свёрнуто: оно должно быть доступно, но не должно давить
+ * сверху каждый день.
  */
 export function TodayBlock({
   events,
@@ -36,9 +38,8 @@ export function TodayBlock({
   const timed = reminders
     .filter((r) => r.scheduledTime)
     .sort((a, b) => ((a.scheduledTime ?? '') < (b.scheduledTime ?? '') ? -1 : 1));
-  const soft = reminders.filter((r) => !r.scheduledTime);
   const [overdueOpen, setOverdueOpen] = useState(false);
-  const total = events.length + tasks.length + reminders.length;
+  const total = events.length + tasks.length + timed.length;
 
   return (
     <section className="card today-block" aria-label="Сегодня">
@@ -121,18 +122,6 @@ export function TodayBlock({
                 </div>
               ))
             : null}
-        </div>
-      ) : null}
-
-      {soft.length > 0 ? (
-        <div className="notime-block">
-          <div className="lbl">Не забыть сегодня</div>
-          {soft.map((r) => (
-            <div className="item" key={r.id}>
-              <Check label={`Выполнить: ${r.text}`} onDone={() => onCompleteReminder(r.id)} />
-              <span>{r.text}</span>
-            </div>
-          ))}
         </div>
       ) : null}
     </section>
