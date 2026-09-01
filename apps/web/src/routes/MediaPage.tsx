@@ -20,7 +20,6 @@ import { ErrorBox, Loading } from '../components/Loading.js';
 
 const KIND_LABEL: Record<string, string> = { book: 'Книги', film: 'Фильмы', series: 'Сериалы' };
 
-/** Полка без статусов: только категории и закрепление. Закреплять можно несколько. */
 /** Вкладки полки: подписи зависят от вида, значения — общие. */
 const STATUS_TABS = [
   { value: null, book: 'Всё', film: 'Всё' },
@@ -46,6 +45,7 @@ export function MediaPage() {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [newGenre, setNewGenre] = useState('');
   const [emoji, setEmoji] = useState('📗');
 
   // Сериалы живут на вкладке фильмов — по смыслу это одна полка.
@@ -71,23 +71,38 @@ export function MediaPage() {
     },
   });
 
+  /*
+    Жанр можно завести прямо здесь: раньше ручка создания жанра существовала
+    в API, но нигде не вызывалась — на пустой полке жанр было не из чего
+    выбрать и фильтровать оказывалось нечего.
+  */
   const create = useMutation({
-    mutationFn: () =>
-      api.media.create({
+    mutationFn: async () => {
+      let genreId = categoryId || null;
+      if (categoryId === 'new' && newGenre.trim()) {
+        genreId = (await api.media.createCategory(newGenre.trim())).id;
+      } else if (categoryId === 'new') {
+        genreId = null;
+      }
+      return api.media.create({
         kind: tab,
         title,
         authorOrDirector: author || null,
-        categoryId: categoryId || null,
+        categoryId: genreId,
         status: 'want',
         coverEmoji: emoji,
         pinned: false,
         rating: 0,
-      }),
+      });
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['media'] });
+      void qc.invalidateQueries({ queryKey: qk.mediaCategories });
       toast.show('Добавлено на полку');
       setTitle('');
       setAuthor('');
+      setNewGenre('');
+      setCategoryId('');
       setOpen(false);
     },
   });
@@ -101,11 +116,16 @@ export function MediaPage() {
   const shelf = all.filter(
     (m) =>
       (statusTab === null || m.status === statusTab) &&
-      (category === 'all' || m.categoryId === category),
+      (category === 'all' ||
+        (category === 'none' ? m.categoryId === null : m.categoryId === category)),
   );
-  const usedCategories = (categories.data ?? []).filter((c) =>
-    all.some((m) => m.categoryId === c.id),
-  );
+  /*
+    Раньше набор жанров собирался только из того, что уже стоит на полке:
+    пока ни одной книге жанр не проставлен, весь фильтр просто не появлялся.
+    Показываем все заведённые жанры, а «без жанра» — только если такие есть.
+  */
+  const genres = categories.data ?? [];
+  const hasUngrouped = all.some((m) => !m.categoryId);
 
   const card = (m: MediaItem) => (
     <div className="media-card" key={m.id}>
@@ -179,45 +199,55 @@ export function MediaPage() {
           <div className="chips">
             <button
               type="button"
-              className="chip"
-              data-on={tab === 'book'}
+              className={`chip${tab === 'book' ? ' is-active' : ''}`}
+              aria-pressed={tab === 'book'}
               onClick={() => setTab('book')}
             >
               Книги
             </button>
             <button
               type="button"
-              className="chip"
-              data-on={tab === 'film'}
+              className={`chip${tab === 'film' ? ' is-active' : ''}`}
+              aria-pressed={tab === 'film'}
               onClick={() => setTab('film')}
             >
               Фильмы и сериалы
             </button>
           </div>
         </div>
-        {usedCategories.length > 0 ? (
+        {genres.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <span className="lbl">Категория</span>
+            <span className="lbl">Жанр</span>
             <div className="chips">
               <button
                 type="button"
-                className="chip"
-                data-on={category === 'all'}
+                className={`chip${category === 'all' ? ' is-active' : ''}`}
+                aria-pressed={category === 'all'}
                 onClick={() => setCategory('all')}
               >
                 все
               </button>
-              {usedCategories.map((c) => (
+              {genres.map((c) => (
                 <button
                   key={c.id}
                   type="button"
-                  className="chip"
-                  data-on={category === c.id}
+                  className={`chip${category === c.id ? ' is-active' : ''}`}
+                  aria-pressed={category === c.id}
                   onClick={() => setCategory(c.id)}
                 >
                   {c.name}
                 </button>
               ))}
+              {hasUngrouped ? (
+                <button
+                  type="button"
+                  className={`chip${category === 'none' ? ' is-active' : ''}`}
+                  aria-pressed={category === 'none'}
+                  onClick={() => setCategory('none')}
+                >
+                  без жанра
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -280,25 +310,36 @@ export function MediaPage() {
           <FormField label={tab === 'book' ? 'Автор' : 'Режиссёр'}>
             <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)} />
           </FormField>
-          <FormField label="Категория">
+          <FormField label="Жанр">
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">без категории</option>
+              <option value="">без жанра</option>
               {(categories.data ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
+              <option value="new">+ новый жанр</option>
             </select>
           </FormField>
         </div>
+        {categoryId === 'new' ? (
+          <FormField label="Название жанра">
+            <input
+              type="text"
+              value={newGenre}
+              onChange={(e) => setNewGenre(e.target.value)}
+              placeholder="например, детектив"
+            />
+          </FormField>
+        ) : null}
         <FormField label="Обложка">
           <div className="chips">
             {(tab === 'book' ? ['📗', '📕', '📘', '📙'] : ['🎬', '🎞️', '🎥', '📺']).map((e) => (
               <button
                 key={e}
                 type="button"
-                className="chip"
-                data-on={emoji === e}
+                className={`chip${emoji === e ? ' is-active' : ''}`}
+                aria-pressed={emoji === e}
                 onClick={() => setEmoji(e)}
               >
                 {e}
@@ -307,7 +348,8 @@ export function MediaPage() {
           </div>
         </FormField>
         <p className="hint" style={{ marginTop: 10 }}>
-          Раздел: {KIND_LABEL[tab]}. Статусов чтения нет — потом просто закрепи то, что читаешь.
+          Раздел: {KIND_LABEL[tab]}. Попадёт в «{MEDIA_STATUS_LABELS[tab].want.toLowerCase()}» —
+          статус можно поменять прямо на полке.
         </p>
       </Modal>
     </>

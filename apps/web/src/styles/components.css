@@ -132,10 +132,16 @@
   background: var(--surface);
 }
 
+/*
+  Токена --ink в дизайне нет, и правило молча ломалось: активный чип терял
+  заливку и выглядел почти как обычный. Держим то же состояние, что и
+  .chip.is-active, чтобы разметка на data-on не расходилась с остальными.
+*/
 .chip[data-on='true'] {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: var(--ink-contrast);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .cols2 {
@@ -182,16 +188,8 @@
   gap: 8px;
 }
 
+/* оформление тоста целиком в дизайне; здесь только появление */
 .toast {
-  background: var(--ink);
-  color: var(--ink-contrast);
-  padding: 10px 16px;
-  border-radius: 11px;
-  font-size: 13px;
-  box-shadow: var(--shadow-lift);
-  display: flex;
-  align-items: center;
-  gap: 8px;
   animation: pop-in 0.2s ease;
 }
 
