@@ -276,15 +276,19 @@ select {
   background: #346c92;
   border-color: #346c92;
 }
+/*
+  Фон белый в обеих темах, поэтому цвет текста и рамка тоже фиксированные:
+  var(--text) в тёмной теме почти белый, и надпись на кнопке пропадала.
+*/
 .btn.google {
   background: #fff;
-  border-color: var(--line-strong);
-  color: var(--text);
+  border-color: #dadce0;
+  color: #1f1f1f;
 }
 .btn.google:hover {
-  background: var(--surface-2);
-  border-color: var(--line-strong);
-  color: var(--text);
+  background: #f5f5f5;
+  border-color: #dadce0;
+  color: #1f1f1f;
 }
 .btn.is-current {
   background: var(--accent-soft);
