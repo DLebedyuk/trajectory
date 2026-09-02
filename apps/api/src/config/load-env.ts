@@ -9,6 +9,15 @@ import { config as loadDotenv } from 'dotenv';
  * Ближний файл важнее дальнего — dotenv не перезаписывает заданные переменные.
  */
 export function loadEnvFiles(): void {
+  /*
+    В тестах .env не читается вообще. Иначе набор зависит от того, что лежит
+    в корневом .env у конкретного разработчика: с AI_PROVIDER=openai и живым
+    ключом обычный `pnpm test` уходил бы в платный endpoint. Значения для
+    тестов выставляет apps/api/test/env.setup.ts, и они должны остаться
+    единственным источником.
+  */
+  if (process.env.NODE_ENV === 'test') return;
+
   const seen = new Set<string>();
   for (const start of [process.cwd(), __dirname]) {
     let dir = start;

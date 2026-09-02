@@ -23,6 +23,13 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts'],
+    /*
+      Выполняется до импортов тестового файла, то есть до того, как
+      src/config/env.ts прочитает process.env. Здесь прогон отвязывается от
+      корневого .env разработчика: ИИ — заглушка, Telegram выключен,
+      сеть наружу закрыта.
+    */
+    setupFiles: ['./test/env.setup.ts'],
     // тесты делят одну базу и чистят её в beforeAll — файлы идут строго по очереди
     fileParallelism: false,
     testTimeout: 30_000,
