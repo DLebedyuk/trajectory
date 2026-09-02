@@ -8,6 +8,7 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:audited": "node scripts/check-no-network.mjs --reset && vitest run && node scripts/check-no-network.mjs",
     "smoke:dist": "node scripts/smoke-dist.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",

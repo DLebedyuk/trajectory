@@ -12,6 +12,10 @@
   Здесь значения выставляются жёстко, поверх всего, что могло прийти снаружи.
 */
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 /** Значения, без которых тестовый прогон нельзя считать изолированным. */
 const FORCED: Record<string, string> = {
   NODE_ENV: 'test',
@@ -49,6 +53,15 @@ export interface BlockedCall {
 
 const blocked: BlockedCall[] = [];
 
+/*
+  setupFiles выполняется для каждого файла набора отдельно, поэтому список
+  в памяти виден только внутри своего файла. Чтобы после полного прогона
+  можно было проверить весь набор разом, каждая попытка дописывается ещё и
+  в файл. Он пересоздаётся первым же файлом набора и лежит рядом со сборкой,
+  а не в репозитории.
+*/
+const AUDIT_FILE = path.join(os.tmpdir(), 'planner-blocked-network.log');
+
 /** Локальные адреса разрешены: это supertest и postgres. */
 const isLocal = (url: string): boolean => {
   try {
@@ -74,6 +87,11 @@ globalThis.fetch = (async (input: FetchArgs[0], init?: FetchArgs[1]) => {
   if (!isLocal(url)) {
     const method = init?.method ?? 'GET';
     blocked.push({ url, method });
+    try {
+      fs.appendFileSync(AUDIT_FILE, `${method} ${url}\n`);
+    } catch {
+      // журнал — вспомогательный: если писать некуда, тест всё равно упадёт
+    }
     throw new Error(
       `Тесты не ходят в сеть: ${method} ${url}. ` +
         'Если это ИИ, Google или Telegram — значит заглушка не сработала.',
@@ -87,8 +105,13 @@ export const blockedNetworkCalls = (): readonly BlockedCall[] => blocked;
 
 declare global {
   var __blockedNetworkCalls: (() => readonly BlockedCall[]) | undefined;
+  var __networkAuditFile: string | undefined;
 }
 
 // набор запускается по файлам в отдельных модульных графах, поэтому доступ
 // к списку идёт через globalThis, а не через импорт этого модуля
 globalThis.__blockedNetworkCalls = blockedNetworkCalls;
+
+/** Путь к журналу попыток выйти в сеть — его читает отчёт после прогона. */
+export const networkAuditFile = (): string => AUDIT_FILE;
+globalThis.__networkAuditFile = AUDIT_FILE;
