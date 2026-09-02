@@ -1,0 +1,139 @@
+# Production-стенд «Траектории» для одного VPS.
+#
+# Это ОТДЕЛЬНЫЙ файл, а не override к docker-compose.yml. Причина простая:
+# override в compose умеет только добавлять записи в `ports`, но не убирать их.
+# Локальный файл публикует наружу postgres:5432 и api:3000; унаследовав его,
+# мы бы выставили базу и API в интернет и никак не смогли бы это отменить.
+#
+# Запуск:  docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# Проверка настроек до запуска:  ./infrastructure/check-prod-config.sh
+#
+# Наружу открыты только 80 и 443 — их слушает Caddy. postgres и api живут
+# во внутренней сети и портов не публикуют вообще.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?переменная обязательна}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?пароль базы обязателен, без значения по умолчанию}
+      POSTGRES_DB: ${POSTGRES_DB:?переменная обязательна}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # ports здесь нет намеренно: база доступна только внутри сети compose
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PORT: '3000'
+
+      # production включает Secure у куки сессии — работает только по HTTPS,
+      # и это ровно то, что нужно за Caddy
+      NODE_ENV: production
+      # dev-вход в production запрещён и на уровне кода: с DEV_AUTH=true
+      # приложение не стартует, а не пускает всех молча
+      DEV_AUTH: 'false'
+
+      # публичный домен: и возврат из Google, и ссылки в письмах
+      WEB_ORIGIN: https://${DOMAIN:?домен обязателен}
+      APP_BASE_URL: https://${DOMAIN}
+      GOOGLE_AUTH_REDIRECT_URI: https://${DOMAIN}/api/auth/google/callback
+      GOOGLE_CALENDAR_REDIRECT_URI: https://${DOMAIN}/api/calendar/google/callback
+
+      # секреты — только из .env.production, в образ не попадают
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?нужен для входа через Google}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?нужен для входа через Google}
+      SESSION_SECRET: ${SESSION_SECRET:?нужен для подписи сессий}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-30}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?нужен для шифрования refresh-токенов Google}
+
+      # Telegram: в production только webhook по HTTPS. Long polling с сервера
+      # тоже работает, но тогда бот молча зависит от исходящей сети контейнера.
+      TELEGRAM_MODE: ${TELEGRAM_MODE:-off}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_URL: https://${DOMAIN}/api/telegram/webhook
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-20000}
+
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Moscow}
+
+      # миграции применяются при каждом старте контейнера; демо-данные — никогда
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_SEED: 'false'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # ports здесь нет намеренно: до API добирается только Caddy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [internal]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      # почта для Let's Encrypt: туда придёт предупреждение, если сертификат
+      # вдруг перестанет обновляться
+      ACME_EMAIL: ${ACME_EMAIL:?почта для Let's Encrypt обязательна}
+    volumes:
+      # тот же образ, что и локально, но с production-конфигом Caddy:
+      # домен, автоматический HTTPS и заголовки безопасности
+      - ./infrastructure/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      # сертификаты переживают пересоздание контейнера. Без этого тома каждый
+      # деплой заново просит сертификат и упирается в лимиты Let's Encrypt
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - '80:80'
+      - '443:443'
+      # тот же порт для HTTP/3
+      - '443:443/udp'
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:80/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks: [internal]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge

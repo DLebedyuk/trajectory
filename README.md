@@ -314,7 +314,12 @@ docker compose up -d --build
 
 `NODE_ENV` в compose намеренно `development`, даже когда включён настоящий вход:
 в production кука сессии получает флаг `Secure`, и по `http://localhost` браузер
-её выбросит. Боевой запуск по HTTPS — отдельная конфигурация.
+её выбросит.
+
+Боевой запуск по HTTPS — отдельный файл `docker-compose.prod.yml` и отдельная
+инструкция: **[docs/deploy.md](docs/deploy.md)**. Локальный compose он не
+трогает; наружу там открыты только 80 и 443, а база и API портов не публикуют
+вовсе.
 
 В Google Cloud Console для этого стенда нужны redirect URI с портом 8080:
 

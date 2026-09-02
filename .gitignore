@@ -6,6 +6,8 @@ coverage/
 *.tsbuildinfo
 .env
 .env.local
+# настоящие production-секреты; в репозитории живёт только .env.production.example
+.env.production
 .DS_Store
 apps/desktop/src-tauri/target/
 apps/web/dev-dist/

@@ -1,0 +1,58 @@
+# Production-конфиг Caddy: домен, автоматический HTTPS, прокси на API.
+#
+# Подключается томом поверх /etc/caddy/Caddyfile — образ веба остаётся тем же,
+# что и локально. Домен и почта приезжают переменными окружения контейнера.
+#
+# Сертификат Caddy получает сам через Let's Encrypt при первом запуске: для
+# этого 80 и 443 должны быть доступны снаружи, а A-запись домена — указывать
+# на этот сервер.
+
+{
+	email {$ACME_EMAIL}
+	# HTTP автоматически редиректится на HTTPS — отдельного блока не нужно
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	# Заголовки безопасности. HSTS включается только здесь, в production:
+	# на localhost он сломал бы работу по http.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# сервер и его версию наружу не сообщаем
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /health {
+		reverse_proxy api:3000
+	}
+
+	# Swagger в production закрыт: это карта всего API, включая ручки записи.
+	# Нужен — раскомментируйте, но лучше через ssh-туннель.
+	handle /docs* {
+		respond 404
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Отдельный слушатель на 80 для healthcheck контейнера: он ходит по http
+# на 127.0.0.1 внутри контейнера, где никакого сертификата нет.
+:80 {
+	handle /health {
+		reverse_proxy api:3000
+	}
+	handle {
+		redir https://{$DOMAIN}{uri} permanent
+	}
+}
