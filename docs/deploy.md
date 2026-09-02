@@ -57,11 +57,16 @@ nano .env.production          # заполнить, см. подсказки в 
 Секреты удобно сгенерировать так:
 
 ```bash
-openssl rand -base64 24    # POSTGRES_PASSWORD
+openssl rand -hex 24       # POSTGRES_PASSWORD — только hex, см. ниже
 openssl rand -base64 48    # SESSION_SECRET
 openssl rand -hex 32       # TOKEN_ENCRYPTION_KEY — ровно 32 байта
 openssl rand -hex 16       # TELEGRAM_WEBHOOK_SECRET
 ```
+
+**Пароль базы — только hex.** Он подставляется в строку подключения
+`postgres://ПОЛЬЗОВАТЕЛЬ:ПАРОЛЬ@postgres:5432/БАЗА`, и `openssl rand -base64`
+выдаёт символы `/`, `+` и `=`, которые ломают разбор этой строки: API не
+найдёт базу, а ошибка будет выглядеть как что угодно, только не как пароль.
 
 **`TOKEN_ENCRYPTION_KEY` менять нельзя.** Им зашифрованы refresh-токены Google
 в базе: со сменой ключа старые токены не расшифруются и календарь придётся
