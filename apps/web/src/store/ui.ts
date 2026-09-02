@@ -54,6 +54,24 @@ export function applyTheme(theme: Theme): void {
   else root.setAttribute('data-theme', theme);
   root.classList.toggle('theme-dark', isDarkNow(theme));
   root.style.colorScheme = isDarkNow(theme) ? 'dark' : 'light';
+  applyStatusBarColor(root);
+}
+
+/**
+ * Статус-бар телефона красится по meta[name=theme-color]. В разметке их две —
+ * под системную светлую и тёмную тему, чтобы первый кадр не мигал. Но тема в
+ * приложении своя и системную может не повторять, поэтому после переключения
+ * обе метки получают цвет фактического фона, а media с них снимается: иначе
+ * браузер возьмёт ту, что совпала с системной темой, и в светлом интерфейсе
+ * полоса статуса останется тёмной.
+ */
+function applyStatusBarColor(root: HTMLElement): void {
+  const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
+  if (!bg) return;
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.removeAttribute('media');
+    meta.setAttribute('content', bg);
+  });
 }
 
 /**
