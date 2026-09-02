@@ -2450,3 +2450,27 @@ body {
   font-size: 13px;
   color: var(--text-2);
 }
+
+/*
+  Safari на iOS увеличивает всю страницу, когда фокус попадает в поле мельче
+  16px, и обратно масштаб сам не возвращается: модалка с открытой клавиатурой
+  выглядит уехавшей за край экрана. Поэтому на тач-устройствах поля ввода —
+  ровно 16px. Селекторы перечислены поимённо, чтобы перебить собственный
+  размер каждого поля: у общего `input` специфичность ниже.
+*/
+@media (pointer: coarse) {
+  .app-shell input,
+  .app-shell select,
+  .app-shell textarea,
+  .modal .field input,
+  .modal .field select,
+  .modal .field textarea,
+  .inbox-fields .f select,
+  .inbox-fields .f input,
+  .proj-filters .sort select,
+  .ai-src-row input,
+  .settings-card .row input[type='text'],
+  .settings-card .row input[type='time'] {
+    font-size: 16px;
+  }
+}
