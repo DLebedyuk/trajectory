@@ -102,10 +102,20 @@ export function RemindersPage() {
   if (reminders.isError)
     return <ErrorBox error={reminders.error} onRetry={() => void reminders.refetch()} />;
 
+  /*
+    Три раздела не пересекаются и вместе покрывают весь список.
+
+    Раньше регулярное напоминание, у которого наступил срок, попадало сразу
+    в «Сегодня» и в «Регулярные»: одна и та же карточка на экране дважды, и
+    непонятно, в какой из них нажимать «Готово». Наступивший срок важнее
+    регулярности — такое напоминание живёт только в «Сегодня», а метка
+    «каждую неделю» на карточке никуда не девается.
+  */
   const active = reminders.data ?? [];
   const todayList = active.filter((r) => r.scheduledDate <= today);
-  const soon = active.filter((r) => r.scheduledDate > today && !r.repeatRule);
-  const repeating = active.filter((r) => r.repeatRule);
+  const later = active.filter((r) => r.scheduledDate > today);
+  const soon = later.filter((r) => !r.repeatRule);
+  const repeating = later.filter((r) => r.repeatRule);
 
   /**
    * Карточка напоминания. Частые действия — «Готово» и переносы — остаются
@@ -226,7 +236,9 @@ export function RemindersPage() {
       <div>
         {section('Сегодня', todayList, 'Сегодня ничего не ждёт.')}
         {section('Ближайшие', soon, 'Впереди пусто.')}
-        {section('Регулярные', repeating, 'Регулярных нет.')}
+        {/* «нет» было бы неправдой: регулярное со сроком на сегодня стоит
+            выше, в «Сегодня» */}
+        {section('Регулярные', repeating, 'Впереди регулярных нет.')}
       </div>
 
       <ReminderModal open={modalOpen} onOpenChange={setModalOpen} today={today} editing={editing} />
