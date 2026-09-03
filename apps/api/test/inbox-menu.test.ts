@@ -27,6 +27,7 @@ async function buildInboxService(db: unknown) {
   const { RemindersService } = await import('../src/modules/reminders/reminders.service.js');
   const { TasksService } = await import('../src/modules/tasks/tasks.service.js');
   const { FocusService } = await import('../src/modules/focus/focus.service.js');
+  const { TouchesService } = await import('../src/modules/touches/touches.service.js');
   const { ProjectsService } = await import('../src/modules/projects/projects.service.js');
   const { MenuService } = await import('../src/modules/menu/menu.service.js');
   const { MediaService } = await import('../src/modules/media/media.service.js');
@@ -34,7 +35,11 @@ async function buildInboxService(db: unknown) {
     db as never,
     new MockAiProvider() as never,
     new RemindersService(db as never) as never,
-    new TasksService(db as never, new FocusService(db as never) as never) as never,
+    new TasksService(
+      db as never,
+      new FocusService(db as never) as never,
+      new TouchesService(db as never) as never,
+    ) as never,
     new ProjectsService(db as never) as never,
     new MenuService(db as never) as never,
     new MediaService(db as never) as never,

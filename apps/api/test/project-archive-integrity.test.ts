@@ -26,8 +26,13 @@ beforeAll(async () => {
   const { ProjectsService } = await import('../src/modules/projects/projects.service.js');
   const { TasksService } = await import('../src/modules/tasks/tasks.service.js');
   const { FocusService } = await import('../src/modules/focus/focus.service.js');
+  const { TouchesService } = await import('../src/modules/touches/touches.service.js');
   projects = new ProjectsService(db as never);
-  tasksService = new TasksService(db as never, new FocusService(db as never) as never);
+  tasksService = new TasksService(
+    db as never,
+    new FocusService(db as never) as never,
+    new TouchesService(db as never) as never,
+  );
 }, 60_000);
 
 afterAll(async () => {
