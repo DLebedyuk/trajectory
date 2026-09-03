@@ -16,6 +16,8 @@ import {
   IconThought,
   IconTouch,
   IconBell,
+  IconMore,
+  IconArchive,
 } from '@planner/ui';
 import { api } from '../api/client.js';
 import { qk, useDashboard, useFocus } from '../api/queries.js';
@@ -34,12 +36,43 @@ const NAV = [
   { to: '/settings', label: 'Настройки', Icon: IconSettings },
 ];
 
-/** Нижняя навигация мобильного: пять точек, центральная — добавление. */
-const MOBILE_NAV = [
-  { to: '/', label: 'Главная', end: true, Icon: IconHome },
-  { to: '/directions', label: 'Направления', Icon: IconDirections },
+/**
+ * Нижняя навигация мобильного: четыре вкладки вокруг круглой «Главной».
+ * Добавление переехало наверх, в кнопку «+»: центр нижней панели — самое
+ * удобное место на экране, и его занимает самый частый переход, а не действие.
+ */
+const MOBILE_NAV_LEFT = [
   { to: '/inbox', label: 'Входящие', badge: 'inbox' as const, Icon: IconInbox },
-  { to: '/menu', label: 'Меню', Icon: IconIdeas },
+  { to: '/media', label: 'Полка', Icon: IconBook },
+];
+
+const MOBILE_NAV_RIGHT = [{ to: '/directions', label: 'Направления', Icon: IconDirections }];
+
+/**
+ * Разделы, которым не хватило места в нижней панели. На десктопе они есть в
+ * боковом меню, а на телефоне до этого дня были недоступны вовсе — включая
+ * настройки.
+ */
+const MORE_LINKS = [
+  {
+    to: '/menu',
+    title: 'Меню возможностей',
+    sub: 'Идеи — приятное и необязательное',
+    Icon: IconIdeas,
+  },
+  { to: '/touches', title: 'История касаний', sub: 'Все факты работы по дням', Icon: IconTouch },
+  {
+    to: '/reminders/archive',
+    title: 'Архив напоминаний',
+    sub: 'Выполненное и пропущенное за 7 дней',
+    Icon: IconArchive,
+  },
+  {
+    to: '/settings',
+    title: 'Настройки',
+    sub: 'Тема, Telegram, Google Calendar',
+    Icon: IconSettings,
+  },
 ];
 
 /**
@@ -72,6 +105,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const dashboard = useDashboard();
 
   const [addOpen, setAddOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [touchOpen, setTouchOpen] = useState(false);
   const [thoughtOpen, setThoughtOpen] = useState(false);
 
@@ -169,14 +203,50 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
+      {/*
+        Верхняя панель мобильного. Держит имя приложения и добавление: на
+        десктопе то и другое живёт в боковой панели, которой здесь нет.
+      */}
+      <header className="m-topbar">
+        <span className="title">Траектория</span>
+        <button
+          type="button"
+          className="m-add"
+          onClick={() => setAddOpen(true)}
+          aria-label="Добавить"
+        >
+          <IconPlus />
+        </button>
+      </header>
+
       <main className={`app-main ${widthClass(location.pathname)}`}>{children}</main>
 
       <nav className="m-bottom" aria-label="Навигация">
-        {MOBILE_NAV.slice(0, 2).map(({ to, label, end, Icon }) => (
+        {MOBILE_NAV_LEFT.map(({ to, label, badge, Icon }) => (
           <NavLink
             key={to}
             to={to}
-            end={end}
+            className={({ isActive }) => `tab${isActive ? ' is-active' : ''}`}
+          >
+            <Icon />
+            {label}
+            {badge && counts[badge] ? <span className="ct mono">{counts[badge]}</span> : null}
+          </NavLink>
+        ))}
+
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) => `tab is-home${isActive ? ' is-active' : ''}`}
+        >
+          <IconHome />
+          Главная
+        </NavLink>
+
+        {MOBILE_NAV_RIGHT.map(({ to, label, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
             className={({ isActive }) => `tab${isActive ? ' is-active' : ''}`}
           >
             <Icon />
@@ -186,26 +256,59 @@ export function Shell({ children }: { children: ReactNode }) {
 
         <button
           type="button"
-          className="tab is-add"
-          onClick={() => setAddOpen(true)}
-          aria-label="Добавить"
+          className={`tab${moreOpen ? ' is-active' : ''}`}
+          onClick={() => setMoreOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
         >
-          <IconPlus />
+          <IconMore />
+          Ещё
         </button>
-
-        {MOBILE_NAV.slice(2).map(({ to, label, end, badge, Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) => `tab${isActive ? ' is-active' : ''}`}
-          >
-            <Icon />
-            {label}
-            {badge && counts[badge] ? <span className="ct mono">{counts[badge]}</span> : null}
-          </NavLink>
-        ))}
       </nav>
+
+      {moreOpen ? (
+        <div
+          className="sheet-backdrop"
+          role="presentation"
+          onClick={() => setMoreOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setMoreOpen(false)}
+        >
+          <div
+            className="plus-sheet"
+            role="dialog"
+            aria-label="Ещё"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h5>Ещё</h5>
+            {MORE_LINKS.map(({ to, title, sub, Icon }) => (
+              <button
+                key={to}
+                type="button"
+                className="opt"
+                onClick={() => {
+                  setMoreOpen(false);
+                  navigate(to);
+                }}
+              >
+                <span className="ic-wrap">
+                  <Icon />
+                </span>
+                <span className="info">
+                  <span className="ttl">{title}</span>
+                  <span className="sub">{sub}</span>
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="btn ghost sheet-cancel"
+              onClick={() => setMoreOpen(false)}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/*
         Единственная глобальная точка добавления на мобильном. Два действия,
