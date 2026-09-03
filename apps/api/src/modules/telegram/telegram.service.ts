@@ -93,6 +93,14 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
         );
         return;
       }
+      /*
+        grammY отказывается обрабатывать апдейт, пока не знает, кто он такой:
+        handleUpdate бросает «Bot not initialized!», если botInfo пуст. В режиме
+        long polling его заполняет bot.start(), а в webhook-режиме start() не
+        вызывается — значит init() нужно вызвать самим. Без этого каждый апдейт
+        падал с 500, Telegram копил очередь, а бот выглядел просто молчащим.
+      */
+      await this.bot.init();
       await this.bot.api.setWebhook(env.TELEGRAM_WEBHOOK_URL, {
         secret_token: env.TELEGRAM_WEBHOOK_SECRET,
       });
