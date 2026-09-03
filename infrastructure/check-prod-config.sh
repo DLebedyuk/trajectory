@@ -126,6 +126,16 @@ case "${tg_mode:-off}" in
     else
       fail "TELEGRAM_MODE=webhook без TELEGRAM_WEBHOOK_SECRET — ручку сможет дёрнуть кто угодно"
     fi
+    # Имя бота нужно не боту, а приложению: из него собирается ссылка
+    # t.me/ИМЯ?start=КОД, которой аккаунт привязывается к Telegram.
+    if is_set TELEGRAM_BOT_USERNAME; then
+      case "$(get TELEGRAM_BOT_USERNAME)" in
+        @*) fail "TELEGRAM_BOT_USERNAME указан с собачкой — нужно имя без @" ;;
+        *) ok "имя бота задано" ;;
+      esac
+    else
+      warn "TELEGRAM_BOT_USERNAME пуст: бот будет отвечать, но привязать аккаунт ссылкой не выйдет"
+    fi
     ok "адрес вебхука соберётся как https://$domain/api/telegram/webhook"
     ;;
   polling)
