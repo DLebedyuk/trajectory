@@ -8,3 +8,4 @@ export * from './PageHeader.js';
 export * from './Heatmap.js';
 export * from './Toast.js';
 export * from './icons.js';
+export * from './directionColors.js';

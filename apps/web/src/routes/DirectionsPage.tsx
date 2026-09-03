@@ -1,25 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
-import { Button, FormField, Heatmap, IconPlus, Modal, PageHeader, useToast } from '@planner/ui';
+import {
+  Button,
+  DEFAULT_DIRECTION_COLOR,
+  DIRECTION_COLORS,
+  FormField,
+  Heatmap,
+  IconPlus,
+  Modal,
+  PageHeader,
+  useToast,
+} from '@planner/ui';
 import { formatLongDate, plural, todayInTimezone } from '@planner/shared';
 import { api } from '../api/client.js';
 import { qk, useDashboard, useDirections, usePinnedProjects } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
-
-/**
- * Палитра направлений. Имена переменных — те же, что хранятся в базе:
- * цвет выбирает человек, а не код, поэтому новое направление сразу
- * правильно красит интерфейс, когда попадает в фокус.
- */
-const PALETTE = [
-  { value: '--d-act', label: 'розовый' },
-  { value: '--d-voice', label: 'золотой' },
-  { value: '--d-vocal', label: 'фиолетовый' },
-  { value: '--d-eng', label: 'бирюзовый' },
-  { value: '--d-phys', label: 'синий' },
-  { value: '--d-neutral', label: 'оливковый' },
-];
 
 /**
  * Направления — широкие плашки: слева имя и статистика, в середине карта
@@ -33,7 +29,7 @@ export function DirectionsPage() {
   const dashboard = useDashboard();
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
-  const [color, setColor] = useState(PALETTE[3]!.value);
+  const [color, setColor] = useState(DEFAULT_DIRECTION_COLOR);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -79,7 +75,8 @@ export function DirectionsPage() {
 
       {(directions.data ?? []).map((d, index) => {
         const heat = heatmaps[index]?.data as
-          { days: never[]; total?: number; weekTotal?: number } | undefined;
+          | { days: never[]; total?: number; weekTotal?: number }
+          | undefined;
         const pinned = (pinnedProjects.data ?? []).find((p) => p.directionId === d.id) ?? null;
         const isFocus = dashboard.data?.focus.focusDirectionId === d.id;
         const total = heat?.total ?? 0;
@@ -177,7 +174,7 @@ export function DirectionsPage() {
         <div className="field">
           <span className="lbl">Цвет</span>
           <div className="chips">
-            {PALETTE.map((c) => (
+            {DIRECTION_COLORS.map((c) => (
               <button
                 key={c.value}
                 type="button"

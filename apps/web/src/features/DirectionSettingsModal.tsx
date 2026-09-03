@@ -1,18 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, FormField, Modal, useToast } from '@planner/ui';
+import { Button, DIRECTION_COLORS, FormField, Modal, useToast } from '@planner/ui';
 import type { Direction } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { qk } from '../api/queries.js';
-
-/** Цвета направлений заданы токенами темы — свой цвет не вводится вручную. */
-export const DIRECTION_COLORS: { value: string; label: string }[] = [
-  { value: '--d-act', label: 'Тёплый красный' },
-  { value: '--d-voice', label: 'Охра' },
-  { value: '--d-vocal', label: 'Фиолетовый' },
-  { value: '--d-eng', label: 'Зелёный' },
-  { value: '--d-phys', label: 'Синий' },
-];
 
 export function DirectionSettingsModal({
   direction,
@@ -91,15 +82,24 @@ export function DirectionSettingsModal({
       <FormField label="Описание" hint="Необязательно">
         <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
       </FormField>
-      <FormField label="Цвет">
-        <select value={color} onChange={(e) => setColor(e.target.value)}>
+      <div className="field">
+        <span className="lbl">Цвет</span>
+        {/* Именно чипы, а не список: «тауп» и «дымчато-лиловый» словами не различишь. */}
+        <div className="chips">
           {DIRECTION_COLORS.map((c) => (
-            <option key={c.value} value={c.value}>
+            <button
+              key={c.value}
+              type="button"
+              className={`chip${color === c.value ? ' is-active' : ''}`}
+              aria-pressed={color === c.value}
+              onClick={() => setColor(c.value)}
+            >
+              <i className="dir-dot" style={{ ['--c' as string]: `var(${c.value})` }} />
               {c.label}
-            </option>
+            </button>
           ))}
-        </select>
-      </FormField>
+        </div>
+      </div>
 
       <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
         <p className="hint" style={{ marginBottom: 10 }}>
