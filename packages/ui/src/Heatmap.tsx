@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { addDaysToDateOnly, monthShort, startOfWeek } from '@planner/shared';
 
 export interface HeatmapDayData {
@@ -16,6 +16,35 @@ export interface HeatmapProps {
   showMonths?: boolean;
   showWeekdays?: boolean;
   onDayClick?: (date: string) => void;
+}
+
+/*
+  На телефоне полугодовая карта шире экрана: она уползает под правый край, а
+  видно остаётся её левую — самую старую — часть, из-за чего кажется, что
+  ничего и не происходило. Поэтому в узком окне показываем последние два
+  месяца ячейками покрупнее: карта помещается целиком, а правым краем всегда
+  упирается в текущую неделю.
+*/
+const COMPACT_QUERY = '(max-width: 900px)';
+const COMPACT_WEEKS = 9;
+const COMPACT_CELL = 30;
+
+function useCompact(): boolean {
+  const supported = (): boolean =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+  // jsdom в тестах matchMedia не реализует, поэтому проверяем поддержку, а не среду
+  const [compact, setCompact] = useState(() =>
+    supported() ? window.matchMedia(COMPACT_QUERY).matches : false,
+  );
+  useEffect(() => {
+    if (!supported()) return;
+    const query = window.matchMedia(COMPACT_QUERY);
+    const sync = (): void => setCompact(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
+  return compact;
 }
 
 const cssVarToRgba = (variable: string, alpha: number): string => {
@@ -46,10 +75,13 @@ export function Heatmap({
   onDayClick,
 }: HeatmapProps) {
   const byDate = useMemo(() => new Map(days.map((d) => [d.date, d])), [days]);
+  const compact = useCompact();
+  const shownWeeks = compact ? Math.min(weeks, COMPACT_WEEKS) : weeks;
+  const shownCell = compact ? COMPACT_CELL : cell;
   const end = startOfWeek(today);
-  const start = addDaysToDateOnly(end, -(weeks - 1) * 7);
+  const start = addDaysToDateOnly(end, -(shownWeeks - 1) * 7);
 
-  const columns = Array.from({ length: weeks }, (_, w) =>
+  const columns = Array.from({ length: shownWeeks }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => addDaysToDateOnly(start, w * 7 + d)),
   );
 
@@ -74,12 +106,12 @@ export function Heatmap({
   };
 
   return (
-    <div className="heat-wrap">
+    <div className={`heat-wrap${compact ? ' is-compact' : ''}`}>
       <div className="heat">
         {showWeekdays ? (
           <div className="heat-side" style={{ gap, paddingTop: showMonths ? 18 : 0 }}>
             {['пн', '', 'ср', '', 'пт', '', ''].map((label, i) => (
-              <span key={i} style={{ height: cell, lineHeight: `${cell}px` }}>
+              <span key={i} style={{ height: shownCell, lineHeight: `${shownCell}px` }}>
                 {label}
               </span>
             ))}
@@ -89,7 +121,7 @@ export function Heatmap({
           {showMonths ? (
             <div className="heat-months" style={{ gap }}>
               {monthLabels.map((label, i) => (
-                <span key={i} style={{ width: cell }}>
+                <span key={i} style={{ width: shownCell }}>
                   {label}
                 </span>
               ))}
@@ -118,7 +150,11 @@ export function Heatmap({
                         data-filled={filled}
                         data-date={date}
                         title={title}
-                        style={{ width: cell, height: cell, background: background(data) }}
+                        style={{
+                          width: shownCell,
+                          height: shownCell,
+                          background: background(data),
+                        }}
                       />
                     );
                   }
@@ -133,7 +169,7 @@ export function Heatmap({
                       aria-label={title || date}
                       title={title}
                       disabled={!filled}
-                      style={{ width: cell, height: cell, background: background(data) }}
+                      style={{ width: shownCell, height: shownCell, background: background(data) }}
                       onClick={() => filled && onDayClick(date)}
                     />
                   );

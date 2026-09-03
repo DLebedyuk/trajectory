@@ -224,6 +224,34 @@
   padding-bottom: 4px;
 }
 
+/*
+  Компактная карта на телефоне: два месяца крупными ячейками. Она помещается
+  целиком, поэтому прокрутка не нужна, а лишнее место по бокам уходит в поля —
+  карта стоит по центру своей плашки, а не жмётся к левому краю.
+*/
+.heat-wrap.is-compact {
+  overflow-x: visible;
+  display: flex;
+  justify-content: center;
+  padding: 14px 12px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.heat-wrap.is-compact .heat-cell {
+  border-radius: 7px;
+}
+
+.heat-wrap.is-compact .heat-months {
+  height: 15px;
+}
+
+.heat-wrap.is-compact .heat-months span,
+.heat-wrap.is-compact .heat-side span {
+  font-size: 11px;
+}
+
 .heat {
   display: flex;
   align-items: flex-start;
