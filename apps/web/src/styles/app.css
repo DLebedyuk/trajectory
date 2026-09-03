@@ -249,36 +249,15 @@
 }
 
 /* ============ МОБИЛЬНАЯ ОБОЛОЧКА ============ */
-/*
-  Верхняя панель существует только на телефоне: на десктопе имя приложения и
-  добавление живут в боковой панели. Поэтому по умолчанию она скрыта, а
-  показывается в том же медиазапросе, что и нижняя навигация.
-*/
 .m-topbar {
-  display: none;
   background: var(--surface);
   padding: 10px 14px;
+  display: flex;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
   min-height: 44px;
-}
-.m-topbar .title {
-  flex: 1;
-  text-align: center;
-}
-.m-topbar .m-add {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  cursor: pointer;
 }
 .m-topbar .back {
   color: var(--text-2);
@@ -364,7 +343,6 @@
   height: 52px;
   flex: 0 0 52px;
   gap: 0;
-  font-size: 9px;
   box-shadow: 0 6px 14px -4px rgba(0, 0, 0, 0.25);
   margin-top: -18px;
 }
@@ -372,7 +350,8 @@
   color: var(--accent-contrast);
 }
 .m-bottom .tab.is-home svg {
-  display: none;
+  width: 22px;
+  height: 22px;
 }
 .m-bottom .tab.is-add .ic {
   font-size: 22px;
@@ -1817,13 +1796,6 @@
     padding: 12px 14px calc(86px + env(safe-area-inset-bottom));
     max-width: none;
   }
-  .m-topbar {
-    display: flex;
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    padding-top: calc(10px + env(safe-area-inset-top));
-  }
   .m-bottom {
     display: flex;
     position: fixed;
@@ -2491,6 +2463,19 @@ body {
   .settings-card .row .lbl {
     flex: 1 1 100%;
   }
+}
+
+/*
+  Строка с набором чипов: они всегда идут под подписью, поэтому строке нужен
+  перенос. Раньше чипы лежали отдельным блоком и подтягивались вверх
+  отрицательным отступом — разделитель строки проходил прямо сквозь них.
+*/
+.settings-card .row.has-chips {
+  flex-wrap: wrap;
+}
+.settings-card .row.has-chips .lbl,
+.settings-card .row.has-chips .chips {
+  flex: 1 1 100%;
 }
 
 /*

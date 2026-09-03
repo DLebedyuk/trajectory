@@ -10,21 +10,16 @@ import {
   IconInbox,
   IconLogout,
   IconMoon,
-  IconPlus,
   IconSettings,
   IconSun,
-  IconThought,
-  IconTouch,
   IconBell,
   IconMore,
   IconArchive,
+  IconTouch,
 } from '@planner/ui';
 import { api } from '../api/client.js';
-import { qk, useDashboard, useFocus } from '../api/queries.js';
-import { todayInTimezone } from '@planner/shared';
+import { qk, useFocus } from '../api/queries.js';
 import { applyTheme, useUiStore, watchSystemTheme } from '../store/ui.js';
-import { TouchModal } from '../features/TouchModal.js';
-import { QuickThoughtModal } from '../features/QuickThoughtModal.js';
 
 const NAV = [
   { to: '/', label: 'Главная', end: true, Icon: IconHome },
@@ -102,12 +97,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const inbox = useQuery({ queryKey: qk.inbox, queryFn: api.inbox.list });
   const me = useQuery({ queryKey: qk.me, queryFn: api.me });
   const focus = useFocus();
-  const dashboard = useDashboard();
 
-  const [addOpen, setAddOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [touchOpen, setTouchOpen] = useState(false);
-  const [thoughtOpen, setThoughtOpen] = useState(false);
 
   const qc = useQueryClient();
   const logout = useMutation({
@@ -203,22 +194,6 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/*
-        Верхняя панель мобильного. Держит имя приложения и добавление: на
-        десктопе то и другое живёт в боковой панели, которой здесь нет.
-      */}
-      <header className="m-topbar">
-        <span className="title">Траектория</span>
-        <button
-          type="button"
-          className="m-add"
-          onClick={() => setAddOpen(true)}
-          aria-label="Добавить"
-        >
-          <IconPlus />
-        </button>
-      </header>
-
       <main className={`app-main ${widthClass(location.pathname)}`}>{children}</main>
 
       <nav className="m-bottom" aria-label="Навигация">
@@ -234,13 +209,14 @@ export function Shell({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
 
+        {/* Домик без подписи: в кружок она не влезает, а иконка понятна и так. */}
         <NavLink
           to="/"
           end
           className={({ isActive }) => `tab is-home${isActive ? ' is-active' : ''}`}
+          aria-label="Главная"
         >
           <IconHome />
-          Главная
         </NavLink>
 
         {MOBILE_NAV_RIGHT.map(({ to, label, Icon }) => (
@@ -309,79 +285,6 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
       ) : null}
-
-      {/*
-        Единственная глобальная точка добавления на мобильном. Два действия,
-        а не список всего подряд: задача создаётся в проекте, напоминание —
-        на своей странице, книга — в медиатеке.
-      */}
-      {addOpen ? (
-        <div
-          className="sheet-backdrop"
-          role="presentation"
-          onClick={() => setAddOpen(false)}
-          onKeyDown={(e) => e.key === 'Escape' && setAddOpen(false)}
-        >
-          <div
-            className="plus-sheet"
-            role="dialog"
-            aria-label="Что добавить"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h5>Что записать</h5>
-            <button
-              type="button"
-              className="opt"
-              onClick={() => {
-                setAddOpen(false);
-                setThoughtOpen(true);
-              }}
-            >
-              <span className="ic-wrap">
-                <IconThought />
-              </span>
-              <span className="info">
-                <span className="ttl">Во входящие</span>
-                <span className="sub">Мысль, которую разберём потом</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="opt"
-              onClick={() => {
-                setAddOpen(false);
-                setTouchOpen(true);
-              }}
-            >
-              <span className="ic-wrap">
-                <IconTouch />
-              </span>
-              <span className="info">
-                <span className="ttl">Записать касание</span>
-                <span className="sub">Факт работы по направлению</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="btn ghost sheet-cancel"
-              onClick={() => setAddOpen(false)}
-            >
-              Отмена
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <TouchModal
-        open={touchOpen}
-        onOpenChange={setTouchOpen}
-        today={dashboard.data?.today ?? todayInTimezone('UTC')}
-      />
-      <QuickThoughtModal
-        open={thoughtOpen}
-        onOpenChange={setThoughtOpen}
-        onSaved={() => navigate('/inbox')}
-      />
     </div>
   );
 }

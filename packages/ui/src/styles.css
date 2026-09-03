@@ -885,12 +885,24 @@ select {
 @media (pointer: coarse) {
   .btn,
   .chip,
-  .sw,
   .tab {
     min-height: 44px;
   }
   .btn.sm {
     min-height: 38px;
+  }
+  /*
+    Тумблер сюда не входит: у него фиксированные пропорции, и от min-height он
+    вытягивался в вертикальный прямоугольник с бегунком, прижатым кверху.
+    Под палец расширяем невидимую область нажатия, а не сам переключатель.
+  */
+  .sw {
+    position: relative;
+  }
+  .sw::before {
+    content: '';
+    position: absolute;
+    inset: -12px -8px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

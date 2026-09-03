@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Heatmap, IconBell, IconPlus, Modal, useToast } from '@planner/ui';
+import { Button, Heatmap, IconBell, IconPlus, IconThought, Modal, useToast } from '@planner/ui';
 import { formatLongDate, humanDate, plural } from '@planner/shared';
 import { api } from '../api/client.js';
 import { invalidateFocusScope, qk, useDashboard, useDirections } from '../api/queries.js';
@@ -32,6 +32,7 @@ export function HomePage() {
   const [touchOpen, setTouchOpen] = useState(false);
   const [remindOpen, setRemindOpen] = useState(false);
   const [thoughtOpen, setThoughtOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
 
   const setActive = useMutation({
@@ -78,13 +79,14 @@ export function HomePage() {
           <h1>Привет</h1>
         </div>
         <div className="home-quick">
-          <Button onClick={() => setThoughtOpen(true)}>
+          {/*
+            Одна кнопка вместо двух: что именно записать — мысль или
+            напоминание — спрашиваем следующим шагом. Так на главной остаётся
+            одно понятное действие, а не развилка до того, как человек решил.
+          */}
+          <Button variant="primary" onClick={() => setAddOpen(true)}>
             <IconPlus />
-            Мысль
-          </Button>
-          <Button variant="primary" onClick={() => setRemindOpen(true)}>
-            <IconBell />
-            Напомнить
+            Добавить
           </Button>
         </div>
       </div>
@@ -143,23 +145,20 @@ export function HomePage() {
               <Link to="/touches">Посмотреть историю</Link>
             </div>
           </div>
-        </div>
 
-        <aside className="right-col">
-          <SoftRemindersCard
-            reminders={data.todayReminders}
-            onComplete={(id) => completeReminder.mutate(id)}
-          />
-
-          {data.pinnedMedia.length > 0 ? (
-            <div className="card">
-              <h4>
-                Читаю и смотрю
-                <Link className="more" to="/media">
-                  Вся полка
-                </Link>
-              </h4>
-              {data.pinnedMedia.map((m) => (
+          {/*
+            Полка на главной: под касаниями, а не сбоку. Показываем и пустой —
+            иначе блок исчезает целиком, и непонятно, куда делось «сейчас читаю».
+          */}
+          <div className="card">
+            <h4>
+              Читаю и смотрю
+              <Link className="more" to="/media">
+                Вся полка
+              </Link>
+            </h4>
+            {data.pinnedMedia.length > 0 ? (
+              data.pinnedMedia.map((m) => (
                 <Link key={m.id} className="media-row" to={`/media/${m.id}`}>
                   <span
                     className="cover"
@@ -176,9 +175,20 @@ export function HomePage() {
                     <span className="sub">{m.authorOrDirector ?? m.categoryName ?? ''}</span>
                   </span>
                 </Link>
-              ))}
-            </div>
-          ) : null}
+              ))
+            ) : (
+              <p className="hint">
+                Ничего не закреплено. Открой полку и закрепи то, что читаешь или смотришь сейчас.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <aside className="right-col">
+          <SoftRemindersCard
+            reminders={data.todayReminders}
+            onComplete={(id) => completeReminder.mutate(id)}
+          />
 
           <div className="card menu-invite">
             <div>
@@ -249,6 +259,63 @@ export function HomePage() {
       <TouchModal open={touchOpen} onOpenChange={setTouchOpen} today={data.today} />
       <ReminderModal open={remindOpen} onOpenChange={setRemindOpen} today={data.today} />
       <QuickThoughtModal open={thoughtOpen} onOpenChange={setThoughtOpen} />
+
+      {addOpen ? (
+        <div
+          className="sheet-backdrop"
+          role="presentation"
+          onClick={() => setAddOpen(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setAddOpen(false)}
+        >
+          <div
+            className="plus-sheet"
+            role="dialog"
+            aria-label="Что добавить"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h5>Что записать</h5>
+            <button
+              type="button"
+              className="opt"
+              onClick={() => {
+                setAddOpen(false);
+                setThoughtOpen(true);
+              }}
+            >
+              <span className="ic-wrap">
+                <IconThought />
+              </span>
+              <span className="info">
+                <span className="ttl">Мысль</span>
+                <span className="sub">Попадёт во входящие, разберём потом</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="opt"
+              onClick={() => {
+                setAddOpen(false);
+                setRemindOpen(true);
+              }}
+            >
+              <span className="ic-wrap">
+                <IconBell />
+              </span>
+              <span className="info">
+                <span className="ttl">Напоминание</span>
+                <span className="sub">Внешняя память: придёт в нужный момент</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="btn ghost sheet-cancel"
+              onClick={() => setAddOpen(false)}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {completeDialog}
     </div>

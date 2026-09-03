@@ -115,7 +115,11 @@ export function SettingsPage() {
 
         <div className="settings-card settings-wide">
           <h4>Напоминания</h4>
-          <div className="row">
+          {/*
+            Чипы — часть этой строки, а не отдельный блок под ней: иначе
+            разделитель строки проходит прямо сквозь них.
+          */}
+          <div className="row has-chips">
             <div className="lbl">
               <b>Если не отметила</b>
               <small>
@@ -123,27 +127,27 @@ export function SettingsPage() {
                 само.
               </small>
             </div>
+            <div className="chips">
+              {(
+                [
+                  ['none', 'не переспрашивать'],
+                  ['evening', 'переспросить вечером'],
+                  ['nextDigest', 'в следующую сводку'],
+                ] as const
+              ).map(([v, l]) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`chip${s.missedReminderBehavior === v ? ' is-active' : ''}`}
+                  aria-pressed={s.missedReminderBehavior === v}
+                  onClick={() => update.mutate({ missedReminderBehavior: v })}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="chips" style={{ marginTop: -6 }}>
-            {(
-              [
-                ['none', 'не переспрашивать'],
-                ['evening', 'переспросить вечером'],
-                ['nextDigest', 'в следующую сводку'],
-              ] as const
-            ).map(([v, l]) => (
-              <button
-                key={v}
-                type="button"
-                className={`chip${s.missedReminderBehavior === v ? ' is-active' : ''}`}
-                aria-pressed={s.missedReminderBehavior === v}
-                onClick={() => update.mutate({ missedReminderBehavior: v })}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-          <div className="row" style={{ marginTop: 14 }}>
+          <div className="row">
             <div className="lbl">
               <b>Жёсткие уведомления</b>
               <small>События с точным временем, задачи с реальными дедлайнами.</small>
