@@ -2517,3 +2517,34 @@ body {
     min-height: 40px;
   }
 }
+
+/*
+  Строка «записать касание?» в окне закрытия задачи. Вся строка — одна кнопка,
+  чтобы попадать пальцем не только в кружок чекбокса.
+*/
+.touch-ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  margin-top: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.touch-ask .touch-ask-text {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+}
+.touch-ask .touch-ask-text small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.4;
+}

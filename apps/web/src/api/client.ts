@@ -247,7 +247,8 @@ export const api = {
     create: (input: CreateTaskInput) => post<Task>('/api/tasks', input),
     update: (id: string, input: UpdateTaskInput) => patch<Task>(`/api/tasks/${id}`, input),
     remove: (id: string) => del<{ ok: true }>(`/api/tasks/${id}`),
-    complete: (id: string) => post<Task>(`/api/tasks/${id}/complete`),
+    complete: (id: string, withTouch = false) =>
+      post<Task>(`/api/tasks/${id}/complete`, { withTouch }),
     reopen: (id: string) => post<Task>(`/api/tasks/${id}/reopen`),
     pin: (id: string) => post<Task>(`/api/tasks/${id}/pin`),
     unpin: (id: string) => post<Task>(`/api/tasks/${id}/unpin`),

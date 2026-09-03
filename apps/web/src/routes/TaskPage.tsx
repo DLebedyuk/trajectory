@@ -14,14 +14,8 @@ import {
   useToast,
 } from '@planner/ui';
 import { api } from '../api/client.js';
-import {
-  invalidateFocusScope,
-  qk,
-  useCompleteTask,
-  useDashboard,
-  useTask,
-  useTogglePin,
-} from '../api/queries.js';
+import { invalidateFocusScope, qk, useDashboard, useTask, useTogglePin } from '../api/queries.js';
+import { useCompleteTaskDialog } from '../features/CompleteTaskDialog.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 
 export function TaskPage() {
@@ -31,7 +25,7 @@ export function TaskPage() {
   const toast = useToast();
   const task = useTask(taskId);
   const dashboard = useDashboard();
-  const completeTask = useCompleteTask();
+  const { askComplete, dialog: completeDialog } = useCompleteTaskDialog();
   const togglePin = useTogglePin();
 
   const [title, setTitle] = useState('');
@@ -157,7 +151,7 @@ export function TaskPage() {
               </Button>
             )}
             {t.status === 'open' ? (
-              <Button size="sm" variant="primary" onClick={() => completeTask.mutate(t.id)}>
+              <Button size="sm" variant="primary" onClick={() => askComplete(t.id, t.title)}>
                 <IconCheck />
                 Выполнена
               </Button>
@@ -316,6 +310,8 @@ export function TaskPage() {
           <input type="text" value={itemText} onChange={(e) => setItemText(e.target.value)} />
         </FormField>
       </Modal>
+
+      {completeDialog}
     </>
   );
 }

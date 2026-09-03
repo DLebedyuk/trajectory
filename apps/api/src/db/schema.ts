@@ -248,12 +248,23 @@ export const touches = pgTable(
       .notNull()
       .references(() => directions.id, { onDelete: 'cascade' }),
     projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    /*
+      Касание, выросшее из закрытой задачи. Каскад намеренный: если задачу
+      удалили, занятия как будто не было — касание уходит вместе с ней.
+      Уникальность делает закрытие идемпотентным: повторное «выполнено»
+      не наплодит дублей. NULL не конфликтуют, поэтому ручные касания,
+      у которых задачи нет, индексу не мешают.
+    */
+    taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
     date: date('date').notNull(),
     title: varchar('title', { length: 300 }).notNull(),
     comment: text('comment'),
     createdAt: now(),
   },
-  (t) => ({ byUserDate: index('touches_user_date_idx').on(t.userId, t.date) }),
+  (t) => ({
+    byUserDate: index('touches_user_date_idx').on(t.userId, t.date),
+    byTask: uniqueIndex('touches_task_unique_idx').on(t.taskId),
+  }),
 );
 
 export const reminders = pgTable(

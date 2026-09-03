@@ -87,6 +87,39 @@ export class TouchesService {
     return list.find((t) => t.id === (row as { id: string }).id) as TouchWithContext;
   }
 
+  /**
+   * Касание из закрытой задачи. Полноправное: в списке и на карте оно ничем не
+   * отличается от записанного руками — задача и есть занятие, просто
+   * запланированное. onConflictDoNothing делает закрытие идемпотентным.
+   */
+  async createForTask(input: {
+    userId: string;
+    taskId: string;
+    directionId: string;
+    projectId: string;
+    title: string;
+    date: string;
+  }): Promise<void> {
+    await this.db
+      .insert(touches)
+      .values({
+        userId: input.userId,
+        directionId: input.directionId,
+        projectId: input.projectId,
+        taskId: input.taskId,
+        date: input.date,
+        title: input.title,
+      })
+      .onConflictDoNothing({ target: touches.taskId });
+  }
+
+  /** Задачу вернули в открытые — занятия не было, касание уходит. */
+  async removeForTask(userId: string, taskId: string): Promise<void> {
+    await this.db
+      .delete(touches)
+      .where(and(eq(touches.userId, userId), eq(touches.taskId, taskId)));
+  }
+
   async remove(userId: string, id: string): Promise<{ ok: true }> {
     await this.db.delete(touches).where(and(eq(touches.userId, userId), eq(touches.id, id)));
     return { ok: true };

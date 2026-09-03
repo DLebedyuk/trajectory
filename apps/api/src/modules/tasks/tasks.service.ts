@@ -8,10 +8,12 @@ import type {
   UpdateTaskInput,
 } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
-import { directions, projects, taskChecklistItems, tasks } from '../../db/schema.js';
+import { directions, projects, taskChecklistItems, tasks, users } from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { dateOnly, iso, isoRequired } from '../../common/mappers.js';
 import { FocusService } from '../focus/focus.service.js';
+import { TouchesService } from '../touches/touches.service.js';
+import { todayInTimezone } from '@planner/shared';
 
 type Row = typeof tasks.$inferSelect;
 
@@ -39,6 +41,7 @@ export class TasksService {
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(FocusService) private readonly focus: FocusService,
+    @Inject(TouchesService) private readonly touches: TouchesService,
   ) {}
 
   async listByProject(userId: string, projectId: string, filter: TaskFilter = {}): Promise<Task[]> {
@@ -234,8 +237,15 @@ export class TasksService {
     return row;
   }
 
-  /** Выполнение: задача уходит из активной и из закреплённых. */
-  async complete(userId: string, id: string): Promise<Task> {
+  /**
+   * Выполнение: задача уходит из активной и из закреплённых.
+   *
+   * withTouch приходит из окна подтверждения, а не из свойств задачи: заранее
+   * не всегда понятно, окажется задача занятием или бытовой мелочью вроде
+   * «позвонить в поликлинику». Массовое закрытие задач при завершении проекта
+   * идёт мимо этого метода и касаний не создаёт — это уборка, а не занятие.
+   */
+  async complete(userId: string, id: string, withTouch = false): Promise<Task> {
     await this.assertExists(userId, id);
     const [row] = await this.db
       .update(tasks)
@@ -243,7 +253,34 @@ export class TasksService {
       .where(and(eq(tasks.userId, userId), eq(tasks.id, id)))
       .returning();
     await this.focus.clearIfActive(userId, id);
+    if (withTouch) await this.recordTouch(userId, row as Row);
     return toTask(row as Row);
+  }
+
+  /**
+   * Направление у касания берётся через проект задачи: собственного поля
+   * направления у задачи нет и быть не должно. Дата — сегодняшняя в часовом
+   * поясе человека, иначе поздний вечер попадёт во вчерашнюю или завтрашнюю
+   * клетку карты.
+   */
+  private async recordTouch(userId: string, task: Row): Promise<void> {
+    const [project] = await this.db
+      .select({ directionId: projects.directionId })
+      .from(projects)
+      .where(and(eq(projects.userId, userId), eq(projects.id, task.projectId)));
+    if (!project) return;
+    const [user] = await this.db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, userId));
+    await this.touches.createForTask({
+      userId,
+      taskId: task.id,
+      directionId: project.directionId,
+      projectId: task.projectId,
+      title: task.title,
+      date: todayInTimezone(user?.timezone ?? 'UTC'),
+    });
   }
 
   async reopen(userId: string, id: string): Promise<Task> {
@@ -265,6 +302,8 @@ export class TasksService {
       .set({ status: 'open', completedAt: null, updatedAt: new Date() })
       .where(and(eq(tasks.userId, userId), eq(tasks.id, id)))
       .returning();
+    // задача снова открыта — значит занятия не было, касание откатываем
+    await this.touches.removeForTask(userId, id);
     return toTask(row as Row);
   }
 

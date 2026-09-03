@@ -54,6 +54,13 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export const updateTaskSchema = createTaskSchema.omit({ projectId: true }).partial();
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 
+/**
+ * Завершение задачи. withTouch решается в момент закрытия, а не при создании:
+ * заранее не всегда понятно, окажется задача занятием или бытовой мелочью.
+ */
+export const completeTaskSchema = z.object({ withTouch: z.boolean().default(false) });
+export type CompleteTaskInput = z.infer<typeof completeTaskSchema>;
+
 export const createChecklistItemSchema = z.object({ text: z.string().min(1).max(300) });
 export const updateChecklistItemSchema = z.object({
   text: z.string().min(1).max(300).optional(),

@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
-    "moduleResolution": "Node10",
+    "moduleResolution": "node10",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "isolatedModules": false,

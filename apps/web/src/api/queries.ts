@@ -169,10 +169,14 @@ export function useToggleProjectPin() {
 export function useCompleteTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => api.tasks.complete(taskId),
-    onSuccess: (_data, taskId) => {
+    mutationFn: ({ taskId, withTouch }: { taskId: string; withTouch: boolean }) =>
+      api.tasks.complete(taskId, withTouch),
+    onSuccess: (_data, { taskId }) => {
       invalidateFocusScope(qc);
       void qc.invalidateQueries({ queryKey: qk.task(taskId) });
+      // касание могло появиться прямо сейчас — карта и список обязаны это увидеть
+      void qc.invalidateQueries({ queryKey: ['heatmap'] });
+      void qc.invalidateQueries({ queryKey: ['touches'] });
     },
   });
 }

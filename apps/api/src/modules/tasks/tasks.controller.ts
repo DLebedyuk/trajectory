@@ -11,7 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { CompleteTaskInput } from '@planner/contracts';
 import {
+  completeTaskSchema,
   createChecklistItemSchema,
   createTaskSchema,
   reorderSchema,
@@ -95,8 +97,12 @@ export class TasksController {
   }
 
   @Post(':id/complete')
-  complete(@CurrentUser() userId: string, @Param('id') id: string) {
-    return this.service.complete(userId, id);
+  complete(
+    @CurrentUser() userId: string,
+    @Param('id') id: string,
+    @Body(zodBody(completeTaskSchema)) body: unknown,
+  ) {
+    return this.service.complete(userId, id, (body as CompleteTaskInput).withTouch);
   }
 
   @Post(':id/reopen')

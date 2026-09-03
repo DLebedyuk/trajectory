@@ -4,13 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Heatmap, IconBell, IconPlus, Modal, useToast } from '@planner/ui';
 import { formatLongDate, humanDate, plural } from '@planner/shared';
 import { api } from '../api/client.js';
-import {
-  invalidateFocusScope,
-  qk,
-  useCompleteTask,
-  useDashboard,
-  useDirections,
-} from '../api/queries.js';
+import { invalidateFocusScope, qk, useDashboard, useDirections } from '../api/queries.js';
+import { useCompleteTaskDialog } from '../features/CompleteTaskDialog.js';
 import { TodayBlock } from '../features/TodayBlock.js';
 import { SoftRemindersCard } from '../features/SoftRemindersCard.js';
 import { FocusCard } from '../features/FocusCard.js';
@@ -29,7 +24,7 @@ export function HomePage() {
   const toast = useToast();
   const dashboard = useDashboard();
   const directions = useDirections();
-  const completeTask = useCompleteTask();
+  const { askComplete, dialog: completeDialog } = useCompleteTaskDialog();
 
   const [pickOpen, setPickOpen] = useState(false);
   const [dirOpen, setDirOpen] = useState(false);
@@ -101,7 +96,7 @@ export function HomePage() {
             tasks={data.dueTasks}
             overdue={data.overdueTasks}
             reminders={data.todayReminders}
-            onCompleteTask={(id) => completeTask.mutate(id)}
+            onCompleteTask={(id) => askComplete(id)}
             onCompleteReminder={(id) => completeReminder.mutate(id)}
           />
 
@@ -110,7 +105,8 @@ export function HomePage() {
             pinnedProject={data.pinnedProject}
             onOpenPinned={() => setPinOpen(true)}
             onComplete={() =>
-              data.focus.activeTaskId && completeTask.mutate(data.focus.activeTaskId)
+              data.focus.activeTaskId &&
+              askComplete(data.focus.activeTaskId, data.focus.activeTask?.title)
             }
             onPickTask={() => setPickOpen(true)}
             onClearActive={() => clearActive.mutate()}
@@ -253,6 +249,8 @@ export function HomePage() {
       <TouchModal open={touchOpen} onOpenChange={setTouchOpen} today={data.today} />
       <ReminderModal open={remindOpen} onOpenChange={setRemindOpen} today={data.today} />
       <QuickThoughtModal open={thoughtOpen} onOpenChange={setThoughtOpen} />
+
+      {completeDialog}
     </div>
   );
 }

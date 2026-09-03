@@ -25,7 +25,6 @@ import { api } from '../api/client.js';
 import {
   invalidateFocusScope,
   qk,
-  useCompleteTask,
   useDashboard,
   useDirection,
   useDirections,
@@ -33,6 +32,7 @@ import {
   useTasks,
   useTogglePin,
 } from '../api/queries.js';
+import { useCompleteTaskDialog } from '../features/CompleteTaskDialog.js';
 import { TaskLine } from '../features/TaskLine.js';
 import { ProjectSettingsModal } from '../features/ProjectSettingsModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
@@ -59,7 +59,7 @@ export function ProjectPage() {
   };
   const tasks = useTasks(projectId, filter);
 
-  const completeTask = useCompleteTask();
+  const { askComplete, dialog: completeDialog } = useCompleteTaskDialog();
   const togglePin = useTogglePin();
   const [taskOpen, setTaskOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -235,7 +235,7 @@ export function ProjectPage() {
                   isActive={activeTaskId === t.id}
                   directionColor={color}
                   onOpen={() => navigate(`/tasks/${t.id}`)}
-                  onComplete={() => completeTask.mutate(t.id)}
+                  onComplete={() => askComplete(t.id, t.title)}
                   onTogglePin={() => togglePin.mutate({ taskId: t.id, pinned: t.pinned })}
                 />
               ))
@@ -341,6 +341,8 @@ export function ProjectPage() {
           <input type="text" value={note} onChange={(e) => setNote(e.target.value)} />
         </FormField>
       </Modal>
+
+      {completeDialog}
     </div>
   );
 }
