@@ -57,6 +57,13 @@ const MORE_LINKS = [
   },
   { to: '/touches', title: 'История касаний', sub: 'Все факты работы по дням', Icon: IconTouch },
   {
+    to: '/reminders',
+    title: 'Напоминания',
+    sub: 'Отметить готовым, перенести',
+    badge: 'reminders' as const,
+    Icon: IconBell,
+  },
+  {
     to: '/reminders/archive',
     title: 'Архив напоминаний',
     sub: 'Выполненное и пропущенное за 7 дней',
@@ -256,7 +263,7 @@ export function Shell({ children }: { children: ReactNode }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h5>Ещё</h5>
-            {MORE_LINKS.map(({ to, title, sub, Icon }) => (
+            {MORE_LINKS.map(({ to, title, sub, badge, Icon }) => (
               <button
                 key={to}
                 type="button"
@@ -273,6 +280,7 @@ export function Shell({ children }: { children: ReactNode }) {
                   <span className="ttl">{title}</span>
                   <span className="sub">{sub}</span>
                 </span>
+                {badge && counts[badge] ? <span className="ct mono">{counts[badge]}</span> : null}
               </button>
             ))}
             <button
