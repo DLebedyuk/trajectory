@@ -57,12 +57,13 @@ export function useCompleteTaskDialog(): {
         </>
       }
     >
-      <button
-        type="button"
-        className="touch-ask"
-        onClick={() => setWithTouch((v) => !v)}
-        aria-pressed={withTouch}
-      >
+      {/*
+        div, а не button: настоящий чекбокс (см. Checkbox) сам рендерится
+        кнопкой, а кнопка внутри кнопки — невалидный HTML. Браузер в этом
+        случае сам разрывает вложенность как ему вздумается, и клик по
+        кружку переставал сохранять новое значение.
+      */}
+      <div className="touch-ask" onClick={() => setWithTouch((v) => !v)}>
         <Checkbox
           checked={withTouch}
           onChange={() => setWithTouch((v) => !v)}
@@ -72,7 +73,7 @@ export function useCompleteTaskDialog(): {
           Записать касание
           <small>Появится в карте направления — так же, как записанное руками.</small>
         </span>
-      </button>
+      </div>
     </Modal>
   );
 
