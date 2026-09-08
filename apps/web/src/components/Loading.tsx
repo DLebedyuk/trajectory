@@ -18,7 +18,7 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
     <div className="card" style={{ borderColor: 'var(--d-act)' }}>
       <b style={{ fontSize: 14 }}>Не удалось загрузить данные</b>
       <p className="hint" style={{ marginTop: 6 }}>
-        {message}. Проверь, что API запущен на порту 3000.
+        {message}. Проверьте, что API запущен на порту 3000.
       </p>
       {onRetry ? (
         <Button size="sm" style={{ marginTop: 10 }} onClick={onRetry}>

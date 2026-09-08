@@ -15,9 +15,9 @@ type MissedBehavior = 'none' | 'evening' | 'nextDigest';
 
 /** Текст-заголовок бакета — одинаковый для «настоящих» и «догоняющих» напоминаний слота. */
 const SLOT_HEADER: Record<TimeSlot, string> = {
-  morning: 'Доброе утро. Ты хотела сегодня:',
-  day: 'Днём ты хотела:',
-  evening: 'Вечером ты хотела:',
+  morning: 'Доброе утро. Вы хотели сегодня:',
+  day: 'Днём Вы хотели:',
+  evening: 'Вечером Вы хотели:',
 };
 
 interface PlannedDelivery {

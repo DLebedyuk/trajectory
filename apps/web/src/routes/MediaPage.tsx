@@ -258,7 +258,7 @@ export function MediaPage() {
       {all.length === 0 ? (
         <EmptyState
           title="Полка пуста"
-          description="Добавь то, что хочется прочитать или посмотреть — без всякого срока."
+          description="Добавьте то, что хочется прочитать или посмотреть — без всякого срока."
           action={<Button onClick={() => setOpen(true)}>Добавить</Button>}
         />
       ) : (

@@ -87,7 +87,7 @@ export function PickTaskModal({
 
       <div style={{ marginTop: 14 }}>
         {!directionId ? (
-          <p className="hint">Выбери направление.</p>
+          <p className="hint">Выберите направление.</p>
         ) : groups.length === 0 ? (
           <p className="hint">Открытых задач нет.</p>
         ) : (

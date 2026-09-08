@@ -241,7 +241,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
         timeSlot: parsed.timeSlot,
       });
       return {
-        text: `Ты имеешь в виду ${parsed.ambiguousWeekday}, ${formatLongDate(parsed.date)}?`,
+        text: `Вы имеете в виду ${parsed.ambiguousWeekday}, ${formatLongDate(parsed.date)}?`,
         actions: [
           { label: `Да, ${formatLongDate(parsed.date)}`, data: 'confirm:yes' },
           { label: 'Другой день', data: 'confirm:no' },
@@ -423,13 +423,13 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
             username: ctx.from?.username ?? null,
           });
           await ctx.reply(
-            'Аккаунт связан. Пиши что угодно — мысль попадёт во «Входящие», ' +
+            'Аккаунт связан. Пишите что угодно — мысль попадёт во «Входящие», ' +
               'а «напомни…» станет напоминанием.',
           );
         } catch {
           await ctx.reply(
             'Код не подошёл: он уже использован или устарел. ' +
-              'Открой «Настройки» в «Траектории» и получи новый.',
+              'Откройте «Настройки» в «Траектории» и получите новый.',
           );
         }
         return;
@@ -440,9 +440,9 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
         (await this.devAutoLink(telegramUserId, chatId));
       await ctx.reply(
         known
-          ? 'Привет. Пиши что угодно — мысль попадёт во «Входящие», а «напомни…» станет напоминанием.'
-          : 'Этот чат ещё не связан с аккаунтом. Открой «Настройки» в «Траектории», ' +
-              'нажми «Подключить Telegram» и пришли сюда полученный код.',
+          ? 'Привет. Пишите что угодно — мысль попадёт во «Входящие», а «напомни…» станет напоминанием.'
+          : 'Этот чат ещё не связан с аккаунтом. Откройте «Настройки» в «Траектории», ' +
+              'нажмите «Подключить Telegram» и пришлите сюда полученный код.',
       );
     });
 
@@ -475,8 +475,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
         (await this.devAutoLink(String(ctx.from?.id), chatId));
       if (!userId) {
         await ctx.reply(
-          'Этот чат не связан с аккаунтом. Открой «Настройки» в «Траектории», ' +
-            'нажми «Подключить Telegram» и пришли сюда код.',
+          'Этот чат не связан с аккаунтом. Откройте «Настройки» в «Траектории», ' +
+            'нажмите «Подключить Telegram» и пришлите сюда код.',
         );
         return;
       }

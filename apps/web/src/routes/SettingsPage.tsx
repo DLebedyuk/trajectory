@@ -139,7 +139,7 @@ export function SettingsPage() {
           */}
           <div className="row has-chips">
             <div className="lbl">
-              <b>Если не отметила</b>
+              <b>Если не отметили</b>
               <small>
                 По умолчанию приложение переспрашивает один раз вечером и больше не возвращается
                 само.

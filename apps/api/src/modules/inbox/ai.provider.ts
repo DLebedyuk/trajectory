@@ -82,7 +82,7 @@ export class MockAiProvider implements AiProvider {
         remindTime: parsed.time,
         note: parsed.date
           ? `Дата взята из текста.`
-          : 'Даты в тексте нет — придумывать не буду, выбери сама.',
+          : 'Даты в тексте нет — придумывать не буду, выберите сами.',
       };
     }
     if (/посмотреть|фильм|сериал|кино|дзеффирелли/.test(low)) {

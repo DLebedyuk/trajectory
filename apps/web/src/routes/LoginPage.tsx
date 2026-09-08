@@ -46,7 +46,7 @@ export function LoginPage({ googleConfigured }: { googleConfigured: boolean }) {
             */}
             <p className="perm-note">
               Мы запросим только <b>имя и почту</b>. Доступ к календарю — отдельно и позже, когда
-              сама решишь его подключить.
+              сами решите его подключить.
             </p>
           </>
         ) : (

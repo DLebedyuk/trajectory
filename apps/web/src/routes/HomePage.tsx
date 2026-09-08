@@ -125,7 +125,7 @@ export function HomePage() {
               </Button>
             </h4>
             <p className="hint" style={{ marginBottom: 10 }}>
-              Нажми на день, чтобы увидеть, что было.
+              Нажмите на день, чтобы увидеть, что было.
             </p>
             <div className="scroll-x">
               <Heatmap days={data.heatmap.days} today={data.today} onDayClick={setDay} />
@@ -178,7 +178,8 @@ export function HomePage() {
               ))
             ) : (
               <p className="hint">
-                Ничего не закреплено. Открой полку и закрепи то, что читаешь или смотришь сейчас.
+                Ничего не закреплено. Откройте полку и закрепите то, что читаете или смотрите
+                сейчас.
               </p>
             )}
           </div>
@@ -193,7 +194,7 @@ export function HomePage() {
           <div className="card menu-invite">
             <div>
               <div className="menu-invite-title">Хочется чего-нибудь совсем другого?</div>
-              <p className="hint">Загляни в меню возможностей.</p>
+              <p className="hint">Загляните в меню возможностей.</p>
             </div>
             <Button onClick={() => navigate('/menu')}>Открыть меню</Button>
           </div>
