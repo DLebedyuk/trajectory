@@ -57,15 +57,17 @@ export function ReminderModal({
         ? api.reminders.update(editing.id, payload)
         : api.reminders.create({ ...payload, source: 'web' as const });
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       void qc.invalidateQueries({ queryKey: qk.reminders });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
+      // текст строим из того, что реально сохранил сервер: прошедший слот он
+      // мог перенести на другую дату, а форма об этом ничего не знает
       toast.show(
-        time
-          ? `Напомню ${formatLongDate(date)} в ${time}`
-          : timeSlot
-            ? `Напомню ${formatLongDate(date)} ${SLOT_LABEL[timeSlot]}`
-            : `Напомню ${formatLongDate(date)} — подберу ближайшее время`,
+        saved.scheduledTime
+          ? `Напомню ${formatLongDate(saved.scheduledDate)} в ${saved.scheduledTime}`
+          : saved.timeSlot
+            ? `Напомню ${formatLongDate(saved.scheduledDate)} ${SLOT_LABEL[saved.timeSlot]}`
+            : `Напомню ${formatLongDate(saved.scheduledDate)} — подберу ближайшее время`,
       );
       onOpenChange(false);
     },

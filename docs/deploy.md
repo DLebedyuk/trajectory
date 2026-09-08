@@ -142,18 +142,23 @@ docker compose -f docker-compose.prod.yml --env-file .env.production \
 их всегда можно собрать заново из репозитория. Беречь надо базу и
 `.env.production`.
 
-Разовый дамп:
+Разовый дамп (на новом хосте `~/backup` ещё не существует — `gzip >` в
+несуществующую директорию просто упадёт):
 
 ```bash
+mkdir -p ~/backup
 docker compose -f docker-compose.prod.yml --env-file .env.production \
   exec -T postgres pg_dump -U planner -d planner --clean --if-exists \
   | gzip > ~/backup/planner-$(date +%F).sql.gz
 ```
 
-Каждую ночь в 3:30 — строкой в `crontab -e` (свой путь подставьте):
+Каждую ночь в 3:30 — строкой в `crontab -e` (свой путь подставьте). `mkdir -p`
+здесь по той же причине: у cron нет интерактивного шага, где это можно
+заметить и поправить руками, — без него первый же ночной прогон молча
+ничего не сохранит.
 
 ```
-30 3 * * * cd /home/USER/planner && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_dump -U planner -d planner --clean --if-exists | gzip > /home/USER/backup/planner-$(date +\%F).sql.gz && find /home/USER/backup -name 'planner-*.sql.gz' -mtime +14 -delete
+30 3 * * * mkdir -p /home/USER/backup && cd /home/USER/planner && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_dump -U planner -d planner --clean --if-exists | gzip > /home/USER/backup/planner-$(date +\%F).sql.gz && find /home/USER/backup -name 'planner-*.sql.gz' -mtime +14 -delete
 ```
 
 Проценты в cron нужно экранировать — отсюда `\%F`. Последняя часть удаляет

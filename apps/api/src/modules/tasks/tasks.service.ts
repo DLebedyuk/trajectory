@@ -8,12 +8,12 @@ import type {
   UpdateTaskInput,
 } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
-import { directions, projects, taskChecklistItems, tasks, users } from '../../db/schema.js';
+import { directions, projects, taskChecklistItems, tasks, userSettings, users } from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { dateOnly, iso, isoRequired } from '../../common/mappers.js';
 import { FocusService } from '../focus/focus.service.js';
 import { TouchesService } from '../touches/touches.service.js';
-import { todayInTimezone } from '@planner/shared';
+import { addDaysToDateOnly, timeInTimezone, todayInTimezone } from '@planner/shared';
 
 type Row = typeof tasks.$inferSelect;
 
@@ -169,7 +169,34 @@ export class TasksService {
     return result;
   }
 
-  async create(userId: string, input: CreateTaskInput): Promise<Task> {
+  /**
+   * Задачи всегда напоминают утром (см. reminder-scheduler.service.ts). Утренний слот на
+   * сегодня формируется один раз (idempotency key планировщика) — remindAt=сегодня,
+   * поставленный уже после того, как этот слот ушёл, физически не попадёт в уже
+   * отправленный бакет и будет молча потерян. Чтобы так не было, сразу переносим на завтра —
+   * тот же утренний слот сработает как обычно. Точная копия rollPastSlot('morning', ...)
+   * из RemindersService: задачи не заводят модульную зависимость ради одного условия.
+   */
+  private async rollPastMorning(
+    remindAt: string | null,
+    userId: string,
+    now: Date,
+  ): Promise<string | null> {
+    if (!remindAt) return remindAt;
+    const [user] = await this.db.select().from(users).where(eq(users.id, userId));
+    const timezone = user?.timezone ?? 'UTC';
+    const today = todayInTimezone(timezone, now);
+    if (remindAt !== today) return remindAt;
+    const [settings] = await this.db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId));
+    const morningTime = settings?.morningTime ?? '10:00';
+    if (timeInTimezone(timezone, now) < morningTime) return remindAt;
+    return addDaysToDateOnly(today, 1);
+  }
+
+  async create(userId: string, input: CreateTaskInput, now: Date = new Date()): Promise<Task> {
     const [project] = await this.db
       .select({ id: projects.id, status: projects.status })
       .from(projects)
@@ -188,6 +215,8 @@ export class TasksService {
       .from(tasks)
       .where(and(eq(tasks.userId, userId), eq(tasks.projectId, input.projectId)));
 
+    const remindAt = await this.rollPastMorning(input.remindAt ?? null, userId, now);
+
     const [row] = await this.db
       .insert(tasks)
       .values({
@@ -197,7 +226,7 @@ export class TasksService {
         deadline: input.deadline ?? null,
         exactTime: input.exactTime ?? null,
         estimatedDuration: input.estimatedDuration ?? null,
-        remindAt: input.remindAt ?? null,
+        remindAt,
         comment: input.comment ?? null,
         pinned: input.pinned,
         sortOrder: Number(value),
@@ -206,8 +235,17 @@ export class TasksService {
     return toTask(row as Row);
   }
 
-  async update(userId: string, id: string, input: UpdateTaskInput): Promise<Task> {
+  async update(
+    userId: string,
+    id: string,
+    input: UpdateTaskInput,
+    now: Date = new Date(),
+  ): Promise<Task> {
     await this.assertExists(userId, id);
+    const remindAt =
+      input.remindAt !== undefined
+        ? await this.rollPastMorning(input.remindAt ?? null, userId, now)
+        : undefined;
     const [row] = await this.db
       .update(tasks)
       .set({
@@ -217,7 +255,7 @@ export class TasksService {
         ...(input.estimatedDuration !== undefined
           ? { estimatedDuration: input.estimatedDuration ?? null }
           : {}),
-        ...(input.remindAt !== undefined ? { remindAt: input.remindAt ?? null } : {}),
+        ...(input.remindAt !== undefined ? { remindAt } : {}),
         ...(input.comment !== undefined ? { comment: input.comment ?? null } : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         updatedAt: new Date(),

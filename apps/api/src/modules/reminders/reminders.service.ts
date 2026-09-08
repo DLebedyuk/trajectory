@@ -169,7 +169,8 @@ export class RemindersService {
   ): Promise<Reminder> {
     const ctx = await this.userContext(userId);
     const scheduledTime = input.scheduledTime ?? null;
-    const deliveryMode = input.deliveryMode ?? (scheduledTime ? 'alert' : 'digest');
+    // deliveryMode всегда выводится из scheduledTime — его нельзя прислать в противоречии
+    const deliveryMode = scheduledTime ? 'alert' : 'digest';
 
     let scheduledDate = input.scheduledDate;
     let timeSlot: TimeSlot | null = null;
@@ -266,7 +267,6 @@ export class RemindersService {
       .set({
         ...(input.text !== undefined ? { text: input.text } : {}),
         ...timePatch,
-        ...(input.deliveryMode !== undefined ? { deliveryMode: input.deliveryMode } : {}),
         ...(input.repeatRule !== undefined ? { repeatRule: input.repeatRule ?? null } : {}),
         ...(input.missedBehavior !== undefined ? { missedBehavior: input.missedBehavior } : {}),
         ...(input.comment !== undefined ? { comment: input.comment ?? null } : {}),

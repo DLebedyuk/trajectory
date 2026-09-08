@@ -157,7 +157,6 @@ export class InboxService {
           text: p.text,
           scheduledDate: p.remindAt,
           scheduledTime: p.remindTime ?? null,
-          ...(p.deliveryMode ? { deliveryMode: p.deliveryMode } : {}),
           source,
           comment: p.comment ?? null,
         });

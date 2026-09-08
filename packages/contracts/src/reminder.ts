@@ -43,9 +43,10 @@ export const createReminderSchema = z.object({
   /**
    * Слот по умолчанию (утро/день/вечер), если точного времени нет. Ни то ни
    * другое не задано — сервис сам подбирает ближайший следующий слот.
+   * deliveryMode здесь намеренно нет: его вычисляет RemindersService из
+   * scheduledTime, чтобы их нельзя было прислать в противоречии друг другу.
    */
   timeSlot: timeSlot.nullish(),
-  deliveryMode: deliveryMode.optional(),
   repeatRule: repeatRuleSchema.nullish(),
   missedBehavior: missedBehavior.optional(),
   source: reminderSource.default('web'),
