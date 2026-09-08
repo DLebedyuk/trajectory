@@ -188,7 +188,7 @@ export function DirectionPage() {
             </Button>
             <Button
               size="sm"
-              variant={isFocus ? undefined : 'primary'}
+              variant={isFocus ? 'current' : 'primary'}
               disabled={isFocus}
               onClick={() => setDirection.mutate({ directionId, onConflict: 'ask' })}
             >
