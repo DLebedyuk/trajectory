@@ -597,6 +597,15 @@
   font-size: 22px;
   line-height: 1.25;
   margin-bottom: 14px;
+  /*
+    Когда задача есть, это <button> (клик по строке открывает задачу), а не
+    просто текст — сбрасываем центрирование и inline-block, которые браузеры
+    ставят кнопкам по умолчанию. У пустого состояния это по-прежнему div,
+    так что здесь ничего не меняет.
+  */
+  display: block;
+  width: 100%;
+  text-align: left;
 }
 .focus-block .actions {
   display: flex;
@@ -622,6 +631,11 @@
 }
 .focus-block .actions .btn.primary:hover {
   background: var(--accent-hover);
+}
+/* «Выполнить» — единственное частое действие, что осталось на виду; уезжает
+   в правый нижний угол блока, а не жмётся к «···» слева */
+.focus-block .actions .complete-btn {
+  margin-left: auto;
 }
 .focus-block .actions .menu-dots {
   width: 32px;

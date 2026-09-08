@@ -104,24 +104,21 @@ export function FocusCard({
 
       {task ? (
         <>
-          <div className="active-task">
+          {/* открытие задачи — клик по самой строке, отдельная кнопка не нужна */}
+          <button
+            type="button"
+            className="active-task"
+            onClick={() => navigate(`/tasks/${task.id}`)}
+          >
             {task.title}
             <span className="focus-state active">активная</span>
-          </div>
+          </button>
           {meta ? <div className="focus-meta">{meta}</div> : null}
 
           <div className="actions">
-            <button type="button" className="btn primary" onClick={onComplete}>
-              Выполнить
-            </button>
-            <button type="button" className="btn" onClick={() => navigate(`/tasks/${task.id}`)}>
-              Открыть задачу
-            </button>
-            <button type="button" className="btn" onClick={onPickTask}>
-              Выбрать другую задачу
-            </button>
             <OverflowMenu
               items={[
+                { label: 'Выбрать другую задачу', onSelect: onPickTask },
                 { label: 'Убрать активную задачу', onSelect: onClearActive },
                 {
                   label: pinnedProject ? 'Сменить закреплённый проект' : 'Закрепить проект',
@@ -131,6 +128,9 @@ export function FocusCard({
                 { label: 'Очистить фокус', onSelect: onClearFocus },
               ]}
             />
+            <button type="button" className="btn primary complete-btn" onClick={onComplete}>
+              Выполнить
+            </button>
           </div>
         </>
       ) : (
