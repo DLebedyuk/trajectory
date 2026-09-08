@@ -304,11 +304,13 @@ export function InboxPage() {
               {b.type === 'menu' ? (
                 <MenuParamFields
                   className="inbox-fields"
+                  withCompany
                   value={{
                     energy: b.energy ?? MENU_DEFAULTS.energy,
                     estimatedTime: b.estimatedTime ?? MENU_DEFAULTS.estimatedTime,
                     cost: b.cost ?? MENU_DEFAULTS.cost,
                     place: b.place ?? MENU_DEFAULTS.place,
+                    company: b.company ?? MENU_DEFAULTS.company,
                   }}
                   onChange={(changes) => patch(index, changes)}
                 />
@@ -369,7 +371,10 @@ function InboxCard({
   const [directionId, setDirectionId] = useState('');
   const [remindAt, setRemindAt] = useState('');
   const [remindTime, setRemindTime] = useState('');
-  const [menu, setMenu] = useState<MenuParamsValue>(menuParamsDefaults);
+  const [menu, setMenu] = useState<MenuParamsValue>(() => ({
+    ...menuParamsDefaults(),
+    company: MENU_DEFAULTS.company,
+  }));
 
   return (
     <div className="inbox-card">
@@ -466,6 +471,7 @@ function InboxCard({
       {type === 'menu' ? (
         <MenuParamFields
           className="inbox-fields"
+          withCompany
           value={menu}
           onChange={(changes) => setMenu((prev) => ({ ...prev, ...changes }))}
         />

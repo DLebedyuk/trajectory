@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { dateOnly, inboxProposedType, inboxStatus, timeOfDay, uuid } from './common.js';
 import { deliveryMode } from './common.js';
-import { menuCost, menuEnergy, menuEstimatedTime, menuPlace } from './menu.js';
+import { menuCompany, menuCost, menuEnergy, menuEstimatedTime, menuPlace } from './menu.js';
 
 export const inboxItemSchema = z.object({
   id: uuid,
@@ -48,6 +48,7 @@ export const inboxProposalSchema = z
     estimatedTime: menuEstimatedTime.nullish(),
     cost: menuCost.nullish(),
     place: menuPlace.nullish(),
+    company: menuCompany.nullish(),
   })
   // strict: посторонние поля не проглатываются молча. Предложение целиком
   // приезжает с клиента, и лишний ключ в нём — признак рассинхронизации,

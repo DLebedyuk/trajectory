@@ -79,6 +79,7 @@ describe('контракт предложения входящих', () => {
       estimatedTime: 'hours',
       cost: 'budget',
       place: 'out',
+      company: 'withSomeone',
     });
     expect(parsed.success).toBe(true);
   });
@@ -122,6 +123,7 @@ describe('применение идеи меню', () => {
         estimatedTime: 'hours',
         cost: 'budget',
         place: 'out',
+        company: 'withSomeone',
       },
     ]);
     expect(result.applied).toBe(1);
@@ -136,6 +138,7 @@ describe('применение идеи меню', () => {
     expect(row?.estimatedTime).toBe('hours');
     expect(row?.cost).toBe('budget');
     expect(row?.place).toBe('out');
+    expect(row?.company).toBe('withSomeone');
   });
 
   it('без параметров берёт общие значения по умолчанию, а не тихие defaults базы', async () => {
@@ -151,5 +154,6 @@ describe('применение идеи меню', () => {
     expect(row?.estimatedTime).toBe('hour');
     expect(row?.cost).toBe('cheap');
     expect(row?.place).toBe('out');
+    expect(row?.company).toBe('any');
   });
 });

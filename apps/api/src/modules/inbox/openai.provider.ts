@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import type { InboxProposal } from '@planner/contracts';
-import { menuCost, menuEnergy, menuEstimatedTime, menuPlace } from '@planner/contracts';
+import { menuCompany, menuCost, menuEnergy, menuEstimatedTime, menuPlace } from '@planner/contracts';
 import { env } from '../../config/env.js';
 import { MockAiProvider, type AiParseContext, type AiProvider } from './ai.provider.js';
 
@@ -36,6 +36,7 @@ const aiItemSchema = z.object({
   estimatedTime: menuEstimatedTime.nullable().optional(),
   cost: menuCost.nullable().optional(),
   place: menuPlace.nullable().optional(),
+  company: menuCompany.nullable().optional(),
 });
 /**
  * Оболочка ответа проверяется отдельно от элементов: если модель ошиблась в одной
@@ -91,13 +92,14 @@ const SYSTEM_PROMPT = `Ты помогаешь разбирать входящи
 Все десять полей обязательны в каждом элементе. Если значения нет — пиши null,
 а не пропускай поле. Никакого текста вне JSON.
 
-ТОЛЬКО для type "menu" можно дополнительно добавить пять полей — человек всё
+ТОЛЬКО для type "menu" можно дополнительно добавить шесть полей — человек всё
 равно увидит их в форме и сможет поменять:
   "menuCategory": короткая категория на русском ("прогулки", "театр", "еда"),
   "energy": "low" | "medium" | "high",
   "estimatedTime": "quick" (15 минут) | "hour" (около часа) | "hours" (несколько часов),
   "cost": "free" | "cheap" | "budget",
-  "place": "home" | "out".
+  "place": "home" | "out",
+  "company": "alone" | "withSomeone" | "any".
 Если не уверена в каком-то из них — null.
 
 ПРИМЕР. Запрос:
@@ -268,6 +270,7 @@ export class OpenAiProvider implements AiProvider {
         estimatedTime: a.type === 'menu' ? (a.estimatedTime ?? null) : null,
         cost: a.type === 'menu' ? (a.cost ?? null) : null,
         place: a.type === 'menu' ? (a.place ?? null) : null,
+        company: a.type === 'menu' ? (a.company ?? null) : null,
         note:
           a.projectId && !projectId ? 'Проект не распознан — выберите сами' : (a.note ?? undefined),
       };

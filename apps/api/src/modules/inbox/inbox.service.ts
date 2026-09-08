@@ -210,7 +210,7 @@ export class InboxService {
           estimatedTime: p.estimatedTime ?? MENU_DEFAULTS.estimatedTime,
           cost: p.cost ?? MENU_DEFAULTS.cost,
           place: p.place ?? MENU_DEFAULTS.place,
-          company: MENU_DEFAULTS.company,
+          company: p.company ?? MENU_DEFAULTS.company,
           tried: false,
         });
         return;
