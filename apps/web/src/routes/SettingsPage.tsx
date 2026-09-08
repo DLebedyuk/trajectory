@@ -101,15 +101,33 @@ export function SettingsPage() {
           </div>
           <div className="row">
             <div className="lbl">
-              <b>Время дневной сводки</b>
-              <small>Все напоминания без точного времени приходят одним сообщением.</small>
+              <b>Время по умолчанию</b>
+              <small>
+                Напоминания без точного времени приходят в одно из трёх — утро, день или вечер.
+              </small>
             </div>
-            <input
-              type="time"
-              defaultValue={s.digestTime}
-              style={{ width: 130, flex: 'none' }}
-              onChange={(e) => update.mutate({ digestTime: e.target.value })}
-            />
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {(
+                [
+                  ['morningTime', 'Утро'],
+                  ['dayTime', 'День'],
+                  ['eveningTime', 'Вечер'],
+                ] as const
+              ).map(([key, label]) => (
+                <label
+                  key={key}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}
+                >
+                  {label}
+                  <input
+                    type="time"
+                    defaultValue={s[key]}
+                    style={{ width: 110 }}
+                    onChange={(e) => update.mutate({ [key]: e.target.value })}
+                  />
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 

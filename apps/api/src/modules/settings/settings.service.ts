@@ -38,7 +38,9 @@ export class SettingsService {
       userId,
       timezone: user.timezone,
       locale: user.locale,
-      digestTime: s.digestTime,
+      morningTime: s.morningTime,
+      dayTime: s.dayTime,
+      eveningTime: s.eveningTime,
       missedReminderBehavior: s.missedReminderBehavior as Settings['missedReminderBehavior'],
       theme: s.theme as Settings['theme'],
       hardNotifications: s.hardNotifications,
@@ -63,7 +65,9 @@ export class SettingsService {
     await this.db
       .update(userSettings)
       .set({
-        ...(input.digestTime !== undefined ? { digestTime: input.digestTime } : {}),
+        ...(input.morningTime !== undefined ? { morningTime: input.morningTime } : {}),
+        ...(input.dayTime !== undefined ? { dayTime: input.dayTime } : {}),
+        ...(input.eveningTime !== undefined ? { eveningTime: input.eveningTime } : {}),
         ...(input.missedReminderBehavior !== undefined
           ? { missedReminderBehavior: input.missedReminderBehavior }
           : {}),

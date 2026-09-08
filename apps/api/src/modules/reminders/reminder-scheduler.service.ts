@@ -2,15 +2,23 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { and, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import { todayInTimezone, zonedDateTimeToUtc } from '@planner/shared';
+import type { TimeSlot } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import { reminderDeliveries, reminders, tasks, userSettings, users } from '../../db/schema.js';
 import { NOTIFICATION_PROVIDER } from './notification.token.js';
 import type { NotificationProvider } from './providers/notification.provider.js';
-import { EVENING_TIME } from './reminders.service.js';
+import { SLOT_ORDER, timeForSlot, type SlotTimes } from './reminders.service.js';
 
 const MAX_ATTEMPTS = 3;
 
 type MissedBehavior = 'none' | 'evening' | 'nextDigest';
+
+/** Текст-заголовок бакета — одинаковый для «настоящих» и «догоняющих» напоминаний слота. */
+const SLOT_HEADER: Record<TimeSlot, string> = {
+  morning: 'Доброе утро. Ты хотела сегодня:',
+  day: 'Днём ты хотела:',
+  evening: 'Вечером ты хотела:',
+};
 
 interface PlannedDelivery {
   userId: string;
@@ -86,29 +94,32 @@ export class ReminderSchedulerService {
   }
 
   /**
-   * Собирает список того, что уже пора отправить: точечные алерты, утренние
-   * сводки, вечернее догоняние пропущенного и напоминания по задачам.
+   * Собирает список того, что уже пора отправить: точечные алерты, три
+   * именованных слота (утро/день/вечер) — свои у напоминаний и у задач —
+   * и вечернее догоняние пропущенного.
    */
   private async plan(now: Date): Promise<PlannedDelivery[]> {
     const alerts: PlannedDelivery[] = [];
-    const digest = new Map<string, Bucket>();
-    const evening = new Map<string, Bucket>();
+    const buckets: Record<TimeSlot, Map<string, Bucket>> = {
+      morning: new Map(),
+      day: new Map(),
+      evening: new Map(),
+    };
 
     const bucketFor = (
-      store: Map<string, Bucket>,
-      kind: 'digest' | 'evening',
+      slot: TimeSlot,
       userId: string,
       today: string,
       at: Date,
       line: string,
     ): void => {
-      const key = `${kind}:${userId}:${today}`;
-      const existing = store.get(key);
+      const key = `${slot}:${userId}:${today}`;
+      const existing = buckets[slot].get(key);
       if (existing) {
         existing.lines.push(line);
         return;
       }
-      store.set(key, {
+      buckets[slot].set(key, {
         delivery: {
           userId,
           reminderId: null,
@@ -125,8 +136,9 @@ export class ReminderSchedulerService {
       .select({
         reminder: reminders,
         timezone: users.timezone,
-        digestTime: userSettings.digestTime,
-        missedDefault: userSettings.missedReminderBehavior,
+        morningTime: userSettings.morningTime,
+        dayTime: userSettings.dayTime,
+        eveningTime: userSettings.eveningTime,
       })
       .from(reminders)
       .innerJoin(users, eq(users.id, reminders.userId))
@@ -138,27 +150,23 @@ export class ReminderSchedulerService {
       const timezone = r.timezone || row.timezone || 'UTC';
       const today = todayInTimezone(timezone, now);
       const date = String(r.scheduledDate).slice(0, 10);
-      const digestTime = row.digestTime ?? '08:30';
+      const slotTimes: SlotTimes = {
+        morningTime: row.morningTime ?? '10:00',
+        dayTime: row.dayTime ?? '15:00',
+        eveningTime: row.eveningTime ?? '21:00',
+      };
 
       if (date > today) continue;
 
       if (date < today) {
         const target = this.planMissed((r.missedBehavior as MissedBehavior) ?? 'evening', {
+          ownSlot: (r.timeSlot as TimeSlot | null) ?? 'morning',
           timezone,
           today,
           now,
-          digestTime,
+          slotTimes,
         });
-        if (target) {
-          bucketFor(
-            target.kind === 'digest' ? digest : evening,
-            target.kind,
-            r.userId,
-            today,
-            target.at,
-            r.text,
-          );
-        }
+        if (target) bucketFor(target.slot, r.userId, today, target.at, r.text);
         continue;
       }
 
@@ -177,9 +185,10 @@ export class ReminderSchedulerService {
         continue;
       }
 
-      const at = zonedDateTimeToUtc(date, digestTime, timezone);
+      const slot = (r.timeSlot as TimeSlot | null) ?? 'morning';
+      const at = zonedDateTimeToUtc(date, timeForSlot(slot, slotTimes), timezone);
       if (at > now) continue;
-      bucketFor(digest, 'digest', r.userId, today, at, r.text);
+      bucketFor(slot, r.userId, today, at, r.text);
     }
 
     const taskRows = await this.db
@@ -189,7 +198,7 @@ export class ReminderSchedulerService {
         title: tasks.title,
         remindAt: tasks.remindAt,
         timezone: users.timezone,
-        digestTime: userSettings.digestTime,
+        morningTime: userSettings.morningTime,
         missedDefault: userSettings.missedReminderBehavior,
       })
       .from(tasks)
@@ -201,67 +210,58 @@ export class ReminderSchedulerService {
       const timezone = t.timezone || 'UTC';
       const today = todayInTimezone(timezone, now);
       const date = String(t.remindAt).slice(0, 10);
-      const digestTime = t.digestTime ?? '08:30';
+      // у задач нет своего слота — они всегда идут утром, как раньше шла общая сводка
+      const slotTimes: SlotTimes = {
+        morningTime: t.morningTime ?? '10:00',
+        dayTime: '15:00',
+        eveningTime: '21:00',
+      };
       if (date > today) continue;
 
       const line = `${t.title} — задача`;
       if (date < today) {
         const target = this.planMissed((t.missedDefault as MissedBehavior) ?? 'evening', {
+          ownSlot: 'morning',
           timezone,
           today,
           now,
-          digestTime,
+          slotTimes,
         });
-        if (target) {
-          bucketFor(
-            target.kind === 'digest' ? digest : evening,
-            target.kind,
-            t.userId,
-            today,
-            target.at,
-            line,
-          );
-        }
+        if (target) bucketFor(target.slot, t.userId, today, target.at, line);
         continue;
       }
 
-      const at = zonedDateTimeToUtc(date, digestTime, timezone);
+      const at = zonedDateTimeToUtc(date, slotTimes.morningTime, timezone);
       if (at > now) continue;
-      bucketFor(digest, 'digest', t.userId, today, at, line);
+      bucketFor('morning', t.userId, today, at, line);
     }
 
-    for (const bucket of digest.values()) {
-      bucket.delivery.text = `Доброе утро. Ты хотела сегодня:\n${bucket.lines
-        .map((l) => `— ${l}`)
-        .join('\n')}`;
-    }
-    for (const bucket of evening.values()) {
-      bucket.delivery.text = `Ты просила напомнить ещё раз:\n${bucket.lines
-        .map((l) => `— ${l}`)
-        .join('\n')}`;
+    for (const slot of SLOT_ORDER) {
+      for (const bucket of buckets[slot].values()) {
+        bucket.delivery.text = `${SLOT_HEADER[slot]}\n${bucket.lines.map((l) => `— ${l}`).join('\n')}`;
+      }
     }
 
     return [
       ...alerts,
-      ...[...digest.values()].map((b) => b.delivery),
-      ...[...evening.values()].map((b) => b.delivery),
+      ...SLOT_ORDER.flatMap((slot) => [...buckets[slot].values()].map((b) => b.delivery)),
     ];
   }
 
   /**
    * Что делать с тем, чей день уже прошёл. Решение принимает пользователь
    * через missedBehavior, а не планировщик: «none» действительно значит «забыть».
+   * «nextDigest» возвращает в тот же слот, где и было; «evening» — всегда в вечер.
    * Возвращает null, если догонять не нужно или момент ещё не наступил.
    */
   private planMissed(
     behavior: MissedBehavior,
-    ctx: { timezone: string; today: string; now: Date; digestTime: string },
-  ): { kind: 'digest' | 'evening'; at: Date } | null {
+    ctx: { ownSlot: TimeSlot; timezone: string; today: string; now: Date; slotTimes: SlotTimes },
+  ): { slot: TimeSlot; at: Date } | null {
     if (behavior === 'none') return null;
-    const kind = behavior === 'nextDigest' ? 'digest' : 'evening';
-    const time = kind === 'digest' ? ctx.digestTime : EVENING_TIME;
-    const at = zonedDateTimeToUtc(ctx.today, time, ctx.timezone);
-    return at > ctx.now ? null : { kind, at };
+    const slot = behavior === 'nextDigest' ? ctx.ownSlot : 'evening';
+    const at = zonedDateTimeToUtc(ctx.today, timeForSlot(slot, ctx.slotTimes), ctx.timezone);
+    return at > ctx.now ? null : { slot, at };
   }
 
   /**

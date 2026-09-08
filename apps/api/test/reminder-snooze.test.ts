@@ -70,7 +70,7 @@ describe('перенос напоминания', () => {
 
   it('«вечером» после вечера переносит на завтрашний вечер', async () => {
     const id = await makeReminder('Полить цветы', '2026-09-14', '21:00');
-    // уже 22:40 по Москве — сегодняшние 20:00 в прошлом
+    // уже 22:40 по Москве — сегодняшний вечерний слот (21:00 по умолчанию) уже прошёл
     const result = await service.snooze(
       TEST_USER_ID,
       id,
@@ -78,7 +78,8 @@ describe('перенос напоминания', () => {
       new Date('2026-09-14T19:40:00.000Z'),
     );
     expect(result.scheduledDate).toBe('2026-09-15');
-    expect(result.scheduledTime).toBe('20:00');
+    expect(result.scheduledTime).toBeNull();
+    expect(result.timeSlot).toBe('evening');
   });
 
   it('«завтра» считает завтра от сегодняшнего дня пользователя, а не от даты напоминания', async () => {

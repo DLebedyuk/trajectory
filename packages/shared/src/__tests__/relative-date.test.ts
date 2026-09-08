@@ -81,4 +81,33 @@ describe('parseRelativePhrase', () => {
     const r = parseRelativePhrase('напомни в 25 сделать что-то', TODAY);
     expect(r.time).toBeNull();
   });
+
+  it('«в пятницу днём» — пятница как дата, день как слот времени', () => {
+    const r = parseRelativePhrase('напомни в пятницу днём забрать документы', TODAY);
+    expect(r.ambiguousWeekday).toBe('пятницу');
+    expect(r.timeSlot).toBe('day');
+    expect(r.time).toBeNull();
+    expect(r.text).toBe('Забрать документы');
+  });
+
+  it('распознаёт «утром» и «вечером» как слоты', () => {
+    expect(parseRelativePhrase('напомни утром выпить таблетки', TODAY).timeSlot).toBe('morning');
+    expect(parseRelativePhrase('напомни вечером позвонить маме', TODAY).timeSlot).toBe('evening');
+  });
+
+  it('точное время важнее слота, если оба почему-то встретились', () => {
+    const r = parseRelativePhrase('напомни завтра в 18:00 вечером написать отчёт', TODAY);
+    expect(r.time).toBe('18:00');
+    expect(r.timeSlot).toBeNull();
+  });
+
+  it('«день рождения» не принимает за слот «день»', () => {
+    const r = parseRelativePhrase('напомни про день рождения Кати', TODAY);
+    expect(r.timeSlot).toBeNull();
+  });
+
+  it('без слова о времени слот тоже null', () => {
+    const r = parseRelativePhrase('напомни купить хлеб', TODAY);
+    expect(r.timeSlot).toBeNull();
+  });
 });

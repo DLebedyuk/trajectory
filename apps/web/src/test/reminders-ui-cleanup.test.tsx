@@ -11,6 +11,7 @@ const reminder: Reminder = {
   text: 'Забрать посылку',
   scheduledDate: '2026-08-27',
   scheduledTime: '12:00',
+  timeSlot: null,
   timezone: 'Europe/Moscow',
   repeatRule: null,
   deliveryMode: 'digest',

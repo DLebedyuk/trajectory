@@ -17,7 +17,10 @@ export const settingsSchema = z.object({
   userId: uuid,
   timezone: z.string().min(1),
   locale: z.string().min(2).max(10),
-  digestTime: timeOfDay,
+  /** Время по умолчанию для напоминаний без точного времени: утро/день/вечер. */
+  morningTime: timeOfDay,
+  dayTime: timeOfDay,
+  eveningTime: timeOfDay,
   missedReminderBehavior: missedBehavior,
   theme: z.enum(['light', 'dark', 'system']),
   hardNotifications: z.boolean(),
@@ -30,7 +33,9 @@ export type Settings = z.infer<typeof settingsSchema>;
 export const updateSettingsSchema = z.object({
   timezone: z.string().min(1).optional(),
   locale: z.string().min(2).max(10).optional(),
-  digestTime: timeOfDay.optional(),
+  morningTime: timeOfDay.optional(),
+  dayTime: timeOfDay.optional(),
+  eveningTime: timeOfDay.optional(),
   missedReminderBehavior: missedBehavior.optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
   hardNotifications: z.boolean().optional(),

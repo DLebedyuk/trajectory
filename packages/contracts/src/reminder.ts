@@ -7,6 +7,7 @@ import {
   reminderSource,
   reminderStatus,
   timeOfDay,
+  timeSlot,
   uuid,
 } from './common.js';
 import { estimatedDuration } from './common.js';
@@ -21,6 +22,7 @@ export const reminderSchema = z.object({
   text: z.string().min(1).max(500),
   scheduledDate: dateOnly,
   scheduledTime: timeOfDay.nullable(),
+  timeSlot: timeSlot.nullable(),
   timezone: z.string().min(1),
   deliveryMode,
   repeatRule: repeatRuleSchema.nullable(),
@@ -38,6 +40,11 @@ export const createReminderSchema = z.object({
   text: z.string().min(1).max(500),
   scheduledDate: dateOnly,
   scheduledTime: timeOfDay.nullish(),
+  /**
+   * Слот по умолчанию (утро/день/вечер), если точного времени нет. Ни то ни
+   * другое не задано — сервис сам подбирает ближайший следующий слот.
+   */
+  timeSlot: timeSlot.nullish(),
   deliveryMode: deliveryMode.optional(),
   repeatRule: repeatRuleSchema.nullish(),
   missedBehavior: missedBehavior.optional(),

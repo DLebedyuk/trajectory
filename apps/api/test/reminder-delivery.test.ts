@@ -119,8 +119,8 @@ describe('серверная доставка напоминаний', () => {
     const scheduler = await makeScheduler(async (n) => {
       sent.push(n.text);
     });
-    // сводка в 08:30 по Москве = 05:30 UTC
-    await scheduler.processDue(new Date('2026-08-28T05:31:00.000Z'));
+    // утренний слот по умолчанию: 10:00 по Москве = 07:00 UTC
+    await scheduler.processDue(new Date('2026-08-28T07:31:00.000Z'));
     const digest = sent.find((t) => t.includes('Доброе утро'));
     expect(digest).toBeDefined();
     expect(digest).toContain('Поставить стирку');

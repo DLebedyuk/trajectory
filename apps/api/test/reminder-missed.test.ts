@@ -54,9 +54,9 @@ describe('missedBehavior: что делать с пропущенным напо
       source: 'web',
     });
 
-    // 10 сентября, утренняя сводка (08:30 MSK = 05:30 UTC) и вечер (20:00 MSK = 17:00 UTC)
-    const morning = await collect(new Date('2026-09-10T05:31:00.000Z'));
-    const evening = await collect(new Date('2026-09-10T17:01:00.000Z'));
+    // 10 сентября, утренний слот (10:00 MSK = 07:00 UTC) и вечерний (21:00 MSK = 18:00 UTC)
+    const morning = await collect(new Date('2026-09-10T07:31:00.000Z'));
+    const evening = await collect(new Date('2026-09-10T18:01:00.000Z'));
     expect([...morning, ...evening].join('\n')).not.toContain('Забытое без догоняния');
   });
 
@@ -87,7 +87,7 @@ describe('missedBehavior: что делать с пропущенным напо
       source: 'web',
     });
 
-    const sent = await collect(new Date('2026-09-11T05:31:00.000Z'));
+    const sent = await collect(new Date('2026-09-11T07:31:00.000Z'));
     const digest = sent.find((t) => t.includes('Доброе утро'));
     expect(digest).toContain('Записаться к стоматологу');
   });
@@ -103,16 +103,16 @@ describe('missedBehavior: что делать с пропущенным напо
       source: 'web',
     });
 
-    const morning = await collect(new Date('2026-09-12T05:31:00.000Z'));
+    const morning = await collect(new Date('2026-09-12T07:31:00.000Z'));
     expect(morning.join('\n')).not.toContain('Оплатить домен');
 
-    const evening = await collect(new Date('2026-09-12T17:01:00.000Z'));
+    const evening = await collect(new Date('2026-09-12T18:01:00.000Z'));
     expect(evening.join('\n')).toContain('Оплатить домен');
   });
 
   it('вечернее догоняние не повторяется на следующем проходе того же вечера', async () => {
-    const first = await collect(new Date('2026-09-12T17:05:00.000Z'));
-    const second = await collect(new Date('2026-09-12T17:30:00.000Z'));
+    const first = await collect(new Date('2026-09-12T18:05:00.000Z'));
+    const second = await collect(new Date('2026-09-12T18:30:00.000Z'));
     expect([...first, ...second].join('\n')).not.toContain('Оплатить домен');
   });
 });

@@ -12,6 +12,7 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   text: 'Полить цветы',
   scheduledDate: '2026-08-27',
   scheduledTime: null,
+  timeSlot: null,
   timezone: 'Europe/Moscow',
   repeatRule: null,
   deliveryMode: 'digest',

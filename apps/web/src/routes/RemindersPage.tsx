@@ -20,7 +20,13 @@ import { ErrorBox, Loading } from '../components/Loading.js';
 const MISS: Record<string, string> = {
   none: 'больше не переспрашивать',
   evening: 'один раз переспросить вечером',
-  nextDigest: 'перенести в следующую сводку',
+  nextDigest: 'перенести в тот же слот на следующий раз',
+};
+
+const SLOT_BADGE: Record<string, string> = {
+  morning: 'утром',
+  day: 'днём',
+  evening: 'вечером',
 };
 
 export function RemindersPage() {
@@ -145,7 +151,9 @@ export function RemindersPage() {
 
       <div className="meta">
         <span className="badge">
-          {r.deliveryMode === 'alert' ? 'отдельное уведомление' : 'в дневной сводке'}
+          {r.deliveryMode === 'alert'
+            ? 'отдельное уведомление'
+            : `в сводке ${r.timeSlot ? SLOT_BADGE[r.timeSlot] : ''}`.trim()}
         </span>
         {r.repeatRule ? (
           <span className="badge">

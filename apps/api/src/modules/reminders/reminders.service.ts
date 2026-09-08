@@ -5,6 +5,7 @@ import type {
   Reminder,
   ReminderToTaskInput,
   SnoozeReminderInput,
+  TimeSlot,
   UpdateReminderInput,
 } from '@planner/contracts';
 import {
@@ -20,8 +21,18 @@ import { dateOnly, iso, isoRequired } from '../../common/mappers.js';
 
 type Row = typeof reminders.$inferSelect;
 
-/** Единое «вечером» для переносов и для догоняния пропущенного. */
-export const EVENING_TIME = '20:00';
+export interface SlotTimes {
+  morningTime: string;
+  dayTime: string;
+  eveningTime: string;
+}
+
+/** Порядок слотов внутри дня — используется, чтобы найти «ближайший следующий». */
+export const SLOT_ORDER: TimeSlot[] = ['morning', 'day', 'evening'];
+
+export function timeForSlot(slot: TimeSlot, times: SlotTimes): string {
+  return slot === 'morning' ? times.morningTime : slot === 'day' ? times.dayTime : times.eveningTime;
+}
 
 const toReminder = (r: Row): Reminder => ({
   id: r.id,
@@ -29,6 +40,7 @@ const toReminder = (r: Row): Reminder => ({
   text: r.text,
   scheduledDate: dateOnly(r.scheduledDate) as string,
   scheduledTime: r.scheduledTime,
+  timeSlot: r.timeSlot as Reminder['timeSlot'],
   timezone: r.timezone,
   deliveryMode: r.deliveryMode as Reminder['deliveryMode'],
   repeatRule: r.repeatRule as Reminder['repeatRule'],
@@ -47,7 +59,7 @@ export class RemindersService {
 
   async userContext(
     userId: string,
-  ): Promise<{ timezone: string; digestTime: string; missed: string }> {
+  ): Promise<{ timezone: string; missed: string } & SlotTimes> {
     const [user] = await this.db.select().from(users).where(eq(users.id, userId));
     const [settings] = await this.db
       .select()
@@ -55,9 +67,46 @@ export class RemindersService {
       .where(eq(userSettings.userId, userId));
     return {
       timezone: user?.timezone ?? 'UTC',
-      digestTime: settings?.digestTime ?? '08:30',
+      morningTime: settings?.morningTime ?? '10:00',
+      dayTime: settings?.dayTime ?? '15:00',
+      eveningTime: settings?.eveningTime ?? '21:00',
       missed: settings?.missedReminderBehavior ?? 'evening',
     };
+  }
+
+  /**
+   * Слот-бакет на сегодня формируется один раз (см. idempotencyKey планировщика) —
+   * напоминание без точного времени, попавшее в уже прошедший слот, физически не попадёт
+   * в уже ушедший бакет. Чтобы оно не терялось и не уезжало в вечернее догоняние
+   * («пропущенное»), сразу ставим его на завтра — там сработает тот же слот как обычно.
+   */
+  private rollPastSlot(
+    date: string,
+    slot: TimeSlot | null,
+    ctx: { timezone: string } & SlotTimes,
+    now: Date,
+  ): string {
+    if (!slot) return date;
+    const today = todayInTimezone(ctx.timezone, now);
+    if (date !== today) return date;
+    if (timeInTimezone(ctx.timezone, now) < timeForSlot(slot, ctx)) return date;
+    return addDaysToDateOnly(today, 1);
+  }
+
+  /**
+   * «Просто напомни» без даты и времени — не переспрашиваем, а берём ближайший
+   * следующий слот (утро/день/вечер); если все три сегодня уже прошли, это
+   * завтрашнее утро.
+   */
+  private nearestSlot(
+    ctx: { timezone: string } & SlotTimes,
+    now: Date,
+  ): { date: string; slot: TimeSlot } {
+    const today = todayInTimezone(ctx.timezone, now);
+    const nowTime = timeInTimezone(ctx.timezone, now);
+    const upcoming = SLOT_ORDER.find((slot) => timeForSlot(slot, ctx) > nowTime);
+    if (upcoming) return { date: today, slot: upcoming };
+    return { date: addDaysToDateOnly(today, 1), slot: SLOT_ORDER[0] as TimeSlot };
   }
 
   async listActive(userId: string): Promise<Reminder[]> {
@@ -113,17 +162,48 @@ export class RemindersService {
     return toReminder(row);
   }
 
-  async create(userId: string, input: CreateReminderInput): Promise<Reminder> {
+  async create(
+    userId: string,
+    input: CreateReminderInput,
+    now: Date = new Date(),
+  ): Promise<Reminder> {
     const ctx = await this.userContext(userId);
+    const scheduledTime = input.scheduledTime ?? null;
+    const deliveryMode = input.deliveryMode ?? (scheduledTime ? 'alert' : 'digest');
+
+    let scheduledDate = input.scheduledDate;
+    let timeSlot: TimeSlot | null = null;
+    if (deliveryMode === 'digest') {
+      timeSlot = (input.timeSlot as TimeSlot | null | undefined) ?? null;
+      if (!timeSlot) {
+        /*
+          Слот не выбран. Для сегодняшней даты (в том числе просто оставленной
+          по умолчанию) это значит «когда угодно» — берём ближайший следующий.
+          Для явно другой даты «ближайший» не имеет смысла: дата уже выбрана,
+          просто ставим утро как нейтральный дефолт, не трогая саму дату.
+        */
+        if (scheduledDate === todayInTimezone(ctx.timezone, now)) {
+          const nearest = this.nearestSlot(ctx, now);
+          scheduledDate = nearest.date;
+          timeSlot = nearest.slot;
+        } else {
+          timeSlot = 'morning';
+        }
+      } else {
+        scheduledDate = this.rollPastSlot(scheduledDate, timeSlot, ctx, now);
+      }
+    }
+
     const [row] = await this.db
       .insert(reminders)
       .values({
         userId,
         text: input.text,
-        scheduledDate: input.scheduledDate,
-        scheduledTime: input.scheduledTime ?? null,
+        scheduledDate,
+        scheduledTime,
+        timeSlot,
         timezone: ctx.timezone,
-        deliveryMode: input.deliveryMode ?? (input.scheduledTime ? 'alert' : 'digest'),
+        deliveryMode,
         repeatRule: input.repeatRule ?? null,
         missedBehavior: input.missedBehavior ?? (ctx.missed as Reminder['missedBehavior']),
         source: input.source,
@@ -133,19 +213,59 @@ export class RemindersService {
     return toReminder(row as Row);
   }
 
-  async update(userId: string, id: string, input: UpdateReminderInput): Promise<Reminder> {
-    await this.get(userId, id);
+  async update(
+    userId: string,
+    id: string,
+    input: UpdateReminderInput,
+    now: Date = new Date(),
+  ): Promise<Reminder> {
+    const current = await this.get(userId, id);
+    const touchesTime =
+      input.scheduledDate !== undefined ||
+      input.scheduledTime !== undefined ||
+      input.timeSlot !== undefined;
+
+    let timePatch: {
+      scheduledDate?: string;
+      scheduledTime?: string | null;
+      timeSlot?: TimeSlot | null;
+      deliveryMode?: 'alert' | 'digest';
+    } = {};
+
+    if (touchesTime) {
+      const ctx = await this.userContext(userId);
+      const scheduledTime =
+        input.scheduledTime !== undefined ? (input.scheduledTime ?? null) : current.scheduledTime;
+      const deliveryMode = scheduledTime ? 'alert' : 'digest';
+      let scheduledDate = input.scheduledDate ?? current.scheduledDate;
+      let timeSlot: TimeSlot | null = null;
+
+      if (deliveryMode === 'digest') {
+        timeSlot =
+          input.timeSlot !== undefined
+            ? ((input.timeSlot as TimeSlot | null | undefined) ?? null)
+            : current.timeSlot;
+        if (!timeSlot) {
+          if (scheduledDate === todayInTimezone(ctx.timezone, now)) {
+            const nearest = this.nearestSlot(ctx, now);
+            scheduledDate = nearest.date;
+            timeSlot = nearest.slot;
+          } else {
+            timeSlot = 'morning';
+          }
+        } else {
+          scheduledDate = this.rollPastSlot(scheduledDate, timeSlot, ctx, now);
+        }
+      }
+
+      timePatch = { scheduledDate, scheduledTime, timeSlot, deliveryMode };
+    }
+
     const [row] = await this.db
       .update(reminders)
       .set({
         ...(input.text !== undefined ? { text: input.text } : {}),
-        ...(input.scheduledDate !== undefined ? { scheduledDate: input.scheduledDate } : {}),
-        ...(input.scheduledTime !== undefined
-          ? {
-              scheduledTime: input.scheduledTime ?? null,
-              deliveryMode: input.scheduledTime ? 'alert' : 'digest',
-            }
-          : {}),
+        ...timePatch,
         ...(input.deliveryMode !== undefined ? { deliveryMode: input.deliveryMode } : {}),
         ...(input.repeatRule !== undefined ? { repeatRule: input.repeatRule ?? null } : {}),
         ...(input.missedBehavior !== undefined ? { missedBehavior: input.missedBehavior } : {}),
@@ -203,32 +323,38 @@ export class RemindersService {
     now: Date = new Date(),
   ): Promise<Reminder> {
     const current = await this.get(userId, id);
-    const { timezone } = await this.userContext(userId);
+    const ctx = await this.userContext(userId);
+    const { timezone } = ctx;
     const today = todayInTimezone(timezone, now);
     let date = current.scheduledDate;
     let time: string | null = current.scheduledTime;
+    let timeSlot: TimeSlot | null = current.timeSlot;
     if (input.mode === 'hour') {
       const [hh, mm] = timeInTimezone(timezone, now).split(':').map(Number) as [number, number];
       const nextHour = hh + 1;
       // через полночь переносим на завтра, иначе напоминание окажется в прошлом
       date = nextHour >= 24 ? addDaysToDateOnly(today, 1) : today;
       time = `${String(nextHour % 24).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      timeSlot = null;
     } else if (input.mode === 'evening') {
-      // если вечер уже прошёл, «вечером» означает завтрашний вечер
-      const past = timeInTimezone(timezone, now) >= EVENING_TIME;
-      date = past ? addDaysToDateOnly(today, 1) : today;
-      time = EVENING_TIME;
+      // «вечером» — тот же настраиваемый слот, что и в остальном приложении;
+      // если он уже прошёл сегодня, значит имелся в виду завтрашний вечер
+      date = this.rollPastSlot(today, 'evening', ctx, now);
+      time = null;
+      timeSlot = 'evening';
     } else if (input.mode === 'tomorrow') {
       date = addDaysToDateOnly(today, 1);
     } else {
       date = input.date ?? current.scheduledDate;
       time = input.time ?? current.scheduledTime;
+      timeSlot = time ? null : current.timeSlot;
     }
     const [row] = await this.db
       .update(reminders)
       .set({
         scheduledDate: date,
         scheduledTime: time,
+        timeSlot,
         deliveryMode: time ? 'alert' : 'digest',
         updatedAt: new Date(),
       })

@@ -8,10 +8,11 @@ import {
 import { Bot, type Context, InlineKeyboard } from 'grammy';
 import { eq } from 'drizzle-orm';
 import { parseRelativePhrase, formatLongDate, todayInTimezone } from '@planner/shared';
+import type { TimeSlot } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import { telegramAccounts, users } from '../../db/schema.js';
 import { env, isDevAuthEnabled } from '../../config/env.js';
-import { EVENING_TIME, RemindersService } from '../reminders/reminders.service.js';
+import { RemindersService } from '../reminders/reminders.service.js';
 import { InboxService } from '../inbox/inbox.service.js';
 import { TelegramLinkService } from './telegram-link.service.js';
 import { NotificationRouter } from '../reminders/providers/notification.router.js';
@@ -20,9 +21,12 @@ import type {
   OutgoingNotification,
 } from '../reminders/providers/notification.provider.js';
 
+const SLOT_LABEL: Record<TimeSlot, string> = { morning: 'утром', day: 'днём', evening: 'вечером' };
+
 interface PendingPhrase {
   text: string;
   time: string | null;
+  timeSlot: TimeSlot | null;
 }
 
 /** Неоднозначная дата ждёт подтверждения и до него никуда не записывается. */
@@ -30,6 +34,13 @@ interface PendingConfirmation {
   text: string;
   date: string;
   time: string | null;
+  timeSlot: TimeSlot | null;
+}
+
+/** Дата уже известна, а время суток — нет. Ждёт ответа «утром/днём/вечером». */
+interface PendingSlot {
+  text: string;
+  date: string;
 }
 
 /** Ответ бота, не зависящий от grammY: так его можно проверить тестом. */
@@ -62,6 +73,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
   private readonly pending = new Map<string, PendingPhrase>();
   /** Ожидающие подтверждения даты — по chatId. */
   private readonly pendingConfirm = new Map<string, PendingConfirmation>();
+  /** Ожидающие ответа «утром/днём/вечером» — по chatId. */
+  private readonly pendingSlot = new Map<string, PendingSlot>();
 
   constructor(
     @Inject(DB) private readonly db: Database,
@@ -181,16 +194,17 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
    * проверить тестом без запуска бота.
    */
   async handleText(userId: string, chatId: string, raw: string, today: string): Promise<BotReply> {
-    // ответ на вопрос «когда напомнить?»
+    // ответ на вопрос «когда напомнить?» (после отклонённой неоднозначной даты)
     const pending = this.pending.get(chatId);
     if (pending) {
       const answer = parseRelativePhrase(`напомни ${raw}`, today);
       if (answer.date) {
         this.pending.delete(chatId);
-        return this.createAndConfirm(userId, {
+        return this.resolveDateKnown(userId, chatId, {
           text: pending.text,
           date: answer.date,
           time: answer.time ?? pending.time,
+          timeSlot: answer.timeSlot ?? pending.timeSlot,
         });
       }
     }
@@ -202,8 +216,19 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       return { text: 'Сохранил во входящие. Ничего делать не надо.' };
     }
 
+    /*
+      Совсем без даты — не переспрашиваем: точное время (или «утром/днём/вечером»)
+      ставит именно его, а полностью пустое «напомни мне» уходит в ближайший
+      следующий слот. Оба случая решает сервис — здесь просто дата «сегодня»,
+      от которой он и отталкивается.
+    */
     if (!parsed.date) {
-      return this.askWhen(chatId, parsed.text, parsed.time);
+      return this.createAndConfirm(userId, {
+        text: parsed.text,
+        date: today,
+        time: parsed.time,
+        timeSlot: parsed.timeSlot,
+      });
     }
 
     // «в субботу» неоднозначно: это ближайшая суббота или следующая?
@@ -213,6 +238,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
         text: parsed.text,
         date: parsed.date,
         time: parsed.time,
+        timeSlot: parsed.timeSlot,
       });
       return {
         text: `Ты имеешь в виду ${parsed.ambiguousWeekday}, ${formatLongDate(parsed.date)}?`,
@@ -223,11 +249,26 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       };
     }
 
-    return this.createAndConfirm(userId, {
+    return this.resolveDateKnown(userId, chatId, {
       text: parsed.text,
       date: parsed.date,
       time: parsed.time,
+      timeSlot: parsed.timeSlot,
     });
+  }
+
+  /**
+   * Дата уже известна. Если известно и время (точное или «утром/днём/вечером») —
+   * создаём сразу. Иначе единственное, чего не хватает, — час дня, и вот это
+   * мы переспрашиваем: «в пятницу» само по себе не говорит, когда именно.
+   */
+  private async resolveDateKnown(
+    userId: string,
+    chatId: string,
+    input: { text: string; date: string; time: string | null; timeSlot: TimeSlot | null },
+  ): Promise<BotReply> {
+    if (input.time || input.timeSlot) return this.createAndConfirm(userId, input);
+    return this.askTimeSlot(chatId, input.text, input.date);
   }
 
   /** Обработка нажатия кнопки. Формат данных — «действие:значение». */
@@ -245,18 +286,41 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
       this.pendingConfirm.delete(chatId);
       if (value === 'yes') {
-        return this.createAndConfirm(userId, waiting);
+        return this.resolveDateKnown(userId, chatId, waiting);
       }
-      return this.askWhen(chatId, waiting.text, waiting.time);
+      return this.askWhen(chatId, waiting.text, waiting.time, waiting.timeSlot);
     }
 
     if (action === 'setdate') {
       const waiting = this.pending.get(chatId);
       if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
       this.pending.delete(chatId);
-      const date = value === 'today' ? today : this.plusDay(today);
-      const time = value === 'today' ? EVENING_TIME : waiting.time;
-      return this.createAndConfirm(userId, { text: waiting.text, date, time });
+      if (value === 'today') {
+        return this.resolveDateKnown(userId, chatId, {
+          text: waiting.text,
+          date: today,
+          time: null,
+          timeSlot: 'evening',
+        });
+      }
+      return this.resolveDateKnown(userId, chatId, {
+        text: waiting.text,
+        date: this.plusDay(today),
+        time: waiting.time,
+        timeSlot: waiting.timeSlot,
+      });
+    }
+
+    if (action === 'timeslot') {
+      const waiting = this.pendingSlot.get(chatId);
+      if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
+      this.pendingSlot.delete(chatId);
+      return this.createAndConfirm(userId, {
+        text: waiting.text,
+        date: waiting.date,
+        time: null,
+        timeSlot: value as TimeSlot,
+      });
     }
 
     try {
@@ -282,8 +346,14 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     return { text: labels[action] ?? 'Готово.' };
   }
 
-  private askWhen(chatId: string, text: string, time: string | null): BotReply {
-    this.pending.set(chatId, { text, time });
+  /** Дата неизвестна вообще (например, отклонённая неоднозначная дата). */
+  private askWhen(
+    chatId: string,
+    text: string,
+    time: string | null,
+    timeSlot: TimeSlot | null,
+  ): BotReply {
+    this.pending.set(chatId, { text, time, timeSlot });
     return {
       text: `Когда напомнить: «${text}»?`,
       actions: [
@@ -293,19 +363,39 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     };
   }
 
+  /** Дата известна, а час дня — нет. */
+  private askTimeSlot(chatId: string, text: string, date: string): BotReply {
+    this.pendingSlot.set(chatId, { text, date });
+    return {
+      text: `Когда напомнить: «${text}»?`,
+      actions: [
+        { label: 'Утром', data: 'timeslot:morning' },
+        { label: 'Днём', data: 'timeslot:day' },
+        { label: 'Вечером', data: 'timeslot:evening' },
+      ],
+    };
+  }
+
   private async createAndConfirm(
     userId: string,
-    input: { text: string; date: string; time: string | null },
+    input: { text: string; date: string; time: string | null; timeSlot: TimeSlot | null },
   ): Promise<BotReply> {
     const reminder = await this.reminders.create(userId, {
       text: input.text,
       scheduledDate: input.date,
       scheduledTime: input.time,
+      timeSlot: input.timeSlot,
       source: 'telegram',
     });
-    const when = reminder.scheduledTime ? ` в ${reminder.scheduledTime}` : ' в утренней сводке';
+    // дата/слот могли уехать вперёд (ближайший слот или откат прошедшего) —
+    // подтверждение показывает то, что реально сохранилось, а не что просили
+    const when = reminder.scheduledTime
+      ? ` в ${reminder.scheduledTime}`
+      : reminder.timeSlot
+        ? ` ${SLOT_LABEL[reminder.timeSlot]}`
+        : '';
     return {
-      text: `Напомню ${formatLongDate(input.date)}${when}: «${reminder.text}».`,
+      text: `Напомню ${formatLongDate(reminder.scheduledDate)}${when}: «${reminder.text}».`,
       actions: reminderActions(reminder.id),
     };
   }

@@ -78,7 +78,10 @@ export const userSettings = pgTable('user_settings', {
   userId: uuid('user_id')
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  digestTime: varchar('digest_time', { length: 5 }).notNull().default('08:30'),
+  /** Три времени по умолчанию для напоминаний без точного времени. */
+  morningTime: varchar('morning_time', { length: 5 }).notNull().default('10:00'),
+  dayTime: varchar('day_time', { length: 5 }).notNull().default('15:00'),
+  eveningTime: varchar('evening_time', { length: 5 }).notNull().default('21:00'),
   missedReminderBehavior: varchar('missed_reminder_behavior', { length: 20 })
     .notNull()
     .default('evening'),
@@ -277,6 +280,8 @@ export const reminders = pgTable(
     text: varchar('text', { length: 500 }).notNull(),
     scheduledDate: date('scheduled_date').notNull(),
     scheduledTime: varchar('scheduled_time', { length: 5 }),
+    /** Слот по умолчанию (утро/день/вечер) для digest-режима; при alert — null. */
+    timeSlot: varchar('time_slot', { length: 10 }),
     timezone: varchar('timezone', { length: 64 }).notNull(),
     deliveryMode: varchar('delivery_mode', { length: 10 }).notNull().default('digest'),
     repeatRule: varchar('repeat_rule', { length: 10 }),

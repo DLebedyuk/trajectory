@@ -21,6 +21,10 @@ export type DeliveryMode = z.infer<typeof deliveryMode>;
 export const missedBehavior = z.enum(['none', 'evening', 'nextDigest']);
 export type MissedBehavior = z.infer<typeof missedBehavior>;
 
+/** Слот по умолчанию для напоминаний без точного времени: утро/день/вечер. */
+export const timeSlot = z.enum(['morning', 'day', 'evening']);
+export type TimeSlot = z.infer<typeof timeSlot>;
+
 export const reminderStatus = z.enum(['active', 'done', 'deleted']);
 export type ReminderStatus = z.infer<typeof reminderStatus>;
 

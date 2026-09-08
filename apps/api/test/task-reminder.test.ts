@@ -63,13 +63,13 @@ describe('напоминание по задаче (remindAt)', () => {
       remindAt: '2026-09-20',
     });
 
-    // 08:30 по Москве = 05:30 UTC
-    const sent = await collect(new Date('2026-09-20T05:31:00.000Z'));
+    // задачи всегда уходят утром: 10:00 по Москве = 07:00 UTC
+    const sent = await collect(new Date('2026-09-20T07:31:00.000Z'));
     expect(sent.join('\n')).toContain('Отправить запись педагогу');
   });
 
   it('не напоминает дважды за один день', async () => {
-    const again = await collect(new Date('2026-09-20T06:00:00.000Z'));
+    const again = await collect(new Date('2026-09-20T08:00:00.000Z'));
     expect(again.join('\n')).not.toContain('Отправить запись педагогу');
   });
 
@@ -80,7 +80,7 @@ describe('напоминание по задаче (remindAt)', () => {
       title: 'Забронировать студию',
       remindAt: '2026-10-05',
     });
-    const sent = await collect(new Date('2026-09-21T05:31:00.000Z'));
+    const sent = await collect(new Date('2026-09-21T07:31:00.000Z'));
     expect(sent.join('\n')).not.toContain('Забронировать студию');
   });
 
@@ -93,7 +93,7 @@ describe('напоминание по задаче (remindAt)', () => {
       status: 'done',
       completedAt: new Date('2026-09-19T10:00:00.000Z'),
     });
-    const sent = await collect(new Date('2026-09-22T05:31:00.000Z'));
+    const sent = await collect(new Date('2026-09-22T07:31:00.000Z'));
     expect(sent.join('\n')).not.toContain('Уже сделанное');
   });
 });

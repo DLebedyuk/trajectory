@@ -1,5 +1,7 @@
 import { addDaysToDateOnly, addMonthsToDateOnly, fromDateOnly, pad, toDateOnly } from './date.js';
 
+export type TimeSlot = 'morning' | 'day' | 'evening';
+
 export interface ParsedPhrase {
   /** Похоже ли сообщение на просьбу напомнить. */
   isReminder: boolean;
@@ -7,6 +9,11 @@ export interface ParsedPhrase {
   date: string | null;
   /** HH:MM или null. */
   time: string | null;
+  /**
+   * Слово «утром/днём/вечером» — заменяет точное время, когда его не назвали.
+   * Взаимоисключимо с `time`: явное «в 18:00» всегда имеет приоритет.
+   */
+  timeSlot: TimeSlot | null;
   /** Текст напоминания без служебных слов. */
   text: string;
   /**
@@ -78,6 +85,7 @@ export function parseRelativePhrase(raw: string, today: string): ParsedPhrase {
 
   let date: string | null = null;
   let time: string | null = null;
+  let timeSlot: TimeSlot | null = null;
   let ambiguousWeekday: string | null = null;
 
   /*
@@ -93,6 +101,21 @@ export function parseRelativePhrase(raw: string, today: string): ParsedPhrase {
     if (hh <= 23) {
       time = `${pad(hh)}:${timeMatch[3] ?? '00'}`;
       cut(timeMatch);
+    }
+  }
+
+  /*
+    «утром/днём/вечером» — то же самое, что точное время, только без цифр:
+    заменяет собой один из трёх настраиваемых слотов пользователя. Ловим
+    только наречную форму («днём»), а не «день» само по себе — это слово
+    слишком часто значит что-то ещё («день рождения», «через день»).
+  */
+  if (!time) {
+    const slotMatch = low.match(/(^|\s)(утром|днём|днем|вечером)(\s|$)/);
+    if (slotMatch) {
+      const word = slotMatch[2] as string;
+      timeSlot = word === 'утром' ? 'morning' : word === 'вечером' ? 'evening' : 'day';
+      cut(slotMatch);
     }
   }
 
@@ -158,5 +181,5 @@ export function parseRelativePhrase(raw: string, today: string): ParsedPhrase {
     .trim();
   if (text.length > 0) text = text.charAt(0).toUpperCase() + text.slice(1);
 
-  return { isReminder, date, time, text: text || original, ambiguousWeekday };
+  return { isReminder, date, time, timeSlot, text: text || original, ambiguousWeekday };
 }

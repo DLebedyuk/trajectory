@@ -18,12 +18,13 @@ const TODAY = '2026-09-14'; // понедельник
 const create = vi.fn(
   async (
     _userId: string,
-    input: { text: string; scheduledDate: string; scheduledTime?: unknown },
+    input: { text: string; scheduledDate: string; scheduledTime?: unknown; timeSlot?: unknown },
   ) => ({
     id: 'reminder-1',
     text: input.text,
     scheduledDate: input.scheduledDate,
     scheduledTime: (input.scheduledTime as string | null) ?? null,
+    timeSlot: (input.timeSlot as string | null) ?? null,
   }),
 );
 const inboxCreate = vi.fn(async () => ({ id: 'inbox-1' }));
@@ -73,15 +74,35 @@ describe('телеграм: подтверждение неоднозначно�
     expect(reply.actions?.map((a) => a.data)).toContain('confirm:no');
   });
 
-  it('после подтверждения создаёт напоминание на названную дату', async () => {
+  it('после подтверждения с известным временем создаёт напоминание на названную дату', async () => {
     const service = makeService();
-    await service.handleText(USER_ID, CHAT_ID, 'напомни в субботу позвонить в театр', TODAY);
+    await service.handleText(
+      USER_ID,
+      CHAT_ID,
+      'напомни в субботу вечером позвонить в театр',
+      TODAY,
+    );
     const reply = await service.handleAction(USER_ID, CHAT_ID, 'confirm:yes', TODAY);
 
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0]?.[1].scheduledDate).toBe('2026-09-19');
     expect(create.mock.calls[0]?.[1].text).toBe('Позвонить в театр');
+    expect(create.mock.calls[0]?.[1].timeSlot).toBe('evening');
     expect(reply.text).toContain('Напомню');
+  });
+
+  it('подтверждение без времени переспрашивает слот, а не создаёт сразу', async () => {
+    const service = makeService();
+    await service.handleText(USER_ID, CHAT_ID, 'напомни в субботу позвонить в театр', TODAY);
+    const reply = await service.handleAction(USER_ID, CHAT_ID, 'confirm:yes', TODAY);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(reply.text).toContain('Когда напомнить');
+    expect(reply.actions?.map((a) => a.data)).toEqual([
+      'timeslot:morning',
+      'timeslot:day',
+      'timeslot:evening',
+    ]);
   });
 
   it('после отказа переспрашивает и не создаёт напоминание', async () => {
@@ -93,12 +114,35 @@ describe('телеграм: подтверждение неоднозначно�
     expect(reply.text).toContain('Когда напомнить');
   });
 
-  it('однозначную дату не переспрашивает', async () => {
+  it('однозначную дату с точным временем не переспрашивает', async () => {
     const service = makeService();
-    const reply = await service.handleText(USER_ID, CHAT_ID, 'напомни завтра купить хлеб', TODAY);
+    const reply = await service.handleText(
+      USER_ID,
+      CHAT_ID,
+      'напомни завтра в 18:00 купить хлеб',
+      TODAY,
+    );
 
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0]?.[1].scheduledDate).toBe('2026-09-15');
+    expect(create.mock.calls[0]?.[1].scheduledTime).toBe('18:00');
+    expect(reply.text).toContain('Напомню');
+  });
+
+  it('однозначная дата без времени переспрашивает, когда именно', async () => {
+    const service = makeService();
+    const reply = await service.handleText(USER_ID, CHAT_ID, 'напомни завтра купить хлеб', TODAY);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(reply.text).toContain('Когда напомнить');
+  });
+
+  it('«напомни мне» совсем без даты и времени не переспрашивает — берёт ближайший слот', async () => {
+    const service = makeService();
+    const reply = await service.handleText(USER_ID, CHAT_ID, 'напомни выпить воды', TODAY);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[1].scheduledDate).toBe(TODAY);
     expect(reply.text).toContain('Напомню');
   });
 

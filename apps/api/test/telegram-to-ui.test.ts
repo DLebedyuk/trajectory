@@ -85,7 +85,7 @@ beforeEach(async () => {
  */
 describe('путь из Telegram до списка напоминаний', () => {
   it('сообщение боту становится активным напоминанием того же пользователя', async () => {
-    await telegram.handleText(TEST_USER_ID, '111', 'напомни завтра забрать пальто', TODAY);
+    await telegram.handleText(TEST_USER_ID, '111', 'напомни завтра вечером забрать пальто', TODAY);
 
     const active = await reminders.listActive(TEST_USER_ID);
     const created = active.find((r) => r.text.includes('пальто'));
@@ -114,7 +114,12 @@ describe('путь из Telegram до списка напоминаний', () =
     });
     expect(redeemed.userId).toBe(OTHER_USER_ID);
 
-    await telegram.handleText(redeemed.userId, '222', 'напомни завтра оплатить интернет', TODAY);
+    await telegram.handleText(
+      redeemed.userId,
+      '222',
+      'напомни завтра вечером оплатить интернет',
+      TODAY,
+    );
 
     const mine = await reminders.listActive(TEST_USER_ID);
     const theirs = await reminders.listActive(OTHER_USER_ID);
@@ -124,7 +129,7 @@ describe('путь из Telegram до списка напоминаний', () =
   });
 
   it('список активных отдаёт напоминание из Telegram без фильтра по источнику', async () => {
-    await telegram.handleText(TEST_USER_ID, '111', 'напомни завтра полить цветы', TODAY);
+    await telegram.handleText(TEST_USER_ID, '111', 'напомни завтра вечером полить цветы', TODAY);
     const [row] = await db
       .select()
       .from(schema.reminders)

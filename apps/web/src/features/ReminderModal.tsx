@@ -2,9 +2,16 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, FormField, Modal, useToast } from '@planner/ui';
 import { formatLongDate } from '@planner/shared';
-import type { Reminder } from '@planner/contracts';
+import type { Reminder, TimeSlot } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { qk } from '../api/queries.js';
+
+const SLOTS: { value: TimeSlot; label: string }[] = [
+  { value: 'morning', label: 'Утро' },
+  { value: 'day', label: 'День' },
+  { value: 'evening', label: 'Вечер' },
+];
+const SLOT_LABEL: Record<TimeSlot, string> = { morning: 'утром', day: 'днём', evening: 'вечером' };
 
 export function ReminderModal({
   open,
@@ -22,6 +29,7 @@ export function ReminderModal({
   const [text, setText] = useState('');
   const [date, setDate] = useState(today);
   const [time, setTime] = useState('');
+  const [timeSlot, setTimeSlot] = useState<TimeSlot | ''>('');
   const [repeat, setRepeat] = useState<'' | 'daily' | 'weekly' | 'monthly'>('');
   const [comment, setComment] = useState('');
 
@@ -30,6 +38,7 @@ export function ReminderModal({
     setText(editing?.text ?? '');
     setDate(editing?.scheduledDate ?? today);
     setTime(editing?.scheduledTime ?? '');
+    setTimeSlot(editing?.timeSlot ?? '');
     setRepeat((editing?.repeatRule as '' | 'daily' | 'weekly' | 'monthly') ?? '');
     setComment(editing?.comment ?? '');
   }, [open, editing, today]);
@@ -40,6 +49,7 @@ export function ReminderModal({
         text,
         scheduledDate: date,
         scheduledTime: time || null,
+        timeSlot: time ? null : timeSlot || null,
         repeatRule: repeat || null,
         comment: comment || null,
       };
@@ -53,7 +63,9 @@ export function ReminderModal({
       toast.show(
         time
           ? `Напомню ${formatLongDate(date)} в ${time}`
-          : `Напомню ${formatLongDate(date)} в дневной сводке`,
+          : timeSlot
+            ? `Напомню ${formatLongDate(date)} ${SLOT_LABEL[timeSlot]}`
+            : `Напомню ${formatLongDate(date)} — подберу ближайшее время`,
       );
       onOpenChange(false);
     },
@@ -91,10 +103,37 @@ export function ReminderModal({
         <FormField label="Дата">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </FormField>
-        <FormField label="Точное время" hint="Без времени уйдёт в дневную сводку">
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        <FormField label="Точное время" hint="Без времени — один из слотов слева">
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => {
+              setTime(e.target.value);
+              if (e.target.value) setTimeSlot('');
+            }}
+          />
         </FormField>
       </div>
+      <FormField
+        label="Когда напомнить, если без точного времени"
+        hint="Ничего не выбрано — возьмём ближайшее подходящее"
+      >
+        <div className="seg">
+          {SLOTS.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              data-on={timeSlot === s.value}
+              onClick={() => {
+                setTimeSlot(timeSlot === s.value ? '' : s.value);
+                setTime('');
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </FormField>
       <FormField label="Повторять">
         <select value={repeat} onChange={(e) => setRepeat(e.target.value as typeof repeat)}>
           <option value="">не повторять</option>
