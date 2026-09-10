@@ -168,9 +168,9 @@ export function Heatmap({
                       data-date={date}
                       aria-label={title || date}
                       title={title}
-                      disabled={!filled}
+                      disabled={future}
                       style={{ width: shownCell, height: shownCell, background: background(data) }}
-                      onClick={() => filled && onDayClick(date)}
+                      onClick={() => onDayClick(date)}
                     />
                   );
                 })}

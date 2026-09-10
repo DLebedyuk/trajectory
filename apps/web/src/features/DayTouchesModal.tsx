@@ -7,10 +7,13 @@ export function DayTouchesModal({
   date,
   directionId,
   onClose,
+  onAddTouch,
 }: {
   date: string | null;
   directionId?: string;
   onClose: () => void;
+  /** Есть — показываем «Записать касание» с этой же датой. Нет — кнопки не будет. */
+  onAddTouch?: (date: string) => void;
 }) {
   const touches = useQuery({
     queryKey: ['touches-day', date, directionId],
@@ -27,9 +30,16 @@ export function DayTouchesModal({
       title={date ? formatLongDate(date) : ''}
       description={`${list.length} ${plural(list.length, 'касание', 'касания', 'касаний')}`}
       footer={
-        <Button variant="ghost" onClick={onClose}>
-          Закрыть
-        </Button>
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Закрыть
+          </Button>
+          {onAddTouch && date ? (
+            <Button variant="primary" onClick={() => onAddTouch(date)}>
+              Записать касание
+            </Button>
+          ) : null}
+        </>
       }
     >
       <div style={{ marginTop: 14 }}>

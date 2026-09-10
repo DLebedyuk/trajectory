@@ -29,7 +29,9 @@ export function HomePage() {
   const [pickOpen, setPickOpen] = useState(false);
   const [dirOpen, setDirOpen] = useState(false);
   const [day, setDay] = useState<string | null>(null);
-  const [touchOpen, setTouchOpen] = useState(false);
+  // дата, с которой открыта запись касания: null — закрыто. Клик по пустому
+  // дню на карте открывает сразу её, а не карточку «касаний не было»
+  const [touchDate, setTouchDate] = useState<string | null>(null);
   const [remindOpen, setRemindOpen] = useState(false);
   const [thoughtOpen, setThoughtOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -125,16 +127,26 @@ export function HomePage() {
           <div className="card">
             <h4>
               Касания по всем направлениям
-              <Button size="sm" onClick={() => setTouchOpen(true)}>
+              <Button size="sm" onClick={() => setTouchDate(data.today)}>
                 <IconPlus />
                 Записать касание
               </Button>
             </h4>
             <p className="hint" style={{ marginBottom: 10 }}>
-              Нажмите на день, чтобы увидеть, что было.
+              Нажмите на день: пустой — записать касание, заполненный — посмотреть, что было.
             </p>
             <div className="scroll-x">
-              <Heatmap days={data.heatmap.days} today={data.today} onDayClick={setDay} />
+              <Heatmap
+                days={data.heatmap.days}
+                today={data.today}
+                onDayClick={(date) => {
+                  const hasTouches = data.heatmap.days.some(
+                    (d) => d.date === date && d.total > 0,
+                  );
+                  if (hasTouches) setDay(date);
+                  else setTouchDate(date);
+                }}
+              />
             </div>
             <div className="heat-legend">
               {(directions.data ?? []).map((d) => (
@@ -257,8 +269,20 @@ export function HomePage() {
 
       {conflictModal}
 
-      <DayTouchesModal date={day} onClose={() => setDay(null)} />
-      <TouchModal open={touchOpen} onOpenChange={setTouchOpen} today={data.today} />
+      <DayTouchesModal
+        date={day}
+        onClose={() => setDay(null)}
+        onAddTouch={(date) => {
+          setDay(null);
+          setTouchDate(date);
+        }}
+      />
+      <TouchModal
+        open={touchDate !== null}
+        onOpenChange={(v) => !v && setTouchDate(null)}
+        today={data.today}
+        initialDate={touchDate ?? undefined}
+      />
       <ReminderModal open={remindOpen} onOpenChange={setRemindOpen} today={data.today} />
       <QuickThoughtModal open={thoughtOpen} onOpenChange={setThoughtOpen} />
 

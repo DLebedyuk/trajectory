@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, FormField, Modal, useToast } from '@planner/ui';
 import { api } from '../api/client.js';
@@ -10,11 +10,14 @@ export function TouchModal({
   onOpenChange,
   directionId,
   today,
+  initialDate,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   directionId?: string;
   today: string;
+  /** Дата, с которой открыли модалку — например, клик по пустому дню на карте касаний. */
+  initialDate?: string;
 }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -22,7 +25,18 @@ export function TouchModal({
   const [projectId, setProjectId] = useState('');
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(initialDate ?? today);
+
+  // модалка не размонтируется между открытиями — без этого дата с прошлого
+  // раза (или прошлого клика по карте касаний) осталась бы в поле
+  useEffect(() => {
+    if (!open) return;
+    setDate(initialDate ?? today);
+    setDir(directionId ?? '');
+    setProjectId('');
+    setTitle('');
+    setComment('');
+  }, [open, initialDate, today, directionId]);
 
   const directions = useQuery({
     queryKey: qk.directions,

@@ -4,6 +4,7 @@ import { Heatmap, PageHeader } from '@planner/ui';
 import { humanDate, plural, todayInTimezone, weekdayShort } from '@planner/shared';
 import { useDashboard, useDirections, useHeatmap, useTouches } from '../api/queries.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
+import { TouchModal } from '../features/TouchModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 
 /** История касаний. Открывается по ссылке с главной, в навигации не висит. */
@@ -11,6 +12,9 @@ export function ActivityPage() {
   const navigate = useNavigate();
   const [directionId, setDirectionId] = useState<string>('');
   const [day, setDay] = useState<string | null>(null);
+  // дата, с которой открыта запись касания: null — закрыто. Клик по пустому
+  // дню на карте открывает сразу её, а не карточку «касаний не было»
+  const [touchDate, setTouchDate] = useState<string | null>(null);
   const dashboard = useDashboard();
   const directions = useDirections();
   const heat = useHeatmap(26, directionId || undefined);
@@ -70,7 +74,17 @@ export function ActivityPage() {
             {total} {plural(total, 'касание', 'касания', 'касаний')}
           </div>
         </div>
-        <Heatmap days={heat.data?.days ?? []} today={today} cell={16} gap={4} onDayClick={setDay} />
+        <Heatmap
+          days={heat.data?.days ?? []}
+          today={today}
+          cell={16}
+          gap={4}
+          onDayClick={(date) => {
+            const hasTouches = (heat.data?.days ?? []).some((d) => d.date === date && d.total > 0);
+            if (hasTouches) setDay(date);
+            else setTouchDate(date);
+          }}
+        />
       </div>
 
       <div className="card" style={{ marginTop: 16, padding: '4px 18px 12px' }}>
@@ -125,6 +139,17 @@ export function ActivityPage() {
         date={day}
         directionId={directionId || undefined}
         onClose={() => setDay(null)}
+        onAddTouch={(date) => {
+          setDay(null);
+          setTouchDate(date);
+        }}
+      />
+      <TouchModal
+        open={touchDate !== null}
+        onOpenChange={(v) => !v && setTouchDate(null)}
+        directionId={directionId || undefined}
+        today={today}
+        initialDate={touchDate ?? undefined}
       />
     </>
   );

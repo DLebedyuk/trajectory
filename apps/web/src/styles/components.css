@@ -281,11 +281,12 @@
   border-color: color-mix(in srgb, var(--line) 55%, transparent);
 }
 
-button.heat-cell[data-filled='true'] {
+/* пустой день кликабелен наравне с заполненным — открывает запись касания */
+button.heat-cell:not(:disabled) {
   cursor: pointer;
 }
 
-button.heat-cell[data-filled='true']:hover {
+button.heat-cell:not(:disabled):hover {
   transform: scale(1.35);
 }
 

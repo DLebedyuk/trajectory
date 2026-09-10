@@ -43,7 +43,9 @@ export function DirectionPage() {
   const touches = useTouches({ directionId, limit: 5 });
   const dashboard = useDashboard();
 
-  const [touchOpen, setTouchOpen] = useState(false);
+  // дата, с которой открыта запись касания: null — закрыто. Клик по пустому
+  // дню на карте открывает сразу её, а не карточку «касаний не было»
+  const [touchDate, setTouchDate] = useState<string | null>(null);
   const [day, setDay] = useState<string | null>(null);
   const [projectOpen, setProjectOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -203,7 +205,17 @@ export function DirectionPage() {
           <div>
             <h4>Карта касаний</h4>
             <div className="scroll-x">
-              <Heatmap days={heat.data?.days ?? []} today={today} onDayClick={setDay} />
+              <Heatmap
+                days={heat.data?.days ?? []}
+                today={today}
+                onDayClick={(date) => {
+                  const hasTouches = (heat.data?.days ?? []).some(
+                    (d) => d.date === date && d.total > 0,
+                  );
+                  if (hasTouches) setDay(date);
+                  else setTouchDate(date);
+                }}
+              />
             </div>
             <p className="hint" style={{ marginTop: 12 }}>
               {total} {plural(total, 'касание', 'касания', 'касаний')} всего ·{' '}
@@ -215,7 +227,7 @@ export function DirectionPage() {
             <h4>
               Последние касания
               <span className="today-links">
-                <button type="button" onClick={() => setTouchOpen(true)}>
+                <button type="button" onClick={() => setTouchDate(today)}>
                   Записать
                 </button>
                 <button
@@ -340,12 +352,21 @@ export function DirectionPage() {
       </div>
 
       <TouchModal
-        open={touchOpen}
-        onOpenChange={setTouchOpen}
+        open={touchDate !== null}
+        onOpenChange={(v) => !v && setTouchDate(null)}
         directionId={directionId}
         today={today}
+        initialDate={touchDate ?? undefined}
       />
-      <DayTouchesModal date={day} directionId={directionId} onClose={() => setDay(null)} />
+      <DayTouchesModal
+        date={day}
+        directionId={directionId}
+        onClose={() => setDay(null)}
+        onAddTouch={(date) => {
+          setDay(null);
+          setTouchDate(date);
+        }}
+      />
 
       <DirectionSettingsModal
         direction={d}
