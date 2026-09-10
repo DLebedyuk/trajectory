@@ -8,7 +8,7 @@ import {
 import { Bot, type Context, InlineKeyboard } from 'grammy';
 import { eq } from 'drizzle-orm';
 import { parseRelativePhrase, formatLongDate, todayInTimezone } from '@planner/shared';
-import type { TimeSlot } from '@planner/contracts';
+import type { Reminder, TimeSlot } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import { telegramAccounts, users } from '../../db/schema.js';
 import { env, isDevAuthEnabled } from '../../config/env.js';
@@ -37,10 +37,9 @@ interface PendingConfirmation {
   timeSlot: TimeSlot | null;
 }
 
-/** Дата уже известна, а время суток — нет. Ждёт ответа «утром/днём/вечером». */
-interface PendingSlot {
-  text: string;
-  date: string;
+/** «Изменить» на подтверждении — ждём свободный ответ, тем же разбором, что и «напомни …». */
+interface PendingEdit {
+  reminderId: string;
 }
 
 /** Ответ бота, не зависящий от grammY: так его можно проверить тестом. */
@@ -73,8 +72,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
   private readonly pending = new Map<string, PendingPhrase>();
   /** Ожидающие подтверждения даты — по chatId. */
   private readonly pendingConfirm = new Map<string, PendingConfirmation>();
-  /** Ожидающие ответа «утром/днём/вечером» — по chatId. */
-  private readonly pendingSlot = new Map<string, PendingSlot>();
+  /** Ожидающие нового времени после «Изменить» — по chatId. */
+  private readonly pendingEdit = new Map<string, PendingEdit>();
 
   constructor(
     @Inject(DB) private readonly db: Database,
@@ -92,6 +91,19 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       return;
     }
     this.bot = new Bot(env.TELEGRAM_BOT_TOKEN);
+    /*
+      grammY без bot.catch() не глотает ошибку обработчика — она вылетает
+      наружу и валит весь процесс (об этом прямо предупреждает документация
+      grammY). Один плохой апдейт — например DB на секунду недоступна —
+      убивал не только сам бот, но и планировщик напоминаний в этом же
+      процессе, до перезапуска контейнера. Отсюда ощущение «то приходит,
+      то нет»: часть напоминаний терялась не из-за логики, а из-за краша.
+    */
+    this.bot.catch((err) => {
+      const message = err.error instanceof Error ? err.error.message : String(err.error);
+      this.logger.error(`Необработанная ошибка в апдейте ${err.ctx.update.update_id}: ${message}`);
+      err.ctx.reply('Что-то пошло не так. Попробуйте ещё раз.').catch(() => {});
+    });
     this.registerHandlers(this.bot);
     this.router.register(this);
 
@@ -194,13 +206,20 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
    * проверить тестом без запуска бота.
    */
   async handleText(userId: string, chatId: string, raw: string, today: string): Promise<BotReply> {
+    // ответ на «Изменить»: свободный текст в том же формате, что и «напомни …»
+    const editing = this.pendingEdit.get(chatId);
+    if (editing) {
+      this.pendingEdit.delete(chatId);
+      return this.applyEdit(userId, chatId, editing.reminderId, raw, today);
+    }
+
     // ответ на вопрос «когда напомнить?» (после отклонённой неоднозначной даты)
     const pending = this.pending.get(chatId);
     if (pending) {
       const answer = parseRelativePhrase(`напомни ${raw}`, today);
       if (answer.date) {
         this.pending.delete(chatId);
-        return this.resolveDateKnown(userId, chatId, {
+        return this.createAndConfirm(userId, {
           text: pending.text,
           date: answer.date,
           time: answer.time ?? pending.time,
@@ -249,7 +268,12 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       };
     }
 
-    return this.resolveDateKnown(userId, chatId, {
+    /*
+      Время суток не названо («в пятницу купить билеты») — не переспрашиваем
+      заранее: сервис сам поставит нейтральный слот, а «Изменить» на
+      подтверждении даёт поправить это без утомительного диалога до создания.
+    */
+    return this.createAndConfirm(userId, {
       text: parsed.text,
       date: parsed.date,
       time: parsed.time,
@@ -258,17 +282,37 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
   }
 
   /**
-   * Дата уже известна. Если известно и время (точное или «утром/днём/вечером») —
-   * создаём сразу. Иначе единственное, чего не хватает, — час дня, и вот это
-   * мы переспрашиваем: «в пятницу» само по себе не говорит, когда именно.
+   * Ответ на «Изменить»: та же грамматика, что и в «напомни …» — «в 18:00»,
+   * «завтра днём», «послезавтра». Не поняли ничего — переспрашиваем ещё раз,
+   * а не подставляем время сами: это уже осознанная правка человека.
    */
-  private async resolveDateKnown(
+  private async applyEdit(
     userId: string,
     chatId: string,
-    input: { text: string; date: string; time: string | null; timeSlot: TimeSlot | null },
+    reminderId: string,
+    raw: string,
+    today: string,
   ): Promise<BotReply> {
-    if (input.time || input.timeSlot) return this.createAndConfirm(userId, input);
-    return this.askTimeSlot(chatId, input.text, input.date);
+    const answer = parseRelativePhrase(`напомни ${raw}`, today);
+    if (!answer.date && !answer.time && !answer.timeSlot) {
+      this.pendingEdit.set(chatId, { reminderId });
+      return { text: 'Не поняла время. Например: «в 18:00» или «завтра днём».' };
+    }
+    const patch: { scheduledDate?: string; scheduledTime?: string | null; timeSlot?: TimeSlot } =
+      {};
+    if (answer.date) patch.scheduledDate = answer.date;
+    if (answer.time) patch.scheduledTime = answer.time;
+    else if (answer.timeSlot) {
+      // если раньше был alert — точное время нужно явно снять, иначе слот не применится
+      patch.scheduledTime = null;
+      patch.timeSlot = answer.timeSlot;
+    }
+    try {
+      const reminder = await this.reminders.update(userId, reminderId, patch);
+      return this.confirmReply(reminder);
+    } catch {
+      return { text: 'Напоминание уже недоступно.', toast: 'Напоминание уже недоступно' };
+    }
   }
 
   /** Обработка нажатия кнопки. Формат данных — «действие:значение». */
@@ -286,7 +330,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
       this.pendingConfirm.delete(chatId);
       if (value === 'yes') {
-        return this.resolveDateKnown(userId, chatId, waiting);
+        return this.createAndConfirm(userId, waiting);
       }
       return this.askWhen(chatId, waiting.text, waiting.time, waiting.timeSlot);
     }
@@ -296,14 +340,14 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
       this.pending.delete(chatId);
       if (value === 'today') {
-        return this.resolveDateKnown(userId, chatId, {
+        return this.createAndConfirm(userId, {
           text: waiting.text,
           date: today,
           time: null,
           timeSlot: 'evening',
         });
       }
-      return this.resolveDateKnown(userId, chatId, {
+      return this.createAndConfirm(userId, {
         text: waiting.text,
         date: this.plusDay(today),
         time: waiting.time,
@@ -311,16 +355,15 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       });
     }
 
-    if (action === 'timeslot') {
-      const waiting = this.pendingSlot.get(chatId);
-      if (!waiting) return { text: 'Уже неактуально.', toast: 'Уже неактуально' };
-      this.pendingSlot.delete(chatId);
-      return this.createAndConfirm(userId, {
-        text: waiting.text,
-        date: waiting.date,
-        time: null,
-        timeSlot: value as TimeSlot,
-      });
+    // «Да» на подтверждении создания/правки — просто открывает быстрые действия
+    if (action === 'remindyes') {
+      return { text: 'Хорошо.', actions: reminderActions(value) };
+    }
+
+    // «Изменить» — ждём свободный текст с новым временем, а не жмём в кнопки
+    if (action === 'remindedit') {
+      this.pendingEdit.set(chatId, { reminderId: value });
+      return { text: 'Когда напомнить?' };
     }
 
     try {
@@ -363,19 +406,6 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     };
   }
 
-  /** Дата известна, а час дня — нет. */
-  private askTimeSlot(chatId: string, text: string, date: string): BotReply {
-    this.pendingSlot.set(chatId, { text, date });
-    return {
-      text: `Когда напомнить: «${text}»?`,
-      actions: [
-        { label: 'Утром', data: 'timeslot:morning' },
-        { label: 'Днём', data: 'timeslot:day' },
-        { label: 'Вечером', data: 'timeslot:evening' },
-      ],
-    };
-  }
-
   private async createAndConfirm(
     userId: string,
     input: { text: string; date: string; time: string | null; timeSlot: TimeSlot | null },
@@ -387,16 +417,28 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       timeSlot: input.timeSlot,
       source: 'telegram',
     });
-    // дата/слот могли уехать вперёд (ближайший слот или откат прошедшего) —
-    // подтверждение показывает то, что реально сохранилось, а не что просили
+    return this.confirmReply(reminder);
+  }
+
+  /**
+   * Единая карточка подтверждения — что для создания, что для правки.
+   * Ответ ровно два: «Да» (ничего решать не надо — сохранено уже сейчас,
+   * кнопка открывает быстрые действия) и «Изменить» (просто написать когда).
+   * Дата/время в тексте — то, что реально сохранил сервис, а не что просили:
+   * прошедший слот мог уехать на завтра, «ближайший» — подобраться сам.
+   */
+  private confirmReply(reminder: Reminder): BotReply {
     const when = reminder.scheduledTime
       ? ` в ${reminder.scheduledTime}`
       : reminder.timeSlot
         ? ` ${SLOT_LABEL[reminder.timeSlot]}`
         : '';
     return {
-      text: `Напомню ${formatLongDate(reminder.scheduledDate)}${when}: «${reminder.text}».`,
-      actions: reminderActions(reminder.id),
+      text: `Напомню ${formatLongDate(reminder.scheduledDate)}${when}: «${reminder.text}» — верно?`,
+      actions: [
+        { label: 'Да', data: `remindyes:${reminder.id}` },
+        { label: 'Изменить', data: `remindedit:${reminder.id}` },
+      ],
     };
   }
 
