@@ -38,6 +38,22 @@ vi.mock('../api/client.js', async () => {
           { ...reminder, id: 'rem-2', text: 'Позвонить в студию', status: 'done' },
         ],
       },
+      settings: {
+        get: async () => ({
+          userId: 'user-1',
+          timezone: 'Europe/Moscow',
+          locale: 'ru',
+          morningTime: '10:00',
+          dayTime: '15:00',
+          eveningTime: '21:00',
+          missedReminderBehavior: 'evening',
+          theme: 'system',
+          hardNotifications: true,
+          softNotifications: true,
+          telegramLinked: false,
+          updatedAt: '2026-08-27T09:00:00.000Z',
+        }),
+      },
     },
   };
 });

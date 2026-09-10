@@ -10,24 +10,60 @@ import {
   PageHeader,
   useToast,
 } from '@planner/ui';
-import { formatLongDate, todayInTimezone } from '@planner/shared';
-import type { Reminder } from '@planner/contracts';
+import { addDaysToDateOnly, formatLongDate, timeInTimezone, todayInTimezone } from '@planner/shared';
+import type { Reminder, TimeSlot } from '@planner/contracts';
 import { api } from '../api/client.js';
-import { qk, useDashboard, useDirections, useReminders } from '../api/queries.js';
+import { qk, useDashboard, useDirections, useReminders, useSettings } from '../api/queries.js';
 import { ReminderModal } from '../features/ReminderModal.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
-
-const MISS: Record<string, string> = {
-  none: 'больше не переспрашивать',
-  evening: 'один раз переспросить вечером',
-  nextDigest: 'перенести в тот же слот на следующий раз',
-};
 
 const SLOT_BADGE: Record<string, string> = {
   morning: 'утром',
   day: 'днём',
   evening: 'вечером',
 };
+
+const SLOT_ORDER: TimeSlot[] = ['morning', 'day', 'evening'];
+
+interface SlotOption {
+  date: string;
+  slot: TimeSlot;
+  label: string;
+}
+
+/**
+ * Ближайшие несколько слотов от текущего момента — то же самое, что сервис
+ * сам подбирает для «напомни мне» без времени, только видно наперёд и можно
+ * выбрать любой из них. Сегодняшние уже прошедшие слоты не предлагаем —
+ * «сегодня утром» после обеда никому не нужно.
+ */
+function nextSlotOptions(
+  now: Date,
+  timezone: string,
+  times: { morningTime: string; dayTime: string; eveningTime: string },
+  count = 4,
+): SlotOption[] {
+  const slotTime: Record<TimeSlot, string> = {
+    morning: times.morningTime,
+    day: times.dayTime,
+    evening: times.eveningTime,
+  };
+  const today = todayInTimezone(timezone, now);
+  const nowTime = timeInTimezone(timezone, now);
+  const options: SlotOption[] = [];
+  let dayOffset = 0;
+  while (options.length < count) {
+    const date = dayOffset === 0 ? today : addDaysToDateOnly(today, dayOffset);
+    const dayLabel = dayOffset === 0 ? 'сегодня' : dayOffset === 1 ? 'завтра' : formatLongDate(date);
+    for (const slot of SLOT_ORDER) {
+      if (dayOffset === 0 && slotTime[slot] <= nowTime) continue;
+      options.push({ date, slot, label: `${dayLabel} ${SLOT_BADGE[slot]}` });
+      if (options.length === count) break;
+    }
+    dayOffset += 1;
+  }
+  return options;
+}
 
 export function RemindersPage() {
   const navigate = useNavigate();
@@ -36,6 +72,7 @@ export function RemindersPage() {
   const reminders = useReminders();
   const dashboard = useDashboard();
   const directions = useDirections();
+  const settings = useSettings();
   const [editing, setEditing] = useState<Reminder | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [toTask, setToTask] = useState<Reminder | null>(null);
@@ -43,8 +80,20 @@ export function RemindersPage() {
   const [projects, setProjects] = useState<{ id: string; title: string; directionName: string }[]>(
     [],
   );
+  const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
+  const [snoozeChoice, setSnoozeChoice] = useState('');
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
+  // только настоящие настройки человека — пока они не загрузились, список пуст,
+  // а не подставленные дефолты: ничего похожего на угаданное время не показываем
+  const snoozeOptions =
+    snoozeTarget && settings.data
+      ? nextSlotOptions(new Date(), settings.data.timezone, {
+          morningTime: settings.data.morningTime,
+          dayTime: settings.data.dayTime,
+          eveningTime: settings.data.eveningTime,
+        })
+      : [];
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: qk.reminders });
@@ -58,20 +107,26 @@ export function RemindersPage() {
       refresh();
       toast.show('Готово. Напоминание ушло в архив.');
     },
+    onError: () => toast.show('Не удалось отметить готовым'),
   });
-  const snooze = useMutation({
-    mutationFn: (vars: { id: string; mode: 'hour' | 'evening' | 'tomorrow' }) =>
-      api.reminders.snooze(vars.id, { mode: vars.mode }),
-    onSuccess: (_d, vars) => {
+  const snoozeEvening = useMutation({
+    mutationFn: (id: string) => api.reminders.snooze(id, { mode: 'evening' }),
+    onSuccess: () => {
       refresh();
-      toast.show(
-        vars.mode === 'hour'
-          ? 'Напомню через час'
-          : vars.mode === 'evening'
-            ? 'Напомню вечером'
-            : 'Перенесено на завтра — без всякого долга',
-      );
+      toast.show('Напомню вечером');
     },
+    onError: () => toast.show('Не удалось перенести напоминание'),
+  });
+  const moveTo = useMutation({
+    mutationFn: (vars: { id: string; date: string; slot: TimeSlot }) =>
+      api.reminders.update(vars.id, { scheduledDate: vars.date, timeSlot: vars.slot }),
+    onSuccess: () => {
+      refresh();
+      toast.show('Перенесено');
+      setSnoozeTarget(null);
+      setSnoozeChoice('');
+    },
+    onError: () => toast.show('Не удалось перенести напоминание'),
   });
   const remove = useMutation({
     mutationFn: (id: string) => api.reminders.remove(id),
@@ -79,6 +134,7 @@ export function RemindersPage() {
       refresh();
       toast.show('Удалено');
     },
+    onError: () => toast.show('Не удалось удалить напоминание'),
   });
   const convert = useMutation({
     mutationFn: () => api.reminders.toTask(toTask?.id as string, { projectId }),
@@ -89,6 +145,7 @@ export function RemindersPage() {
       setToTask(null);
       setProjectId('');
     },
+    onError: () => toast.show('Не удалось превратить в задачу'),
   });
 
   const openConvert = async (r: Reminder) => {
@@ -124,9 +181,9 @@ export function RemindersPage() {
   const repeating = later.filter((r) => r.repeatRule);
 
   /**
-   * Карточка напоминания. Частые действия — «Готово» и переносы — остаются
-   * на виду, редкие уезжают в «···»: на телефоне семь кнопок подряд
-   * превращаются в кашу, но исчезнуть ни одно действие не должно.
+   * Карточка напоминания. Чекбокс слева — это и есть «Готово», отдельной
+   * кнопки под него не заводим. Сам текст — главное на карточке, поэтому
+   * без ряда кнопок под ним: все действия, включая «Отложить», живут в «···».
    */
   const card = (r: Reminder) => (
     <div
@@ -143,13 +200,35 @@ export function RemindersPage() {
           onClick={() => complete.mutate(r.id)}
         />
         <span className="rt">{r.text}</span>
+        <OverflowMenu
+          label={`Ещё действия: ${r.text}`}
+          items={[
+            {
+              label: 'Отложить',
+              onSelect: () => {
+                setSnoozeTarget(r);
+                setSnoozeChoice('');
+              },
+            },
+            { label: 'Вечером', onSelect: () => snoozeEvening.mutate(r.id) },
+            {
+              label: 'Другая дата',
+              onSelect: () => {
+                setEditing(r);
+                setModalOpen(true);
+              },
+            },
+            { label: 'Превратить в задачу', onSelect: () => void openConvert(r) },
+            { label: 'Удалить', danger: true, onSelect: () => remove.mutate(r.id) },
+          ]}
+        />
+      </div>
+
+      <div className="meta">
         <span className="when mono">
           {formatLongDate(r.scheduledDate)}
           {r.scheduledTime ? `, ${r.scheduledTime}` : ''}
         </span>
-      </div>
-
-      <div className="meta">
         <span className="badge">
           {r.deliveryMode === 'alert'
             ? 'отдельное уведомление'
@@ -164,45 +243,9 @@ export function RemindersPage() {
                 : 'каждый месяц'}
           </span>
         ) : null}
-        <span className="badge">{MISS[r.missedBehavior]}</span>
       </div>
 
       {r.comment ? <p className="hint rem-comment">{r.comment}</p> : null}
-
-      <div className="actions">
-        <button type="button" className="btn primary" onClick={() => complete.mutate(r.id)}>
-          Готово
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => snooze.mutate({ id: r.id, mode: 'hour' })}
-        >
-          Через час
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => snooze.mutate({ id: r.id, mode: 'tomorrow' })}
-        >
-          Завтра
-        </button>
-        <OverflowMenu
-          label={`Ещё действия: ${r.text}`}
-          items={[
-            { label: 'Вечером', onSelect: () => snooze.mutate({ id: r.id, mode: 'evening' }) },
-            {
-              label: 'Другая дата',
-              onSelect: () => {
-                setEditing(r);
-                setModalOpen(true);
-              },
-            },
-            { label: 'Превратить в задачу', onSelect: () => void openConvert(r) },
-            { label: 'Удалить', danger: true, onSelect: () => remove.mutate(r.id) },
-          ]}
-        />
-      </div>
     </div>
   );
 
@@ -281,6 +324,50 @@ export function RemindersPage() {
               </option>
             ))}
           </select>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(snoozeTarget)}
+        onOpenChange={(v) => !v && setSnoozeTarget(null)}
+        title="Отложить"
+        description={snoozeTarget ? `«${snoozeTarget.text}»` : undefined}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setSnoozeTarget(null)}>
+              Отмена
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!snoozeChoice}
+              onClick={() => {
+                const chosen = snoozeOptions.find(
+                  (o) => `${o.date}|${o.slot}` === snoozeChoice,
+                );
+                if (chosen && snoozeTarget) {
+                  moveTo.mutate({ id: snoozeTarget.id, date: chosen.date, slot: chosen.slot });
+                }
+              }}
+            >
+              Перенести
+            </Button>
+          </>
+        }
+      >
+        <div className="field">
+          <span className="lbl">Новое время</span>
+          {settings.isLoading ? (
+            <p className="hint">Загружаю настройки времени…</p>
+          ) : (
+            <select value={snoozeChoice} onChange={(e) => setSnoozeChoice(e.target.value)}>
+              <option value="">— выбери —</option>
+              {snoozeOptions.map((o) => (
+                <option key={`${o.date}|${o.slot}`} value={`${o.date}|${o.slot}`}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </Modal>
     </>

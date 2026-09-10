@@ -14,7 +14,6 @@ import {
   IconSun,
   IconBell,
   IconMore,
-  IconArchive,
   IconTouch,
 } from '@planner/ui';
 import { api } from '../api/client.js';
@@ -57,17 +56,12 @@ const MORE_LINKS = [
   },
   { to: '/touches', title: 'История касаний', sub: 'Все факты работы по дням', Icon: IconTouch },
   {
+    // архив живёт кнопкой прямо на этой странице — свой пункт в «Ещё» дублировал бы её
     to: '/reminders',
     title: 'Напоминания',
     sub: 'Отметить готовым, перенести',
     badge: 'reminders' as const,
     Icon: IconBell,
-  },
-  {
-    to: '/reminders/archive',
-    title: 'Архив напоминаний',
-    sub: 'Выполненное и пропущенное за 7 дней',
-    Icon: IconArchive,
   },
   {
     to: '/settings',

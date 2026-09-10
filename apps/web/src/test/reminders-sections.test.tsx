@@ -50,6 +50,22 @@ vi.mock('../api/client.js', async () => {
       dashboard: async () => makeDashboard({ today: '2026-08-27' }),
       directions: { list: async () => [] },
       reminders: { list: async () => LIST, archive: async () => [] },
+      settings: {
+        get: async () => ({
+          userId: 'user-1',
+          timezone: 'Europe/Moscow',
+          locale: 'ru',
+          morningTime: '10:00',
+          dayTime: '15:00',
+          eveningTime: '21:00',
+          missedReminderBehavior: 'evening',
+          theme: 'system',
+          hardNotifications: true,
+          softNotifications: true,
+          telegramLinked: false,
+          updatedAt: iso,
+        }),
+      },
     },
   };
 });
@@ -102,7 +118,10 @@ describe('разделы напоминаний не пересекаются', 
     await screen.findByText('Зарядка');
 
     const counted = ['Сегодня', 'Ближайшие', 'Регулярные']
-      .map((title) => within(section(title)).queryAllByRole('button', { name: 'Готово' }).length)
+      .map(
+        (title) =>
+          within(section(title)).queryAllByRole('button', { name: /^Выполнить:/ }).length,
+      )
       .reduce((a, b) => a + b, 0);
     expect(counted).toBe(LIST.length);
   });

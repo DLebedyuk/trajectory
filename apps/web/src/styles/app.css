@@ -1306,48 +1306,22 @@
   margin-bottom: 6px;
 }
 .rem-card .top .rt {
-  font-size: 14px;
+  font-size: 17px;
+  font-weight: 500;
   color: var(--text);
   flex: 1;
-}
-.rem-card .top .when {
-  font-size: 11px;
-  color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
-  flex-shrink: 0;
 }
 .rem-card .meta {
   font-size: 11px;
   color: var(--text-3);
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   margin-bottom: 8px;
 }
-.rem-card .actions {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-.rem-card .actions .btn {
-  padding: 4px 9px;
-  font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text-2);
-}
-.rem-card .actions .btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.rem-card .actions .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-contrast);
-}
-.rem-card .actions .btn.danger {
-  color: var(--danger);
+.rem-card .meta .when {
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* ============ INBOX ============ */
@@ -2310,17 +2284,29 @@ body {
 
 /* ============ НАПОМИНАНИЯ: производные ============ */
 .rem-card .top .check {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 1.5px solid var(--text);
+  border: 1.5px solid var(--text-3);
   flex-shrink: 0;
-  margin-top: 3px;
+  margin-top: 2px;
   background: none;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  /* галочка есть всегда — едва видна в цвет рамки, чтобы кружок читался
+     как чекбокс, а не как «уже отмечено» */
+  color: var(--text-3);
+}
+.rem-card .top .check::after {
+  content: '✓';
 }
 .rem-card .top .check:hover {
   border-color: var(--accent);
+  color: var(--accent);
 }
 .rem-card .meta .badge {
   background: var(--surface-2);
