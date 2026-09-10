@@ -86,6 +86,7 @@ export function TodayBlock({
         </div>
       ))}
 
+      {tasks.length > 0 ? <p className="today-group-label">Дедлайны</p> : null}
       {tasks.map((t) => (
         <div className="t-row" key={t.id}>
           <span className="time mono">{t.exactTime ?? 'до конца дня'}</span>

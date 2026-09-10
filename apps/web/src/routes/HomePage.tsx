@@ -103,6 +103,11 @@ export function HomePage() {
             onCompleteReminder={(id) => completeReminder.mutate(id)}
           />
 
+          <SoftRemindersCard
+            reminders={data.todayReminders}
+            onComplete={(id) => completeReminder.mutate(id)}
+          />
+
           <FocusCard
             focus={data.focus}
             pinnedProject={data.pinnedProject}
@@ -187,11 +192,6 @@ export function HomePage() {
         </div>
 
         <aside className="right-col">
-          <SoftRemindersCard
-            reminders={data.todayReminders}
-            onComplete={(id) => completeReminder.mutate(id)}
-          />
-
           <div className="card menu-invite">
             <div>
               <div className="menu-invite-title">Хочется чего-нибудь совсем другого?</div>

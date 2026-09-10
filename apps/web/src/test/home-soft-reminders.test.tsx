@@ -46,14 +46,15 @@ const { HomePage } = await import('../routes/HomePage.js');
 
 /**
  * «Не забыть сегодня» — это те же напоминания, только без времени. В ленте
- * «Сегодня», выстроенной по часам, им места нет: они уехали в правую колонку.
+ * «Сегодня», выстроенной по часам, им места нет: они стоят отдельной плашкой
+ * сразу под лентой, рядом с календарём.
  */
 describe('главная: напоминания без времени', () => {
-  it('напоминание без времени стоит в правой колонке, а не в ленте «Сегодня»', async () => {
+  it('напоминание без времени стоит отдельной плашкой, а не в ленте «Сегодня»', async () => {
     renderWithProviders(<HomePage />, '/');
     await screen.findByText('Полить цветы');
 
-    expect(document.querySelector('.right-col .notime-card')).not.toBeNull();
+    expect(document.querySelector('.home-main .notime-card')).not.toBeNull();
     expect(document.querySelector('.today-block .notime-block')).toBeNull();
     const inToday = document.querySelector('.today-block')?.textContent ?? '';
     expect(inToday).not.toContain('Полить цветы');

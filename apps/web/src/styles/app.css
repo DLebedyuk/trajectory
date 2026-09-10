@@ -753,6 +753,13 @@
   background: var(--c);
   display: inline-block;
 }
+.today-group-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 10px 0 2px;
+}
 .today-block .overdue-toggle {
   font-size: 12px;
   color: var(--warn);
@@ -2379,10 +2386,26 @@ body {
   border: none;
 }
 .media-card .pin {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-3);
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-3);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.media-card .pin:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .media-card .pin.is-pinned {
-  color: var(--accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
 }
 .media-card .chips {
   margin-top: auto;
