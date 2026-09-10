@@ -457,7 +457,6 @@ async function main(): Promise<void> {
       timezone: TIMEZONE,
       deliveryMode: 'digest',
       source: 'telegram',
-      missedBehavior: 'evening',
     },
     {
       userId: DEV_USER_ID,
@@ -466,7 +465,6 @@ async function main(): Promise<void> {
       timezone: TIMEZONE,
       deliveryMode: 'digest',
       source: 'web',
-      missedBehavior: 'evening',
     },
     {
       userId: DEV_USER_ID,
@@ -476,7 +474,6 @@ async function main(): Promise<void> {
       timezone: TIMEZONE,
       deliveryMode: 'alert',
       source: 'telegram',
-      missedBehavior: 'none',
       comment: 'Слот можно менять до полуночи.',
     },
     {
@@ -486,7 +483,6 @@ async function main(): Promise<void> {
       timezone: TIMEZONE,
       deliveryMode: 'digest',
       source: 'telegram',
-      missedBehavior: 'evening',
     },
     {
       userId: DEV_USER_ID,
@@ -495,7 +491,6 @@ async function main(): Promise<void> {
       timezone: TIMEZONE,
       deliveryMode: 'digest',
       source: 'web',
-      missedBehavior: 'nextDigest',
       comment: 'Обещали до десяти рабочих дней.',
     },
     {
@@ -505,7 +500,6 @@ async function main(): Promise<void> {
       timezone: TIMEZONE,
       deliveryMode: 'digest',
       source: 'telegram',
-      missedBehavior: 'evening',
     },
     {
       userId: DEV_USER_ID,
@@ -516,7 +510,6 @@ async function main(): Promise<void> {
       deliveryMode: 'alert',
       repeatRule: 'weekly',
       source: 'web',
-      missedBehavior: 'none',
     },
     {
       userId: DEV_USER_ID,
@@ -526,7 +519,6 @@ async function main(): Promise<void> {
       deliveryMode: 'digest',
       repeatRule: 'monthly',
       source: 'web',
-      missedBehavior: 'nextDigest',
     },
     {
       userId: DEV_USER_ID,

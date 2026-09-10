@@ -92,6 +92,20 @@
       "when": 1788867363018,
       "tag": "0012_drop_digest_time",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789075371063,
+      "tag": "0013_missed_repeat_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789075484935,
+      "tag": "0014_drop_missed_legacy_columns",
+      "breakpoints": true
     }
   ]
 }

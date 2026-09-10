@@ -41,10 +41,8 @@ export class SettingsService {
       morningTime: s.morningTime,
       dayTime: s.dayTime,
       eveningTime: s.eveningTime,
-      missedReminderBehavior: s.missedReminderBehavior as Settings['missedReminderBehavior'],
+      missedReminderRepeat: s.missedReminderRepeat,
       theme: s.theme as Settings['theme'],
-      hardNotifications: s.hardNotifications,
-      softNotifications: s.softNotifications,
       telegramLinked: Boolean(tg),
       updatedAt: isoRequired(s.updatedAt),
     };
@@ -68,16 +66,10 @@ export class SettingsService {
         ...(input.morningTime !== undefined ? { morningTime: input.morningTime } : {}),
         ...(input.dayTime !== undefined ? { dayTime: input.dayTime } : {}),
         ...(input.eveningTime !== undefined ? { eveningTime: input.eveningTime } : {}),
-        ...(input.missedReminderBehavior !== undefined
-          ? { missedReminderBehavior: input.missedReminderBehavior }
+        ...(input.missedReminderRepeat !== undefined
+          ? { missedReminderRepeat: input.missedReminderRepeat }
           : {}),
         ...(input.theme !== undefined ? { theme: input.theme } : {}),
-        ...(input.hardNotifications !== undefined
-          ? { hardNotifications: input.hardNotifications }
-          : {}),
-        ...(input.softNotifications !== undefined
-          ? { softNotifications: input.softNotifications }
-          : {}),
         updatedAt: new Date(),
       })
       .where(eq(userSettings.userId, userId));

@@ -82,12 +82,12 @@ export const userSettings = pgTable('user_settings', {
   morningTime: varchar('morning_time', { length: 5 }).notNull().default('10:00'),
   dayTime: varchar('day_time', { length: 5 }).notNull().default('15:00'),
   eveningTime: varchar('evening_time', { length: 5 }).notNull().default('21:00'),
-  missedReminderBehavior: varchar('missed_reminder_behavior', { length: 20 })
-    .notNull()
-    .default('evening'),
+  /**
+   * «Переспросить»: пропущенное дублируется в каждую следующую сводку, пока
+   * не отмечено готовым (true), или напоминает о себе ровно один раз (false).
+   */
+  missedReminderRepeat: boolean('missed_reminder_repeat').notNull().default(true),
   theme: varchar('theme', { length: 10 }).notNull().default('system'),
-  hardNotifications: boolean('hard_notifications').notNull().default(true),
-  softNotifications: boolean('soft_notifications').notNull().default(true),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -213,6 +213,8 @@ export const tasks = pgTable(
     exactTime: varchar('exact_time', { length: 5 }),
     estimatedDuration: varchar('estimated_duration', { length: 10 }),
     remindAt: date('remind_at'),
+    /** См. reminders.missedNotified — то же самое, для задач с remindAt. */
+    missedNotified: boolean('missed_notified').notNull().default(false),
     comment: text('comment'),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: now(),
@@ -285,7 +287,11 @@ export const reminders = pgTable(
     timezone: varchar('timezone', { length: 64 }).notNull(),
     deliveryMode: varchar('delivery_mode', { length: 10 }).notNull().default('digest'),
     repeatRule: varchar('repeat_rule', { length: 10 }),
-    missedBehavior: varchar('missed_behavior', { length: 20 }).notNull().default('evening'),
+    /**
+     * Пропущенное уже догоняло один раз (при выключенном «переспросить» в
+     * настройках) — сбрасывается на false при любой смене даты/времени/слота.
+     */
+    missedNotified: boolean('missed_notified').notNull().default(false),
     source: varchar('source', { length: 10 }).notNull().default('web'),
     comment: text('comment'),
     status: varchar('status', { length: 10 }).notNull().default('active'),

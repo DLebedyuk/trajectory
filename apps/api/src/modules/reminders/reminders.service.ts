@@ -44,7 +44,6 @@ const toReminder = (r: Row): Reminder => ({
   timezone: r.timezone,
   deliveryMode: r.deliveryMode as Reminder['deliveryMode'],
   repeatRule: r.repeatRule as Reminder['repeatRule'],
-  missedBehavior: r.missedBehavior as Reminder['missedBehavior'],
   source: r.source as Reminder['source'],
   comment: r.comment,
   status: r.status as Reminder['status'],
@@ -57,9 +56,7 @@ const toReminder = (r: Row): Reminder => ({
 export class RemindersService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
-  async userContext(
-    userId: string,
-  ): Promise<{ timezone: string; missed: string } & SlotTimes> {
+  async userContext(userId: string): Promise<{ timezone: string } & SlotTimes> {
     const [user] = await this.db.select().from(users).where(eq(users.id, userId));
     const [settings] = await this.db
       .select()
@@ -70,7 +67,6 @@ export class RemindersService {
       morningTime: settings?.morningTime ?? '10:00',
       dayTime: settings?.dayTime ?? '15:00',
       eveningTime: settings?.eveningTime ?? '21:00',
-      missed: settings?.missedReminderBehavior ?? 'evening',
     };
   }
 
@@ -206,7 +202,6 @@ export class RemindersService {
         timezone: ctx.timezone,
         deliveryMode,
         repeatRule: input.repeatRule ?? null,
-        missedBehavior: input.missedBehavior ?? (ctx.missed as Reminder['missedBehavior']),
         source: input.source,
         comment: input.comment ?? null,
       })
@@ -231,6 +226,8 @@ export class RemindersService {
       scheduledTime?: string | null;
       timeSlot?: TimeSlot | null;
       deliveryMode?: 'alert' | 'digest';
+      // новая дата/время — новый шанс догнать вовремя, «уже напомнили один раз» не считается
+      missedNotified?: boolean;
     } = {};
 
     if (touchesTime) {
@@ -259,7 +256,7 @@ export class RemindersService {
         }
       }
 
-      timePatch = { scheduledDate, scheduledTime, timeSlot, deliveryMode };
+      timePatch = { scheduledDate, scheduledTime, timeSlot, deliveryMode, missedNotified: false };
     }
 
     const [row] = await this.db
@@ -268,7 +265,6 @@ export class RemindersService {
         ...(input.text !== undefined ? { text: input.text } : {}),
         ...timePatch,
         ...(input.repeatRule !== undefined ? { repeatRule: input.repeatRule ?? null } : {}),
-        ...(input.missedBehavior !== undefined ? { missedBehavior: input.missedBehavior } : {}),
         ...(input.comment !== undefined ? { comment: input.comment ?? null } : {}),
         updatedAt: new Date(),
       })
@@ -356,6 +352,7 @@ export class RemindersService {
         scheduledTime: time,
         timeSlot,
         deliveryMode: time ? 'alert' : 'digest',
+        missedNotified: false,
         updatedAt: new Date(),
       })
       .where(and(eq(reminders.userId, userId), eq(reminders.id, id)))

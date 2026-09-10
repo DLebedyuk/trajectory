@@ -255,7 +255,8 @@ export class TasksService {
         ...(input.estimatedDuration !== undefined
           ? { estimatedDuration: input.estimatedDuration ?? null }
           : {}),
-        ...(input.remindAt !== undefined ? { remindAt } : {}),
+        // новая дата напоминания — новый шанс догнать вовремя
+        ...(input.remindAt !== undefined ? { remindAt, missedNotified: false } : {}),
         ...(input.comment !== undefined ? { comment: input.comment ?? null } : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         updatedAt: new Date(),

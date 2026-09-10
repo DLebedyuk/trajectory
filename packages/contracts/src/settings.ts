@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { missedBehavior, timeOfDay, uuid } from './common.js';
+import { timeOfDay, uuid } from './common.js';
 
 export const userSchema = z.object({
   id: uuid,
@@ -21,10 +21,9 @@ export const settingsSchema = z.object({
   morningTime: timeOfDay,
   dayTime: timeOfDay,
   eveningTime: timeOfDay,
-  missedReminderBehavior: missedBehavior,
+  /** «Переспросить»: пропущенное дублируется в каждой следующей сводке (true) или напомнит один раз (false). */
+  missedReminderRepeat: z.boolean(),
   theme: z.enum(['light', 'dark', 'system']),
-  hardNotifications: z.boolean(),
-  softNotifications: z.boolean(),
   telegramLinked: z.boolean(),
   updatedAt: z.string().datetime(),
 });
@@ -36,9 +35,7 @@ export const updateSettingsSchema = z.object({
   morningTime: timeOfDay.optional(),
   dayTime: timeOfDay.optional(),
   eveningTime: timeOfDay.optional(),
-  missedReminderBehavior: missedBehavior.optional(),
+  missedReminderRepeat: z.boolean().optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
-  hardNotifications: z.boolean().optional(),
-  softNotifications: z.boolean().optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

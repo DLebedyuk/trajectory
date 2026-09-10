@@ -3,7 +3,6 @@ import {
   dateOnly,
   deliveryMode,
   deliveryStatus,
-  missedBehavior,
   reminderSource,
   reminderStatus,
   timeOfDay,
@@ -26,7 +25,6 @@ export const reminderSchema = z.object({
   timezone: z.string().min(1),
   deliveryMode,
   repeatRule: repeatRuleSchema.nullable(),
-  missedBehavior,
   source: reminderSource,
   comment: z.string().max(2000).nullable(),
   status: reminderStatus,
@@ -48,7 +46,6 @@ export const createReminderSchema = z.object({
    */
   timeSlot: timeSlot.nullish(),
   repeatRule: repeatRuleSchema.nullish(),
-  missedBehavior: missedBehavior.optional(),
   source: reminderSource.default('web'),
   comment: z.string().max(2000).nullish(),
 });

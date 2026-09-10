@@ -11,8 +11,6 @@ import { SLOT_ORDER, timeForSlot, type SlotTimes } from './reminders.service.js'
 
 const MAX_ATTEMPTS = 3;
 
-type MissedBehavior = 'none' | 'evening' | 'nextDigest';
-
 /** Текст-заголовок бакета — одинаковый для «настоящих» и «догоняющих» напоминаний слота. */
 const SLOT_HEADER: Record<TimeSlot, string> = {
   morning: 'Доброе утро. Вы хотели сегодня:',
@@ -139,6 +137,7 @@ export class ReminderSchedulerService {
         morningTime: userSettings.morningTime,
         dayTime: userSettings.dayTime,
         eveningTime: userSettings.eveningTime,
+        missedRepeat: userSettings.missedReminderRepeat,
       })
       .from(reminders)
       .innerJoin(users, eq(users.id, reminders.userId))
@@ -159,14 +158,23 @@ export class ReminderSchedulerService {
       if (date > today) continue;
 
       if (date < today) {
-        const target = this.planMissed((r.missedBehavior as MissedBehavior) ?? 'evening', {
+        const repeat = row.missedRepeat ?? true;
+        const target = this.planMissed(repeat, r.missedNotified, {
           ownSlot: (r.timeSlot as TimeSlot | null) ?? 'morning',
           timezone,
           today,
           now,
           slotTimes,
         });
-        if (target) bucketFor(target.slot, r.userId, today, target.at, r.text);
+        if (target) {
+          bucketFor(target.slot, r.userId, today, target.at, r.text);
+          if (!repeat) {
+            await this.db
+              .update(reminders)
+              .set({ missedNotified: true })
+              .where(eq(reminders.id, r.id));
+          }
+        }
         continue;
       }
 
@@ -197,9 +205,10 @@ export class ReminderSchedulerService {
         userId: tasks.userId,
         title: tasks.title,
         remindAt: tasks.remindAt,
+        missedNotified: tasks.missedNotified,
         timezone: users.timezone,
         morningTime: userSettings.morningTime,
-        missedDefault: userSettings.missedReminderBehavior,
+        missedRepeat: userSettings.missedReminderRepeat,
       })
       .from(tasks)
       .innerJoin(users, eq(users.id, tasks.userId))
@@ -220,14 +229,20 @@ export class ReminderSchedulerService {
 
       const line = `${t.title} — задача`;
       if (date < today) {
-        const target = this.planMissed((t.missedDefault as MissedBehavior) ?? 'evening', {
+        const repeat = t.missedRepeat ?? true;
+        const target = this.planMissed(repeat, t.missedNotified, {
           ownSlot: 'morning',
           timezone,
           today,
           now,
           slotTimes,
         });
-        if (target) bucketFor(target.slot, t.userId, today, target.at, line);
+        if (target) {
+          bucketFor(target.slot, t.userId, today, target.at, line);
+          if (!repeat) {
+            await this.db.update(tasks).set({ missedNotified: true }).where(eq(tasks.id, t.id));
+          }
+        }
         continue;
       }
 
@@ -249,19 +264,20 @@ export class ReminderSchedulerService {
   }
 
   /**
-   * Что делать с тем, чей день уже прошёл. Решение принимает пользователь
-   * через missedBehavior, а не планировщик: «none» действительно значит «забыть».
-   * «nextDigest» возвращает в тот же слот, где и было; «evening» — всегда в вечер.
+   * Что делать с тем, чей день уже прошёл. Всегда догоняет в собственном слоте —
+   * ни для чего не выделяем вечер отдельно, это и путало в настройках. «Переспросить»
+   * решает не «когда», а «сколько раз»: repeat — в каждой следующей сводке, пока не
+   * отмечено готовым; иначе — ровно один раз (missedNotified не даёт напомнить снова).
    * Возвращает null, если догонять не нужно или момент ещё не наступил.
    */
   private planMissed(
-    behavior: MissedBehavior,
+    repeat: boolean,
+    alreadyNotified: boolean,
     ctx: { ownSlot: TimeSlot; timezone: string; today: string; now: Date; slotTimes: SlotTimes },
   ): { slot: TimeSlot; at: Date } | null {
-    if (behavior === 'none') return null;
-    const slot = behavior === 'nextDigest' ? ctx.ownSlot : 'evening';
-    const at = zonedDateTimeToUtc(ctx.today, timeForSlot(slot, ctx.slotTimes), ctx.timezone);
-    return at > ctx.now ? null : { slot, at };
+    if (!repeat && alreadyNotified) return null;
+    const at = zonedDateTimeToUtc(ctx.today, timeForSlot(ctx.ownSlot, ctx.slotTimes), ctx.timezone);
+    return at > ctx.now ? null : { slot: ctx.ownSlot, at };
   }
 
   /**

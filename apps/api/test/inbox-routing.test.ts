@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import { prepareDatabase, TEST_DB_URL, TEST_USER_ID } from './setup.js';
@@ -45,10 +45,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.close();
-});
-
-beforeEach(async () => {
-  await api.patch('/api/settings').send({ missedReminderBehavior: 'none' });
 });
 
 /**
@@ -115,21 +111,6 @@ describe('куда попадают разобранные входящие', ()
     expect(timed.deliveryMode).toBe('alert');
     expect(soft.scheduledTime).toBeNull();
     expect(soft.deliveryMode).toBe('digest');
-  });
-
-  it('напоминание из входящих слушается настройки «если пропущено»', async () => {
-    // раньше здесь молча вставлялось значение по умолчанию из базы — 'evening'
-    const id = await addItem('забрать заказ');
-    await applyOne({
-      inboxItemId: id,
-      type: 'reminder',
-      text: 'Забрать заказ',
-      remindAt: '2026-12-02',
-    });
-
-    const list = await api.get('/api/reminders');
-    const created = list.body.find((r: { text: string }) => r.text === 'Забрать заказ');
-    expect(created.missedBehavior).toBe('none');
   });
 
   it('задача уходит в выбранный проект и сохраняет дату напоминания', async () => {

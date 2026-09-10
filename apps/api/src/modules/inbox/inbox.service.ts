@@ -150,9 +150,8 @@ export class InboxService {
 
       case 'reminder': {
         if (!p.remindAt) throw new SkipReason('Не выбрана дата напоминания');
-        // deliveryMode и missedBehavior считает сервис: со временем —
-        // отдельное уведомление, без времени — дневная сводка, а поведение
-        // при пропуске берётся из настроек человека
+        // deliveryMode считает сервис: со временем — отдельное уведомление,
+        // без времени — сводка нужного слота
         await this.reminders.create(userId, {
           text: p.text,
           scheduledDate: p.remindAt,

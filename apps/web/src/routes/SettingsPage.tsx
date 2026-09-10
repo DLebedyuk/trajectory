@@ -52,10 +52,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Настройки"
-        subtitle="Жёсткие уведомления — только для реальных сроков. Всё остальное можно закрыть без последствий."
-      />
+      <PageHeader title="Настройки" subtitle="Тема, время напоминаний, привязка Telegram и календаря." />
 
       <div className="settings-grid">
         <div className="settings-card">
@@ -133,58 +130,18 @@ export function SettingsPage() {
 
         <div className="settings-card settings-wide">
           <h4>Напоминания</h4>
-          {/*
-            Чипы — часть этой строки, а не отдельный блок под ней: иначе
-            разделитель строки проходит прямо сквозь них.
-          */}
-          <div className="row has-chips">
+          <div className="row">
             <div className="lbl">
-              <b>Если не отметили</b>
+              <b>Переспросить, если не отметили</b>
               <small>
-                По умолчанию приложение переспрашивает один раз вечером и больше не возвращается
-                само.
+                Включено — пропущенное дублируется в каждой следующей сводке, пока не отмечено
+                готовым. Выключено — напомнит об этом только один раз.
               </small>
             </div>
-            <div className="chips">
-              {(
-                [
-                  ['none', 'не переспрашивать'],
-                  ['evening', 'переспросить вечером'],
-                  ['nextDigest', 'в следующую сводку'],
-                ] as const
-              ).map(([v, l]) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`chip${s.missedReminderBehavior === v ? ' is-active' : ''}`}
-                  aria-pressed={s.missedReminderBehavior === v}
-                  onClick={() => update.mutate({ missedReminderBehavior: v })}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="row">
-            <div className="lbl">
-              <b>Жёсткие уведомления</b>
-              <small>События с точным временем, задачи с реальными дедлайнами.</small>
-            </div>
             <Switch
-              on={s.hardNotifications}
-              label="Жёсткие уведомления"
-              onToggle={() => update.mutate({ hardNotifications: !s.hardNotifications })}
-            />
-          </div>
-          <div className="row">
-            <div className="lbl">
-              <b>Мягкие уведомления</b>
-              <small>Направления и фокус. Ответ «не сейчас» ничего не переносит в долг.</small>
-            </div>
-            <Switch
-              on={s.softNotifications}
-              label="Мягкие уведомления"
-              onToggle={() => update.mutate({ softNotifications: !s.softNotifications })}
+              on={s.missedReminderRepeat}
+              label="Переспросить, если не отметили"
+              onToggle={() => update.mutate({ missedReminderRepeat: !s.missedReminderRepeat })}
             />
           </div>
         </div>

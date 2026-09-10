@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { eq } from 'drizzle-orm';
 import { prepareDatabase, TEST_DB_URL, TEST_USER_ID } from './setup.js';
 
 process.env.DATABASE_URL = TEST_DB_URL;
@@ -38,29 +39,45 @@ async function collect(now: Date): Promise<string[]> {
   return sent;
 }
 
+async function setRepeat(value: boolean): Promise<void> {
+  await db
+    .update(schema.userSettings)
+    .set({ missedReminderRepeat: value })
+    .where(eq(schema.userSettings.userId, TEST_USER_ID));
+}
+
 /**
- * Пропущенное напоминание — то, чей день уже прошёл. Что с ним делать,
- * решает missedBehavior, и это решение должно исполняться.
+ * Пропущенное напоминание — то, чей день уже прошёл. «Переспросить» в
+ * настройках решает не «когда» (всегда в собственном слоте, вечер тут ничем
+ * не выделен), а «сколько раз»: дублировать в каждой следующей сводке или
+ * напомнить об этом ровно один раз.
  */
-describe('missedBehavior: что делать с пропущенным напоминанием', () => {
-  it('none — пропущенное не догоняет пользователя вообще', async () => {
+describe('переспросить: сколько раз догонять пропущенное', () => {
+  it('выключено — догоняет ровно один раз в своём слоте, затем молчит', async () => {
+    await setRepeat(false);
     await db.insert(schema.reminders).values({
       userId: TEST_USER_ID,
-      text: 'Забытое без догоняния',
+      text: 'Записаться к стоматологу',
       scheduledDate: '2026-09-08',
       timezone: 'Europe/Moscow',
       deliveryMode: 'digest',
-      missedBehavior: 'none',
+      timeSlot: 'day',
       source: 'web',
     });
 
-    // 10 сентября, утренний слот (10:00 MSK = 07:00 UTC) и вечерний (21:00 MSK = 18:00 UTC)
-    const morning = await collect(new Date('2026-09-10T07:31:00.000Z'));
-    const evening = await collect(new Date('2026-09-10T18:01:00.000Z'));
-    expect([...morning, ...evening].join('\n')).not.toContain('Забытое без догоняния');
+    // 9 сентября, дневной слот (15:00 MSK = 12:00 UTC)
+    const first = await collect(new Date('2026-09-09T12:01:00.000Z'));
+    const digest = first.find((t) => t.includes('Днём'));
+    expect(digest).toContain('Записаться к стоматологу');
+
+    // 10 сентября, тот же дневной слот — уже не приходит: своё единственное
+    // напоминание использовано
+    const second = await collect(new Date('2026-09-10T12:01:00.000Z'));
+    expect(second.join('\n')).not.toContain('Записаться к стоматологу');
   });
 
-  it('none — просроченный алерт тоже не срабатывает задним числом', async () => {
+  it('выключено — просроченный алерт тоже разово догоняет через дефолтный слот «утро»', async () => {
+    await setRepeat(false);
     await db.insert(schema.reminders).values({
       userId: TEST_USER_ID,
       text: 'Просроченный алерт',
@@ -68,51 +85,53 @@ describe('missedBehavior: что делать с пропущенным напо
       scheduledTime: '10:00',
       timezone: 'Europe/Moscow',
       deliveryMode: 'alert',
-      missedBehavior: 'none',
       source: 'web',
     });
 
-    const sent = await collect(new Date('2026-09-10T05:31:00.000Z'));
-    expect(sent.join('\n')).not.toContain('Просроченный алерт');
+    // утренний слот (10:00 MSK = 07:00 UTC) 9 сентября — единственный раз
+    const first = await collect(new Date('2026-09-09T07:31:00.000Z'));
+    expect(first.join('\n')).toContain('Просроченный алерт');
+
+    const second = await collect(new Date('2026-09-10T07:31:00.000Z'));
+    expect(second.join('\n')).not.toContain('Просроченный алерт');
   });
 
-  it('nextDigest — пропущенное приходит в ближайшей утренней сводке', async () => {
-    await db.insert(schema.reminders).values({
-      userId: TEST_USER_ID,
-      text: 'Записаться к стоматологу',
-      scheduledDate: '2026-09-09',
-      timezone: 'Europe/Moscow',
-      deliveryMode: 'digest',
-      missedBehavior: 'nextDigest',
-      source: 'web',
-    });
-
-    const sent = await collect(new Date('2026-09-11T07:31:00.000Z'));
-    const digest = sent.find((t) => t.includes('Доброе утро'));
-    expect(digest).toContain('Записаться к стоматологу');
-  });
-
-  it('evening — пропущенное приходит вечером, а не в утренней сводке', async () => {
+  it('включено — дублируется в каждой следующей сводке, в собственном слоте', async () => {
+    await setRepeat(true);
     await db.insert(schema.reminders).values({
       userId: TEST_USER_ID,
       text: 'Оплатить домен',
       scheduledDate: '2026-09-11',
       timezone: 'Europe/Moscow',
       deliveryMode: 'digest',
-      missedBehavior: 'evening',
+      timeSlot: 'evening',
       source: 'web',
     });
 
-    const morning = await collect(new Date('2026-09-12T07:31:00.000Z'));
-    expect(morning.join('\n')).not.toContain('Оплатить домен');
+    // вечерний слот (21:00 MSK = 18:00 UTC) 12 сентября
+    const day1 = await collect(new Date('2026-09-12T18:01:00.000Z'));
+    expect(day1.join('\n')).toContain('Оплатить домен');
 
-    const evening = await collect(new Date('2026-09-12T18:01:00.000Z'));
-    expect(evening.join('\n')).toContain('Оплатить домен');
+    // и снова на следующий день — не «один раз», а до тех пор, пока не отмечено
+    const day2 = await collect(new Date('2026-09-13T18:01:00.000Z'));
+    expect(day2.join('\n')).toContain('Оплатить домен');
   });
 
-  it('вечернее догоняние не повторяется на следующем проходе того же вечера', async () => {
-    const first = await collect(new Date('2026-09-12T18:05:00.000Z'));
-    const second = await collect(new Date('2026-09-12T18:30:00.000Z'));
-    expect([...first, ...second].join('\n')).not.toContain('Оплатить домен');
+  it('один и тот же вечер не повторяется дважды за один проход', async () => {
+    await setRepeat(true);
+    await db.insert(schema.reminders).values({
+      userId: TEST_USER_ID,
+      text: 'Полить орхидею',
+      scheduledDate: '2026-09-11',
+      timezone: 'Europe/Moscow',
+      deliveryMode: 'digest',
+      timeSlot: 'evening',
+      source: 'web',
+    });
+
+    const first = await collect(new Date('2026-09-14T18:05:00.000Z'));
+    expect(first.join('\n')).toContain('Полить орхидею');
+    const second = await collect(new Date('2026-09-14T18:30:00.000Z'));
+    expect(second.join('\n')).not.toContain('Полить орхидею');
   });
 });

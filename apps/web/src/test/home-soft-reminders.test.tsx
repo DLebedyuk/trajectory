@@ -16,7 +16,6 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   timezone: 'Europe/Moscow',
   repeatRule: null,
   deliveryMode: 'digest',
-  missedBehavior: 'none',
   source: 'web',
   comment: null,
   status: 'active',
