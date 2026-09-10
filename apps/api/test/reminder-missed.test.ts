@@ -135,3 +135,43 @@ describe('переспросить: сколько раз догонять пр�
     expect(second.join('\n')).not.toContain('Полить орхидею');
   });
 });
+
+/**
+ * complete() у регулярного напоминания не закрывает его, а двигает дату
+ * вперёд (см. reminders.service.ts). Раньше при этом «уже напомнили один
+ * раз» (missedNotified) не сбрасывалось — следующий пропуск того же
+ * регулярного напоминания молчал навсегда, потому что флаг оставался true
+ * ещё с прошлого раза.
+ */
+describe('выполнение регулярного напоминания даёт новый шанс на догонку', () => {
+  it('missedNotified сбрасывается при переносе даты через complete()', async () => {
+    const { RemindersService } = await import(
+      '../src/modules/reminders/reminders.service.js'
+    );
+    const service = new RemindersService(db as never);
+
+    const [created] = await db
+      .insert(schema.reminders)
+      .values({
+        userId: TEST_USER_ID,
+        text: 'Полить кактус',
+        scheduledDate: '2026-09-08',
+        timezone: 'Europe/Moscow',
+        deliveryMode: 'digest',
+        timeSlot: 'evening',
+        repeatRule: 'daily',
+        source: 'web',
+        // уже использовала свой единственный шанс на догонку в прошлом цикле
+        missedNotified: true,
+      })
+      .returning();
+
+    await service.complete(TEST_USER_ID, created!.id);
+
+    const [after] = await db
+      .select()
+      .from(schema.reminders)
+      .where(eq(schema.reminders.id, created!.id));
+    expect(after?.missedNotified).toBe(false);
+  });
+});

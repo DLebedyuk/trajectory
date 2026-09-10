@@ -119,7 +119,13 @@ export function RemindersPage() {
   });
   const moveTo = useMutation({
     mutationFn: (vars: { id: string; date: string; slot: TimeSlot }) =>
-      api.reminders.update(vars.id, { scheduledDate: vars.date, timeSlot: vars.slot }),
+      // scheduledTime нужно снять явно: иначе у напоминания с точным временем
+      // (alert) выбранный слот молча отбрасывается — deliveryMode не меняется
+      api.reminders.update(vars.id, {
+        scheduledDate: vars.date,
+        scheduledTime: null,
+        timeSlot: vars.slot,
+      }),
     onSuccess: () => {
       refresh();
       toast.show('Перенесено');

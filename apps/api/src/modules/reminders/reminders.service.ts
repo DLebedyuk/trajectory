@@ -285,7 +285,8 @@ export class RemindersService {
       );
       const [row] = await this.db
         .update(reminders)
-        .set({ scheduledDate: next, updatedAt: new Date() })
+        // новая дата — новый шанс догнать вовремя, «уже напомнили один раз» не считается
+        .set({ scheduledDate: next, missedNotified: false, updatedAt: new Date() })
         .where(and(eq(reminders.userId, userId), eq(reminders.id, id)))
         .returning();
       return toReminder(row as Row);
