@@ -71,6 +71,7 @@ export function ReminderModal({
       );
       onOpenChange(false);
     },
+    onError: () => toast.show('Не удалось сохранить напоминание'),
   });
 
   return (

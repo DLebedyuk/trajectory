@@ -59,6 +59,7 @@ export function HomePage() {
       void qc.invalidateQueries({ queryKey: qk.reminders });
       toast.show('Готово. Напоминание ушло в архив.');
     },
+    onError: () => toast.show('Не удалось отметить готовым'),
   });
 
   if (dashboard.isLoading) return <Loading what="Собираю главную" />;
