@@ -317,6 +317,33 @@ select {
   outline-offset: 2px;
 }
 
+/*
+  Checkbox.tsx — собственные базовые стили, а не расчёт на то, что где-то
+  выше по дереву найдётся чужой .check с нужным видом. Раньше компонент
+  вставляли в места без такой обёртки (диалог закрытия задачи), и он
+  выглядел никак: ни рамки, ни разницы между отмеченным и нет.
+*/
+.check[role='checkbox'] {
+  border-radius: 50%;
+  border: 1.5px solid var(--text-3);
+  background: none;
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-contrast);
+  font-size: 11px;
+  cursor: pointer;
+}
+.check[role='checkbox']:hover {
+  border-color: var(--accent);
+}
+.check[role='checkbox'][data-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ============ TWO-COLUMN LAYOUT ============ */
 .two-col {
   display: grid;
@@ -790,11 +817,21 @@ select {
     позиционирования у неё не было вовсе. В приложении это Radix Dialog:
     содержимое рендерится в портал и без fixed уезжает в конец страницы —
     экран оставался просто затемнённым.
+
+    Центрирование по вертикали (top: 50%) считается от полного layout viewport,
+    который на iOS не сжимается при открытии клавиатуры — модалка оставалась
+    «в центре» уже несуществующего полноэкранного пространства, и низ формы
+    (кнопки в футере) уезжал под клавиатуру безо всякого способа туда
+    докрутить. Фикс в двух частях: якорь у верхнего края вместо центра — тогда
+    низкому контенту незачем заезжать за нижнюю половину экрана — и max-height
+    в dvh (динамический viewport), который на современных iOS/Chrome честно
+    сжимается вместе с видимой областью, включив внутренний скролл раньше,
+    чем футер скроется из viewport.
   */
   position: fixed;
-  top: 50%;
+  top: max(24px, env(safe-area-inset-top));
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   z-index: 61;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -802,7 +839,7 @@ select {
   box-shadow: var(--shadow);
   width: calc(100% - 32px);
   max-width: 560px;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
   padding: 24px;
 }

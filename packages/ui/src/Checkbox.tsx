@@ -23,7 +23,9 @@ export function Checkbox({ checked, onChange, label, size = 19 }: CheckboxProps)
         onChange();
       }}
     >
-      <IconCheck />
+      {/* раньше галочка рисовалась всегда, вне зависимости от checked —
+          выглядело так, будто чекбокс невозможно снять */}
+      {checked ? <IconCheck /> : null}
     </button>
   );
 }
