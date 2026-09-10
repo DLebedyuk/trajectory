@@ -563,13 +563,19 @@
   border-radius: 14px;
   padding: 18px 22px;
 }
+.focus-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
 .focus-block .label {
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--accent) 60%, #f4f1ea);
   font-weight: 700;
-  margin-bottom: 8px;
 }
 .focus-block .chain {
   display: flex;

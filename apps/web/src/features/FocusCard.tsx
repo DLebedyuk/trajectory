@@ -59,9 +59,34 @@ export function FocusCard({
         .join(' · ')
     : '';
 
+  // «···» — одна и та же кнопка сверху для обоих состояний, пункты разные:
+  // без задачи менять/убирать активную нечего
+  const menuItems = task
+    ? [
+        { label: 'Выбрать другую задачу', onSelect: onPickTask },
+        { label: 'Убрать активную задачу', onSelect: onClearActive },
+        {
+          label: pinnedProject ? 'Сменить закреплённый проект' : 'Закрепить проект',
+          onSelect: onOpenPinned,
+        },
+        { label: 'Сменить направление', onSelect: onChangeDirection },
+        { label: 'Очистить фокус', onSelect: onClearFocus },
+      ]
+    : [
+        {
+          label: pinnedProject ? 'Сменить закреплённый проект' : 'Закрепить проект',
+          onSelect: onOpenPinned,
+        },
+        { label: 'Сменить направление', onSelect: onChangeDirection },
+        { label: 'Очистить фокус', onSelect: onClearFocus },
+      ];
+
   return (
     <section className="focus-block" aria-label="Фокус">
-      <div className="label">В фокусе</div>
+      <div className="focus-top">
+        <div className="label">В фокусе</div>
+        <OverflowMenu items={menuItems} />
+      </div>
 
       <div className="chain">
         <span
@@ -111,23 +136,10 @@ export function FocusCard({
             onClick={() => navigate(`/tasks/${task.id}`)}
           >
             {task.title}
-            <span className="focus-state active">активная</span>
           </button>
           {meta ? <div className="focus-meta">{meta}</div> : null}
 
           <div className="actions">
-            <OverflowMenu
-              items={[
-                { label: 'Выбрать другую задачу', onSelect: onPickTask },
-                { label: 'Убрать активную задачу', onSelect: onClearActive },
-                {
-                  label: pinnedProject ? 'Сменить закреплённый проект' : 'Закрепить проект',
-                  onSelect: onOpenPinned,
-                },
-                { label: 'Сменить направление', onSelect: onChangeDirection },
-                { label: 'Очистить фокус', onSelect: onClearFocus },
-              ]}
-            />
             <button type="button" className="btn primary complete-btn" onClick={onComplete}>
               Выполнить
             </button>
@@ -140,16 +152,6 @@ export function FocusCard({
             <button type="button" className="btn primary" onClick={onPickTask}>
               Выбрать задачу
             </button>
-            <OverflowMenu
-              items={[
-                {
-                  label: pinnedProject ? 'Сменить закреплённый проект' : 'Закрепить проект',
-                  onSelect: onOpenPinned,
-                },
-                { label: 'Сменить направление', onSelect: onChangeDirection },
-                { label: 'Очистить фокус', onSelect: onClearFocus },
-              ]}
-            />
           </div>
         </>
       )}

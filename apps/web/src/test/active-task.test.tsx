@@ -51,7 +51,8 @@ describe('выбор активной задачи', () => {
     expect(screen.getAllByText('Озвучка').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Подготовить демо для сайта').length).toBeGreaterThan(0);
     // связка направление → проект → задача видна целиком, без служебной подписи
-    expect(screen.getByText('активная')).toBeInTheDocument();
+    // «активная» — карточка и так называется «В фокусе», подпись избыточна
+    expect(screen.queryByText('активная')).not.toBeInTheDocument();
   });
 
   it('не дублирует активную задачу на главной', async () => {
