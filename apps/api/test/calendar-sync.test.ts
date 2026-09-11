@@ -2,7 +2,18 @@ import { beforeAll, beforeEach, describe, expect, it, afterAll } from 'vitest';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { eq } from 'drizzle-orm';
+import { addDaysToDateOnly, todayInTimezone } from '@planner/shared';
 import { prepareDatabase, TEST_DB_URL, TEST_USER_ID } from './setup.js';
+
+/*
+ * Синхронизация подтягивает события только за последние SYNC_DAYS_BACK=7 дней
+ * (см. calendar.service.ts). Раньше тестовое событие лежало на фиксированной
+ * дате '2026-09-01' — тест ломался сам по себе, как только реальный календарь
+ * уходил дальше чем на неделю вперёд от этой даты, никак не связанным с кодом
+ * образом. Дата события считается от реального «сегодня», поэтому всегда
+ * попадает в окно синхронизации, когда бы тест ни запускался.
+ */
+const EVENT_DATE = addDaysToDateOnly(todayInTimezone('Europe/Moscow'), -2);
 
 process.env.DATABASE_URL = TEST_DB_URL;
 process.env.TELEGRAM_MODE = 'off';
@@ -32,7 +43,7 @@ const fake = {
       externalId: 'ev-1',
       calendarExternalId: 'primary@gmail.com',
       title: 'Стоматолог',
-      date: '2026-09-01',
+      date: EVENT_DATE,
       time: '17:30',
       duration: '40 мин',
       allDay: false,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Reminder } from '@planner/contracts';
 import { renderWithProviders } from './render.js';
@@ -35,7 +35,11 @@ vi.mock('../api/client.js', async () => {
     api: {
       dashboard: async () => makeDashboard({ today: '2026-08-27' }),
       directions: { list: async () => [] },
-      reminders: { list: async () => [reminder()], archive: async () => [], complete: completeApi },
+      reminders: {
+        list: async () => [reminder(), reminder({ id: 'rem-2', text: 'Полить кактус' })],
+        archive: async () => [],
+        complete: completeApi,
+      },
       settings: {
         get: async () => ({
           userId: 'user-1',
@@ -112,5 +116,57 @@ describe('напоминания: сообщение и блокировка п�
 
     resolveComplete(reminder({ status: 'done', closedAt: iso }));
     await screen.findByText('Готово. Напоминание ушло в архив.');
+  });
+
+  /*
+   * Раньше блокировка держалась на mutation.isPending/mutation.variables —
+   * одном значении на весь shared-инстанс мутации. Клик по B, пока A ещё
+   * летит, переключал variables на B и снимал disabled с A, хотя её запрос
+   * ещё не завершился: второй клик по A в этот момент отправлял вторую
+   * complete() для того же напоминания.
+   */
+  it('A → B, пока A ещё не завершилась — блокирует обе кнопки независимо', async () => {
+    let resolveA: (r: Reminder) => void = () => {};
+    let resolveB: (r: Reminder) => void = () => {};
+    completeApi.mockImplementationOnce(
+      () =>
+        new Promise<Reminder>((resolve) => {
+          resolveA = resolve;
+        }),
+    );
+    completeApi.mockImplementationOnce(
+      () =>
+        new Promise<Reminder>((resolve) => {
+          resolveB = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<RemindersPage />, '/reminders');
+    await screen.findByText('Полить орхидею');
+    await screen.findByText('Полить кактус');
+
+    const btnA = screen.getByRole('button', { name: 'Выполнить: Полить орхидею' });
+    const btnB = screen.getByRole('button', { name: 'Выполнить: Полить кактус' });
+
+    await user.click(btnA);
+    expect(btnA).toBeDisabled();
+    expect(btnB).not.toBeDisabled();
+
+    // B нажимается, пока запрос A ещё не ответил
+    await user.click(btnB);
+    expect(btnA).toBeDisabled();
+    expect(btnB).toBeDisabled();
+    expect(completeApi).toHaveBeenCalledTimes(2);
+
+    // повторный клик по A, пока обе кнопки заблокированы — не должен пройти
+    await user.click(btnA);
+    expect(completeApi).toHaveBeenCalledTimes(2);
+
+    resolveA(reminder({ status: 'done', closedAt: iso }));
+    await waitFor(() => expect(btnA).not.toBeDisabled());
+    expect(btnB).toBeDisabled();
+
+    resolveB(reminder({ id: 'rem-2', status: 'done', closedAt: iso }));
+    await waitFor(() => expect(btnB).not.toBeDisabled());
   });
 });

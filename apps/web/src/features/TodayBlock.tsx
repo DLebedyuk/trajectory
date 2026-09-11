@@ -13,9 +13,11 @@ export interface TodayBlockProps {
   reminders: Reminder[];
   onCompleteTask: (id: string) => void;
   onCompleteReminder: (id: string) => void;
-  /** Напоминание, которое сейчас завершается — его кнопка блокируется на время запроса. */
-  completingReminderId?: string | null;
+  /** Id завершающихся напоминаний — их кнопки блокируются на время запроса. */
+  completingReminderIds?: Set<string>;
 }
+
+const EMPTY_IDS: Set<string> = new Set();
 
 /** Кружок «выполнить». Событие календаря выполнить нельзя — у него нет кружка. */
 function Check({
@@ -52,7 +54,7 @@ export function TodayBlock({
   reminders,
   onCompleteTask,
   onCompleteReminder,
-  completingReminderId = null,
+  completingReminderIds = EMPTY_IDS,
 }: TodayBlockProps) {
   const timed = reminders
     .filter((r) => r.scheduledTime)
@@ -97,7 +99,7 @@ export function TodayBlock({
           <Check
             label={`Выполнить напоминание: ${r.text}`}
             onDone={() => onCompleteReminder(r.id)}
-            disabled={r.id === completingReminderId}
+            disabled={completingReminderIds.has(r.id)}
           />
           <span className="ttl">{r.text}</span>
           <span className="meta">

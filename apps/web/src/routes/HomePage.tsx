@@ -36,6 +36,10 @@ export function HomePage() {
   const [thoughtOpen, setThoughtOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
+  // id завершающихся напоминаний — набор, а не одно значение: mutation.variables
+  // хранит только последний вызов mutate(), и при быстром клике A → B кнопка A
+  // разблокировалась бы, пока её запрос ещё летит
+  const [completingReminderIds, setCompletingReminderIds] = useState<Set<string>>(new Set());
 
   const setActive = useMutation({
     mutationFn: (taskId: string) => api.tasks.activate(taskId),
@@ -56,6 +60,16 @@ export function HomePage() {
   });
   const completeReminder = useMutation({
     mutationFn: (id: string) => api.reminders.complete(id),
+    onMutate: (id) => {
+      setCompletingReminderIds((prev) => new Set(prev).add(id));
+    },
+    onSettled: (_data, _error, id) => {
+      setCompletingReminderIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    },
     onSuccess: (saved) => {
       void qc.invalidateQueries({ queryKey: qk.dashboard });
       void qc.invalidateQueries({ queryKey: qk.reminders });
@@ -69,11 +83,6 @@ export function HomePage() {
     },
     onError: () => toast.show('Не удалось отметить готовым'),
   });
-  // id напоминания, которое сейчас завершается — блокирует именно его кнопку,
-  // чтобы двойной клик на повторяющемся не перенёс его сразу на два периода
-  const completingReminderId = completeReminder.isPending
-    ? (completeReminder.variables ?? null)
-    : null;
 
   if (dashboard.isLoading) return <Loading what="Собираю главную" />;
   if (dashboard.isError)
@@ -114,13 +123,13 @@ export function HomePage() {
             reminders={data.todayReminders}
             onCompleteTask={(id) => askComplete(id)}
             onCompleteReminder={(id) => completeReminder.mutate(id)}
-            completingReminderId={completingReminderId}
+            completingReminderIds={completingReminderIds}
           />
 
           <SoftRemindersCard
             reminders={data.todayReminders}
             onComplete={(id) => completeReminder.mutate(id)}
-            completingId={completingReminderId}
+            completingIds={completingReminderIds}
           />
 
           <FocusCard

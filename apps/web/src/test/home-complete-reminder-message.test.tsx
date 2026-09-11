@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './render.js';
 import type { Reminder } from '@planner/contracts';
@@ -33,7 +33,13 @@ vi.mock('../api/client.js', async () => {
   return {
     ...actual,
     api: {
-      dashboard: async () => makeDashboard({ todayReminders: [reminder()] }),
+      dashboard: async () =>
+        makeDashboard({
+          todayReminders: [
+            reminder(),
+            reminder({ id: 'rem-2', text: 'Полить цветы', scheduledTime: null, deliveryMode: 'digest' }),
+          ],
+        }),
       directions: { list: async () => [] },
       reminders: { complete: completeApi },
     },
@@ -88,5 +94,51 @@ describe('главная: сообщение и блокировка при за
 
     expect(await screen.findByText(/Отметил\. Следующее/)).toBeInTheDocument();
     expect(screen.queryByText('Готово. Напоминание ушло в архив.')).not.toBeInTheDocument();
+  });
+
+  /*
+   * Раньше блокировка держалась на mutation.isPending/mutation.variables —
+   * одном значении на общую мутацию, которой пользуются и TodayBlock, и
+   * SoftRemindersCard. Клик по B (в другой карточке), пока A ещё летит,
+   * переключал variables на B и снимал disabled с A.
+   */
+  it('A → B в разных карточках, пока A ещё не завершилась — блокирует обе кнопки независимо', async () => {
+    let resolveA: (r: Reminder) => void = () => {};
+    let resolveB: (r: Reminder) => void = () => {};
+    completeApi.mockImplementationOnce(
+      () =>
+        new Promise<Reminder>((resolve) => {
+          resolveA = resolve;
+        }),
+    );
+    completeApi.mockImplementationOnce(
+      () =>
+        new Promise<Reminder>((resolve) => {
+          resolveB = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<HomePage />, '/');
+    await screen.findByText('Позвонить педагогу');
+    await screen.findByText('Полить цветы');
+
+    const btnA = screen.getByRole('button', { name: 'Выполнить напоминание: Позвонить педагогу' });
+    const btnB = screen.getByRole('button', { name: 'Выполнить напоминание: Полить цветы' });
+
+    await user.click(btnA);
+    expect(btnA).toBeDisabled();
+    expect(btnB).not.toBeDisabled();
+
+    await user.click(btnB);
+    expect(btnA).toBeDisabled();
+    expect(btnB).toBeDisabled();
+    expect(completeApi).toHaveBeenCalledTimes(2);
+
+    resolveA(reminder({ status: 'done', closedAt: iso }));
+    await waitFor(() => expect(btnA).not.toBeDisabled());
+    expect(btnB).toBeDisabled();
+
+    resolveB(reminder({ id: 'rem-2', status: 'done', closedAt: iso }));
+    await waitFor(() => expect(btnB).not.toBeDisabled());
   });
 });

@@ -82,6 +82,10 @@ export function RemindersPage() {
   );
   const [snoozeTarget, setSnoozeTarget] = useState<Reminder | null>(null);
   const [snoozeChoice, setSnoozeChoice] = useState('');
+  // id завершающихся напоминаний — набор, а не одно значение: mutation.variables
+  // хранит только последний вызов mutate(), и при быстром клике A → B кнопка A
+  // разблокировалась бы, пока её запрос ещё летит
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
   // только настоящие настройки человека — пока они не загрузились, список пуст,
@@ -103,6 +107,16 @@ export function RemindersPage() {
 
   const complete = useMutation({
     mutationFn: (id: string) => api.reminders.complete(id),
+    onMutate: (id) => {
+      setCompletingIds((prev) => new Set(prev).add(id));
+    },
+    onSettled: (_data, _error, id) => {
+      setCompletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    },
     onSuccess: (saved) => {
       refresh();
       // повторяющееся напоминание сервер не архивирует, а переносит на
@@ -210,8 +224,9 @@ export function RemindersPage() {
           className="check"
           aria-label={`Выполнить: ${r.text}`}
           // блокируем именно эту кнопку на время запроса — иначе двойной клик
-          // на повторяющемся напоминании переносит его сразу на два периода
-          disabled={complete.isPending && complete.variables === r.id}
+          // (в том числе A → B → A, пока A ещё летит) на повторяющемся
+          // напоминании переносит его сразу на два периода
+          disabled={completingIds.has(r.id)}
           onClick={() => complete.mutate(r.id)}
         />
         <span className="rt">{r.text}</span>

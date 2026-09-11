@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import type { Reminder } from '@planner/contracts';
 
+const EMPTY_IDS: Set<string> = new Set();
+
 /**
  * «Не забыть сегодня» — те же напоминания, что и в разделе «Напоминания»,
  * просто у них не проставлено время. В ленте «Сегодня» им места нет: она
@@ -10,12 +12,12 @@ import type { Reminder } from '@planner/contracts';
 export function SoftRemindersCard({
   reminders,
   onComplete,
-  completingId = null,
+  completingIds = EMPTY_IDS,
 }: {
   reminders: Reminder[];
   onComplete: (id: string) => void;
-  /** Напоминание, которое сейчас завершается — его кнопка блокируется на время запроса. */
-  completingId?: string | null;
+  /** Id завершающихся напоминаний — их кнопки блокируются на время запроса. */
+  completingIds?: Set<string>;
 }) {
   const soft = reminders.filter((r) => !r.scheduledTime);
 
@@ -36,7 +38,7 @@ export function SoftRemindersCard({
               type="button"
               className="check"
               aria-label={`Выполнить напоминание: ${r.text}`}
-              disabled={r.id === completingId}
+              disabled={completingIds.has(r.id)}
               onClick={() => onComplete(r.id)}
             />
             <span className="ttl">{r.text}</span>
