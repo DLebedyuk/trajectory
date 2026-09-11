@@ -132,13 +132,7 @@ describe('телеграм: подтверждение неоднозначно�
     const reply = await service.handleAction(USER_ID, CHAT_ID, 'remindyes:reminder-1', TODAY);
 
     expect(create).not.toHaveBeenCalled();
-    expect(reply.actions?.map((a) => a.data)).toEqual([
-      'done:reminder-1',
-      'hour:reminder-1',
-      'evening:reminder-1',
-      'tomorrow:reminder-1',
-      'delete:reminder-1',
-    ]);
+    expect(reply.actions?.map((a) => a.data)).toEqual(['done:reminder-1', 'delete:reminder-1']);
   });
 
   it('«Изменить» ждёт свободный текст и правит то же напоминание, а не создаёт новое', async () => {

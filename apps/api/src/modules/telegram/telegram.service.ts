@@ -52,9 +52,6 @@ export interface BotReply {
 
 const reminderActions = (reminderId: string): { label: string; data: string }[] => [
   { label: 'Готово', data: `done:${reminderId}` },
-  { label: 'Через час', data: `hour:${reminderId}` },
-  { label: 'Вечером', data: `evening:${reminderId}` },
-  { label: 'Завтра', data: `tomorrow:${reminderId}` },
   { label: 'Удалить', data: `delete:${reminderId}` },
 ];
 
@@ -385,11 +382,6 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     try {
       if (action === 'done') await this.reminders.complete(userId, value);
       else if (action === 'delete') await this.reminders.remove(userId, value);
-      else if (action === 'hour') await this.reminders.snooze(userId, value, { mode: 'hour' });
-      else if (action === 'evening')
-        await this.reminders.snooze(userId, value, { mode: 'evening' });
-      else if (action === 'tomorrow')
-        await this.reminders.snooze(userId, value, { mode: 'tomorrow' });
       else return { text: 'Не понял кнопку.' };
     } catch {
       return { text: 'Напоминание уже недоступно.', toast: 'Напоминание уже недоступно' };
@@ -398,9 +390,6 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     const labels: Record<string, string> = {
       done: 'Отметил.',
       delete: 'Удалил.',
-      hour: 'Вернусь через час.',
-      evening: 'Вернусь вечером.',
-      tomorrow: 'Перенёс на завтра.',
     };
     return { text: labels[action] ?? 'Готово.' };
   }
