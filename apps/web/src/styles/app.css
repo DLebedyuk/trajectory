@@ -389,6 +389,7 @@
   background: var(--accent-soft);
 }
 .plus-sheet .opt .ic-wrap {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 10px;
@@ -400,6 +401,25 @@
 }
 .plus-sheet .opt .ic-wrap .ic {
   font-size: 18px;
+}
+/* счётчик — кружок поверх иконки, а не голое число рядом с текстом */
+.plus-sheet .opt .ic-wrap .ct-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: 2px solid var(--surface-2);
+  box-sizing: border-box;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
 }
 .plus-sheet .opt .info .ttl {
   font-size: 14px;
@@ -1048,18 +1068,9 @@
 .dir-project-card .stats {
   margin-left: auto;
 }
-/* закрепление проекта: булавка рядом с именем, как у задачи внутри проекта */
+/* закрепление проекта — общий .pin (см. ниже), тут только отступ от заголовка */
 .dir-project-card .pin {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--text-3);
-  display: inline-flex;
-  cursor: pointer;
-}
-.dir-project-card .pin:hover,
-.dir-project-card .pin.is-pinned {
-  color: var(--accent);
+  margin-left: 4px;
 }
 /* закреплённый проект: полоса направления слева остаётся, добавляется рамка */
 .dir-project-card.is-pinned {
@@ -2391,7 +2402,13 @@ body {
 .media-card .cover {
   border: none;
 }
-.media-card .pin {
+/*
+  Кнопка закрепления — один стиль на всё приложение (полка, проект в
+  направлении, задача в проекте): круглая обводка, явная заливка акцентом,
+  когда закреплено. Раньше у каждого места было своё — где-то плоская
+  иконка без обводки, где-то вообще без стилей.
+*/
+.pin {
   width: 26px;
   height: 26px;
   border-radius: 50%;
@@ -2404,11 +2421,11 @@ body {
   flex-shrink: 0;
   cursor: pointer;
 }
-.media-card .pin:hover {
+.pin:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
-.media-card .pin.is-pinned {
+.pin.is-pinned {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-contrast);

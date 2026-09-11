@@ -106,7 +106,7 @@ export function SettingsPage() {
                 Напоминания без точного времени приходят в одно из трёх — утро, день или вечер.
               </small>
             </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flex: '1 1 100%' }}>
               {(
                 [
                   ['morningTime', 'Утро'],
@@ -116,13 +116,20 @@ export function SettingsPage() {
               ).map(([key, label]) => (
                 <label
                   key={key}
-                  style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    fontSize: 12,
+                    flex: 1,
+                    minWidth: 0,
+                  }}
                 >
                   {label}
                   <input
                     type="time"
                     defaultValue={s[key]}
-                    style={{ width: 110 }}
+                    style={{ width: '100%' }}
                     onChange={(e) => update.mutate({ [key]: e.target.value })}
                   />
                 </label>

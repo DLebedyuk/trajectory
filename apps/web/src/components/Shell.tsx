@@ -269,12 +269,14 @@ export function Shell({ children }: { children: ReactNode }) {
               >
                 <span className="ic-wrap">
                   <Icon />
+                  {badge && counts[badge] ? (
+                    <span className="ct-badge">{counts[badge]}</span>
+                  ) : null}
                 </span>
                 <span className="info">
                   <span className="ttl">{title}</span>
                   <span className="sub">{sub}</span>
                 </span>
-                {badge && counts[badge] ? <span className="ct mono">{counts[badge]}</span> : null}
               </button>
             ))}
             <button
