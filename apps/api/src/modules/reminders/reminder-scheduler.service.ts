@@ -26,6 +26,14 @@ interface PlannedDelivery {
   scheduledFor: Date;
   idempotencyKey: string;
   text: string;
+  /**
+   * Разово пропущенные (missedReminderRepeat=false) напоминания и задачи,
+   * догнанные этой доставкой. missedNotified для них выставляется только
+   * после успешной provider.send() — иначе сбой доставки «сжигает» их
+   * единственный шанс, а повторная попытка planMissed() их больше не находит.
+   */
+  onceMissedReminderIds: string[];
+  onceMissedTaskIds: string[];
 }
 
 interface Bucket {
@@ -73,6 +81,20 @@ export class ReminderSchedulerService {
           .update(reminderDeliveries)
           .set({ status: 'sent', sentAt: new Date(), updatedAt: new Date() })
           .where(eq(reminderDeliveries.id, claimed.id));
+        // единственный шанс на догонку считается использованным только теперь,
+        // когда сообщение реально ушло — не раньше
+        if (item.onceMissedReminderIds.length > 0) {
+          await this.db
+            .update(reminders)
+            .set({ missedNotified: true })
+            .where(inArray(reminders.id, item.onceMissedReminderIds));
+        }
+        if (item.onceMissedTaskIds.length > 0) {
+          await this.db
+            .update(tasks)
+            .set({ missedNotified: true })
+            .where(inArray(tasks.id, item.onceMissedTaskIds));
+        }
         sent += 1;
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
@@ -110,11 +132,14 @@ export class ReminderSchedulerService {
       today: string,
       at: Date,
       line: string,
+      once?: { reminderId?: string; taskId?: string },
     ): void => {
       const key = `${slot}:${userId}:${today}`;
       const existing = buckets[slot].get(key);
       if (existing) {
         existing.lines.push(line);
+        if (once?.reminderId) existing.delivery.onceMissedReminderIds.push(once.reminderId);
+        if (once?.taskId) existing.delivery.onceMissedTaskIds.push(once.taskId);
         return;
       }
       buckets[slot].set(key, {
@@ -125,6 +150,8 @@ export class ReminderSchedulerService {
           scheduledFor: at,
           idempotencyKey: key,
           text: '',
+          onceMissedReminderIds: once?.reminderId ? [once.reminderId] : [],
+          onceMissedTaskIds: once?.taskId ? [once.taskId] : [],
         },
         lines: [line],
       });
@@ -167,13 +194,14 @@ export class ReminderSchedulerService {
           slotTimes,
         });
         if (target) {
-          bucketFor(target.slot, r.userId, today, target.at, r.text);
-          if (!repeat) {
-            await this.db
-              .update(reminders)
-              .set({ missedNotified: true })
-              .where(eq(reminders.id, r.id));
-          }
+          bucketFor(
+            target.slot,
+            r.userId,
+            today,
+            target.at,
+            r.text,
+            repeat ? undefined : { reminderId: r.id },
+          );
         }
         continue;
       }
@@ -188,6 +216,8 @@ export class ReminderSchedulerService {
             scheduledFor: at,
             idempotencyKey: `alert:${r.id}:${date}:${r.scheduledTime}`,
             text: `Напоминание: ${r.text}`,
+            onceMissedReminderIds: [],
+            onceMissedTaskIds: [],
           });
         }
         continue;
@@ -238,10 +268,14 @@ export class ReminderSchedulerService {
           slotTimes,
         });
         if (target) {
-          bucketFor(target.slot, t.userId, today, target.at, line);
-          if (!repeat) {
-            await this.db.update(tasks).set({ missedNotified: true }).where(eq(tasks.id, t.id));
-          }
+          bucketFor(
+            target.slot,
+            t.userId,
+            today,
+            target.at,
+            line,
+            repeat ? undefined : { taskId: t.id },
+          );
         }
         continue;
       }

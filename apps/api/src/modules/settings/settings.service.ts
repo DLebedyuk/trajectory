@@ -49,7 +49,27 @@ export class SettingsService {
   }
 
   async update(userId: string, input: UpdateSettingsInput): Promise<Settings> {
-    await this.get(userId);
+    const current = await this.get(userId);
+
+    // Проверяем итоговые слоты — после слияния текущих настроек с частичным
+    // запросом, а не только присланные поля: иначе обновление одного слота
+    // (например, только dayTime) могло молча увести порядок в бессмыслицу.
+    if (
+      input.morningTime !== undefined ||
+      input.dayTime !== undefined ||
+      input.eveningTime !== undefined
+    ) {
+      const morningTime = input.morningTime ?? current.morningTime;
+      const dayTime = input.dayTime ?? current.dayTime;
+      const eveningTime = input.eveningTime ?? current.eveningTime;
+      if (!(morningTime < dayTime && dayTime < eveningTime)) {
+        throw ApiException.validation(
+          'Время слотов должно идти по порядку: утро раньше дня, день раньше вечера',
+          { morningTime, dayTime, eveningTime },
+        );
+      }
+    }
+
     if (input.timezone !== undefined || input.locale !== undefined) {
       await this.db
         .update(users)

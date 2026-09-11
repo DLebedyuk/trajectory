@@ -103,9 +103,15 @@ export function RemindersPage() {
 
   const complete = useMutation({
     mutationFn: (id: string) => api.reminders.complete(id),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       refresh();
-      toast.show('Готово. Напоминание ушло в архив.');
+      // повторяющееся напоминание сервер не архивирует, а переносит на
+      // следующую дату — сообщение должно говорить о том, что реально случилось
+      toast.show(
+        saved.repeatRule
+          ? `Отметил. Следующее — ${formatLongDate(saved.scheduledDate)}.`
+          : 'Готово. Напоминание ушло в архив.',
+      );
     },
     onError: () => toast.show('Не удалось отметить готовым'),
   });
@@ -203,6 +209,9 @@ export function RemindersPage() {
           type="button"
           className="check"
           aria-label={`Выполнить: ${r.text}`}
+          // блокируем именно эту кнопку на время запроса — иначе двойной клик
+          // на повторяющемся напоминании переносит его сразу на два периода
+          disabled={complete.isPending && complete.variables === r.id}
           onClick={() => complete.mutate(r.id)}
         />
         <span className="rt">{r.text}</span>

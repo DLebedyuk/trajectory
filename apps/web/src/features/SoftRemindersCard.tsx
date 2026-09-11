@@ -10,9 +10,12 @@ import type { Reminder } from '@planner/contracts';
 export function SoftRemindersCard({
   reminders,
   onComplete,
+  completingId = null,
 }: {
   reminders: Reminder[];
   onComplete: (id: string) => void;
+  /** Напоминание, которое сейчас завершается — его кнопка блокируется на время запроса. */
+  completingId?: string | null;
 }) {
   const soft = reminders.filter((r) => !r.scheduledTime);
 
@@ -33,6 +36,7 @@ export function SoftRemindersCard({
               type="button"
               className="check"
               aria-label={`Выполнить напоминание: ${r.text}`}
+              disabled={r.id === completingId}
               onClick={() => onComplete(r.id)}
             />
             <span className="ttl">{r.text}</span>

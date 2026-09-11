@@ -56,13 +56,24 @@ export function HomePage() {
   });
   const completeReminder = useMutation({
     mutationFn: (id: string) => api.reminders.complete(id),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       void qc.invalidateQueries({ queryKey: qk.dashboard });
       void qc.invalidateQueries({ queryKey: qk.reminders });
-      toast.show('Готово. Напоминание ушло в архив.');
+      // повторяющееся напоминание сервер не архивирует, а переносит на
+      // следующую дату — сообщение должно говорить о том, что реально случилось
+      toast.show(
+        saved.repeatRule
+          ? `Отметил. Следующее — ${formatLongDate(saved.scheduledDate)}.`
+          : 'Готово. Напоминание ушло в архив.',
+      );
     },
     onError: () => toast.show('Не удалось отметить готовым'),
   });
+  // id напоминания, которое сейчас завершается — блокирует именно его кнопку,
+  // чтобы двойной клик на повторяющемся не перенёс его сразу на два периода
+  const completingReminderId = completeReminder.isPending
+    ? (completeReminder.variables ?? null)
+    : null;
 
   if (dashboard.isLoading) return <Loading what="Собираю главную" />;
   if (dashboard.isError)
@@ -103,11 +114,13 @@ export function HomePage() {
             reminders={data.todayReminders}
             onCompleteTask={(id) => askComplete(id)}
             onCompleteReminder={(id) => completeReminder.mutate(id)}
+            completingReminderId={completingReminderId}
           />
 
           <SoftRemindersCard
             reminders={data.todayReminders}
             onComplete={(id) => completeReminder.mutate(id)}
+            completingId={completingReminderId}
           />
 
           <FocusCard

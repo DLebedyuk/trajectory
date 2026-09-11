@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, useToast } from '@planner/ui';
-import { api } from '../api/client.js';
+import { api, ApiError } from '../api/client.js';
 import { TelegramCard } from '../features/TelegramCard.js';
 import { CalendarCard } from '../features/CalendarCard.js';
 import { qk, useSettings } from '../api/queries.js';
@@ -20,6 +20,9 @@ export function SettingsPage() {
       void qc.invalidateQueries({ queryKey: qk.settings });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
       toast.show('Сохранено');
+    },
+    onError: (e) => {
+      toast.show(e instanceof ApiError ? e.message : 'Не удалось сохранить настройки');
     },
   });
 
