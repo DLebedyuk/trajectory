@@ -102,7 +102,14 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     this.bot.catch((err) => {
       const message = err.error instanceof Error ? err.error.message : String(err.error);
       this.logger.error(`Необработанная ошибка в апдейте ${err.ctx.update.update_id}: ${message}`);
-      err.ctx.reply('Что-то пошло не так. Попробуйте ещё раз.').catch(() => {});
+      // если и запасной ответ не уходит — молчание было бы совсем без следа
+      // в логах: человек не понимает, принял бот сообщение или нет
+      err.ctx.reply('Что-то пошло не так. Попробуйте ещё раз.').catch((replyErr: unknown) => {
+        const replyMessage = replyErr instanceof Error ? replyErr.message : String(replyErr);
+        this.logger.error(
+          `Запасной ответ на апдейт ${err.ctx.update.update_id} тоже не отправился: ${replyMessage}`,
+        );
+      });
     });
     this.registerHandlers(this.bot);
     this.router.register(this);
@@ -233,6 +240,15 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     if (!parsed.isReminder) {
       await this.inbox.create(userId, { originalText: raw, source: 'telegram' });
       return { text: 'Сохранил во входящие. Ничего делать не надо.' };
+    }
+
+    /*
+      «напомни завтра днём» и больше ничего — от текста после вырезания
+      служебных слов ничего не остаётся. Раньше в reminder.text попадала
+      вся исходная фраза целиком, включая само слово «напомни».
+    */
+    if (!parsed.text.trim()) {
+      return { text: 'О чём напомнить? Например: «напомни купить молоко завтра днём».' };
     }
 
     /*

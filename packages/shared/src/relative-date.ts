@@ -181,5 +181,11 @@ export function parseRelativePhrase(raw: string, today: string): ParsedPhrase {
     .trim();
   if (text.length > 0) text = text.charAt(0).toUpperCase() + text.slice(1);
 
-  return { isReminder, date, time, timeSlot, text: text || original, ambiguousWeekday };
+  /*
+    Если сообщение — это ровно «напомни завтра днём» и больше ничего, после
+    вырезания служебных слов текста не останется. Раньше в этом случае в
+    text подставлялся весь original целиком, включая «напомни»: получалось
+    напоминание, буквально озаглавленное «напомни завтра днём».
+  */
+  return { isReminder, date, time, timeSlot, text, ambiguousWeekday };
 }

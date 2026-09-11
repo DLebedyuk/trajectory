@@ -227,4 +227,17 @@ describe('телеграм: подтверждение неоднозначно�
     expect(create).not.toHaveBeenCalled();
     expect(reply.text).toContain('входящие');
   });
+
+  /*
+    «напомни завтра днём» и больше ничего — раньше в reminder.text попадала
+    вся исходная фраза целиком, включая само слово «напомни».
+  */
+  it('«напомни завтра днём» без содержания — не создаёт напоминание, переспрашивает', async () => {
+    const service = makeService();
+    const reply = await service.handleText(USER_ID, CHAT_ID, 'напомни завтра днем', TODAY);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(reply.text).not.toContain('напомни завтра днем');
+    expect(reply.text).toMatch(/о чём/i);
+  });
 });

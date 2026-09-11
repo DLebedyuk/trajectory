@@ -110,4 +110,23 @@ describe('parseRelativePhrase', () => {
     const r = parseRelativePhrase('напомни купить хлеб', TODAY);
     expect(r.timeSlot).toBeNull();
   });
+
+  /*
+    Раньше text подставлял весь original, включая само «напомни», когда от
+    фразы после вырезания служебных слов ничего не оставалось — получалось
+    напоминание, буквально озаглавленное «напомни завтра днём».
+  */
+  it('пустой текст после вырезания служебных слов — text пустая строка, а не весь original', () => {
+    const r = parseRelativePhrase('напомни завтра днём', TODAY);
+    expect(r.isReminder).toBe(true);
+    expect(r.date).toBe('2026-08-27');
+    expect(r.timeSlot).toBe('day');
+    expect(r.text).toBe('');
+  });
+
+  it('то же самое для голого «напомни»', () => {
+    const r = parseRelativePhrase('напомни', TODAY);
+    expect(r.isReminder).toBe(true);
+    expect(r.text).toBe('');
+  });
 });
