@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm --filter @planner/web dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "pnpm --filter @planner/web build",
+    "beforeBuildCommand": "pnpm --filter @planner/web build:desktop",
     "frontendDist": "../../web/dist"
   },
   "app": {
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:3000"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' http://localhost:3000 https://yourtrajectory.app"
     }
   },
   "bundle": {
