@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { and, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
-import { todayInTimezone, zonedDateTimeToUtc } from '@planner/shared';
+import { and, eq, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
+import { todayInTimezone, toDateOnly, zonedDateTimeToUtc } from '@planner/shared';
 import type { TimeSlot } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import { reminderDeliveries, reminders, tasks, userSettings, users } from '../../db/schema.js';
@@ -119,6 +119,16 @@ export class ReminderSchedulerService {
    * и вечернее догоняние пропущенного.
    */
   private async plan(now: Date): Promise<PlannedDelivery[]> {
+    /*
+      Без этого фильтра запрос вытягивал вообще все активные напоминания и
+      открытые задачи с remindAt во всей системе — включая те, что назначены
+      на через полгода — и только потом отбрасывал будущее в JS. cutoffDate —
+      самая поздняя календарная дата, которая прямо сейчас вообще может
+      считаться «сегодня» хоть в одном часовом поясе на Земле (UTC+14); дата
+      позже этого гарантированно ещё не наступила нигде, значит её можно
+      безопасно исключить в SQL, не трогая саму логику «наступило/не наступило».
+    */
+    const cutoffDate = toDateOnly(new Date(now.getTime() + 14 * 60 * 60 * 1000));
     const alerts: PlannedDelivery[] = [];
     const buckets: Record<TimeSlot, Map<string, Bucket>> = {
       morning: new Map(),
@@ -169,7 +179,7 @@ export class ReminderSchedulerService {
       .from(reminders)
       .innerJoin(users, eq(users.id, reminders.userId))
       .leftJoin(userSettings, eq(userSettings.userId, reminders.userId))
-      .where(eq(reminders.status, 'active'));
+      .where(and(eq(reminders.status, 'active'), lte(reminders.scheduledDate, cutoffDate)));
 
     for (const row of reminderRows) {
       const r = row.reminder;
@@ -243,7 +253,13 @@ export class ReminderSchedulerService {
       .from(tasks)
       .innerJoin(users, eq(users.id, tasks.userId))
       .leftJoin(userSettings, eq(userSettings.userId, tasks.userId))
-      .where(and(eq(tasks.status, 'open'), isNotNull(tasks.remindAt)));
+      .where(
+        and(
+          eq(tasks.status, 'open'),
+          isNotNull(tasks.remindAt),
+          lte(tasks.remindAt, cutoffDate),
+        ),
+      );
 
     for (const t of taskRows) {
       const timezone = t.timezone || 'UTC';

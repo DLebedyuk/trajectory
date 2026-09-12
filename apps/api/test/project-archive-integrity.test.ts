@@ -113,4 +113,61 @@ describe('целостность архива проектов', () => {
     const reopened = await tasksService.reopen(TEST_USER_ID, task.id);
     expect(reopened.status).toBe('open');
   });
+
+  /*
+   * complete() пишет в tasks, user_focus и projects тремя отдельными
+   * запросами внутри одной транзакции — проверяем, что все три изменения
+   * реально происходят вместе за один вызов.
+   */
+  it('завершение проекта архивирует его и снимает фокус с его же активной задачи', async () => {
+    const project = await makeProject();
+    const task = await tasksService.create(TEST_USER_ID, {
+      projectId: project.id,
+      title: 'Записать дубль',
+      pinned: false,
+    });
+    await db
+      .update(schema.userFocus)
+      .set({ activeTaskId: task.id })
+      .where(eq(schema.userFocus.userId, TEST_USER_ID));
+
+    const completed = await projects.complete(TEST_USER_ID, project.id);
+
+    expect(completed.status).toBe('archived');
+    expect(completed.pinned).toBe(false);
+    expect(completed.completedAt).not.toBeNull();
+
+    const [focus] = await db
+      .select()
+      .from(schema.userFocus)
+      .where(eq(schema.userFocus.userId, TEST_USER_ID));
+    expect(focus?.activeTaskId).toBeNull();
+  });
+
+  it('завершение проекта не трогает активную задачу из другого проекта', async () => {
+    const project = await makeProject();
+    const otherProject = await projects.create(TEST_USER_ID, {
+      directionId,
+      title: 'Другой проект',
+      status: 'active',
+      notes: [],
+    });
+    const otherTask = await tasksService.create(TEST_USER_ID, {
+      projectId: otherProject.id,
+      title: 'Задача из другого проекта',
+      pinned: false,
+    });
+    await db
+      .update(schema.userFocus)
+      .set({ activeTaskId: otherTask.id })
+      .where(eq(schema.userFocus.userId, TEST_USER_ID));
+
+    await projects.complete(TEST_USER_ID, project.id);
+
+    const [focus] = await db
+      .select()
+      .from(schema.userFocus)
+      .where(eq(schema.userFocus.userId, TEST_USER_ID));
+    expect(focus?.activeTaskId).toBe(otherTask.id);
+  });
 });

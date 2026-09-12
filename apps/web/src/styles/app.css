@@ -810,6 +810,19 @@
 .notime-card .notime-row .ttl {
   color: var(--text);
 }
+/* раньше не было вообще никакого правила — кружок «выполнить» был нулевого
+   размера и невидим */
+.notime-card .notime-row .check {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.notime-card .notime-row .check:hover {
+  background: var(--surface-2);
+}
 
 /* Pinned row */
 .pinned-row {

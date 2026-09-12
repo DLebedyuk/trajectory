@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, sql, type SQL } from 'drizzle-orm';
 import type {
   CreateTaskInput,
   Task,
@@ -71,6 +71,12 @@ export class TasksService {
     const items = await this.db
       .select()
       .from(taskChecklistItems)
+      .where(
+        inArray(
+          taskChecklistItems.taskId,
+          rows.map((r) => r.id),
+        ),
+      )
       .orderBy(taskChecklistItems.sortOrder);
     const byTask = new Map<string, Task['checklist']>();
     for (const i of items) {
