@@ -224,26 +224,34 @@ export class ProjectsService {
    * Касания остаются в статистике направления — они принадлежат направлению.
    */
   async complete(userId: string, id: string): Promise<Project> {
-    const project = await this.get(userId, id);
-    await this.db
-      .update(tasks)
-      .set({ status: 'done', completedAt: new Date(), pinned: false, updatedAt: new Date() })
-      .where(and(eq(tasks.userId, userId), eq(tasks.projectId, id), eq(tasks.status, 'open')));
+    await this.get(userId, id);
+    // одна транзакция на все три таблицы — иначе падение процесса между
+    // шагами могло оставить проект «живым» с уже закрытыми задачами
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(tasks)
+        .set({ status: 'done', completedAt: new Date(), pinned: false, updatedAt: new Date() })
+        .where(and(eq(tasks.userId, userId), eq(tasks.projectId, id), eq(tasks.status, 'open')));
 
-    const [focus] = await this.db.select().from(userFocus).where(eq(userFocus.userId, userId));
-    if (focus?.activeTaskId) {
-      const [t] = await this.db
-        .select({ projectId: tasks.projectId })
-        .from(tasks)
-        .where(eq(tasks.id, focus.activeTaskId));
-      if (t?.projectId === id) {
-        await this.db
-          .update(userFocus)
-          .set({ activeTaskId: null, updatedAt: new Date() })
-          .where(eq(userFocus.userId, userId));
+      const [focus] = await tx.select().from(userFocus).where(eq(userFocus.userId, userId));
+      if (focus?.activeTaskId) {
+        const [t] = await tx
+          .select({ projectId: tasks.projectId })
+          .from(tasks)
+          .where(eq(tasks.id, focus.activeTaskId));
+        if (t?.projectId === id) {
+          await tx
+            .update(userFocus)
+            .set({ activeTaskId: null, updatedAt: new Date() })
+            .where(eq(userFocus.userId, userId));
+        }
       }
-    }
-    void project;
-    return this.setStatus(userId, id, 'archived');
+
+      await tx
+        .update(projects)
+        .set({ status: 'archived', completedAt: new Date(), pinned: false, updatedAt: new Date() })
+        .where(and(eq(projects.userId, userId), eq(projects.id, id)));
+    });
+    return this.get(userId, id);
   }
 }

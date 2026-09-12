@@ -18,7 +18,11 @@ async function bootstrap(): Promise<void> {
   if (keyProblem) logger.warn(keyProblem.message);
 
   const app = await NestFactory.create(AppModule, {
-    cors: { origin: env.WEB_ORIGIN, credentials: true },
+    // http://tauri.localhost — фиксированный адрес десктоп-обёртки (Tauri на
+    // Windows отдаёт фронтенд с него, useHttpsScheme не включён). Подделать
+    // его с постороннего сайта нельзя, поэтому он разрешён всегда, а не
+    // только там, где есть desktop-сборка.
+    cors: { origin: [env.WEB_ORIGIN, 'http://tauri.localhost'], credentials: true },
   });
   app.useGlobalFilters(new AllExceptionsFilter());
 
