@@ -372,6 +372,7 @@ export class ReminderSchedulerService {
         allDay: calendarEvents.allDay,
         timezone: users.timezone,
         morningTime: userSettings.morningTime,
+        morningDigestEnabled: userSettings.morningDigestEnabled,
       })
       .from(calendarEvents)
       .innerJoin(calendars, eq(calendars.id, calendarEvents.calendarId))
@@ -387,6 +388,7 @@ export class ReminderSchedulerService {
       .orderBy(calendarEvents.time);
 
     for (const row of calendarRows) {
+      if (row.morningDigestEnabled === false) continue;
       const timezone = row.timezone || 'UTC';
       const today = todayInTimezone(timezone, now);
       const date = String(row.date).slice(0, 10);
@@ -407,6 +409,7 @@ export class ReminderSchedulerService {
         deadline: tasks.deadline,
         timezone: users.timezone,
         morningTime: userSettings.morningTime,
+        morningDigestEnabled: userSettings.morningDigestEnabled,
       })
       .from(tasks)
       .innerJoin(users, eq(users.id, tasks.userId))
@@ -422,6 +425,7 @@ export class ReminderSchedulerService {
       .orderBy(tasks.deadline);
 
     for (const row of deadlineTaskRows) {
+      if (row.morningDigestEnabled === false) continue;
       const timezone = row.timezone || 'UTC';
       const today = todayInTimezone(timezone, now);
       const tomorrow = addDaysToDateOnly(today, 1);

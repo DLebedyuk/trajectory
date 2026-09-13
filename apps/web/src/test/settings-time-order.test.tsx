@@ -12,6 +12,7 @@ const settings = {
   dayTime: '15:00',
   eveningTime: '21:00',
   missedReminderRepeat: true,
+  morningDigestEnabled: true,
   theme: 'system' as const,
   telegramLinked: false,
   updatedAt: iso,

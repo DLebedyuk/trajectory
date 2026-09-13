@@ -42,6 +42,7 @@ export class SettingsService {
       dayTime: s.dayTime,
       eveningTime: s.eveningTime,
       missedReminderRepeat: s.missedReminderRepeat,
+      morningDigestEnabled: s.morningDigestEnabled,
       theme: s.theme as Settings['theme'],
       telegramLinked: Boolean(tg),
       updatedAt: isoRequired(s.updatedAt),
@@ -88,6 +89,9 @@ export class SettingsService {
         ...(input.eveningTime !== undefined ? { eveningTime: input.eveningTime } : {}),
         ...(input.missedReminderRepeat !== undefined
           ? { missedReminderRepeat: input.missedReminderRepeat }
+          : {}),
+        ...(input.morningDigestEnabled !== undefined
+          ? { morningDigestEnabled: input.morningDigestEnabled }
           : {}),
         ...(input.theme !== undefined ? { theme: input.theme } : {}),
         updatedAt: new Date(),

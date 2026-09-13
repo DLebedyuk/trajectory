@@ -154,6 +154,20 @@ export function SettingsPage() {
               onToggle={() => update.mutate({ missedReminderRepeat: !s.missedReminderRepeat })}
             />
           </div>
+          <div className="row">
+            <div className="lbl">
+              <b>Сводка дня в утреннем сообщении</b>
+              <small>
+                Дела из календаря на сегодня и задачи с дедлайном сегодня или завтра. Выключено —
+                утреннее сообщение состоит только из напоминаний.
+              </small>
+            </div>
+            <Switch
+              on={s.morningDigestEnabled}
+              label="Сводка дня в утреннем сообщении"
+              onToggle={() => update.mutate({ morningDigestEnabled: !s.morningDigestEnabled })}
+            />
+          </div>
         </div>
 
         <TelegramCard />

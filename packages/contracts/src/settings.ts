@@ -23,6 +23,8 @@ export const settingsSchema = z.object({
   eveningTime: timeOfDay,
   /** «Переспросить»: пропущенное дублируется в каждой следующей сводке (true) или напомнит один раз (false). */
   missedReminderRepeat: z.boolean(),
+  /** Раздел «Сегодня» (календарь + дедлайны задач) в утреннем сообщении Telegram. */
+  morningDigestEnabled: z.boolean(),
   theme: z.enum(['light', 'dark', 'system']),
   telegramLinked: z.boolean(),
   updatedAt: z.string().datetime(),
@@ -36,6 +38,7 @@ export const updateSettingsSchema = z.object({
   dayTime: timeOfDay.optional(),
   eveningTime: timeOfDay.optional(),
   missedReminderRepeat: z.boolean().optional(),
+  morningDigestEnabled: z.boolean().optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

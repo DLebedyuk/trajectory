@@ -46,6 +46,7 @@ vi.mock('../api/client.js', async () => {
           dayTime: '15:00',
           eveningTime: '21:00',
           missedReminderRepeat: true,
+          morningDigestEnabled: true,
           theme: 'system',
           telegramLinked: false,
           updatedAt: '2026-08-27T09:00:00.000Z',

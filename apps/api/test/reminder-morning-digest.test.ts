@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { eq } from 'drizzle-orm';
 import { prepareDatabase, TEST_DB_URL, TEST_USER_ID } from './setup.js';
 
 process.env.DATABASE_URL = TEST_DB_URL;
@@ -43,6 +44,10 @@ beforeEach(async () => {
   await db.delete(schema.calendarEvents);
   await db.delete(schema.calendars);
   await db.delete(schema.tasks);
+  await db
+    .update(schema.userSettings)
+    .set({ morningDigestEnabled: true })
+    .where(eq(schema.userSettings.userId, TEST_USER_ID));
 });
 
 async function collect(now: Date): Promise<string[]> {
@@ -221,5 +226,46 @@ describe('утренняя сводка: календарь и дедлайны 
     expect(first.some((t) => t.includes('Ветклиника'))).toBe(true);
     const second = await collect(new Date('2026-09-14T08:00:00.000Z'));
     expect(second.some((t) => t.includes('Ветклиника'))).toBe(false);
+  });
+
+  it('выключенная в настройках сводка не показывает календарь и дедлайны, но напоминания доходят как обычно', async () => {
+    await db
+      .update(schema.userSettings)
+      .set({ morningDigestEnabled: false })
+      .where(eq(schema.userSettings.userId, TEST_USER_ID));
+
+    const calendarId = await makeCalendar();
+    await db.insert(schema.calendarEvents).values({
+      userId: TEST_USER_ID,
+      calendarId,
+      title: 'Ветклиника',
+      date: '2026-09-14',
+      time: '14:00',
+    });
+    await db.insert(schema.tasks).values({
+      userId: TEST_USER_ID,
+      projectId,
+      title: 'Сдать отчёт',
+      deadline: '2026-09-14',
+    });
+    await db.insert(schema.reminders).values({
+      userId: TEST_USER_ID,
+      text: 'Полить цветы',
+      scheduledDate: '2026-09-14',
+      timezone: 'Europe/Moscow',
+      deliveryMode: 'digest',
+      timeSlot: 'morning',
+      source: 'web',
+    });
+
+    const sent = await collect(new Date(MORNING_UTC));
+    const morning = sent.find((t) => t.includes('Доброе утро'));
+
+    expect(morning).toBeDefined();
+    expect(morning).not.toContain('Сегодня:');
+    expect(morning).not.toContain('Ветклиника');
+    expect(morning).not.toContain('Сдать отчёт');
+    expect(morning).toContain('Напоминания:');
+    expect(morning).toContain('Полить цветы');
   });
 });

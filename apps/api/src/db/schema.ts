@@ -87,6 +87,8 @@ export const userSettings = pgTable('user_settings', {
    * не отмечено готовым (true), или напоминает о себе ровно один раз (false).
    */
   missedReminderRepeat: boolean('missed_reminder_repeat').notNull().default(true),
+  /** Раздел «Сегодня» (календарь + дедлайны задач) в утреннем сообщении Telegram. */
+  morningDigestEnabled: boolean('morning_digest_enabled').notNull().default(true),
   theme: varchar('theme', { length: 10 }).notNull().default('system'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
