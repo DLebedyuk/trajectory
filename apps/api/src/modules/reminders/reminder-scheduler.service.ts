@@ -1,10 +1,18 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { and, eq, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
-import { todayInTimezone, toDateOnly, zonedDateTimeToUtc } from '@planner/shared';
+import { and, eq, gte, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
+import { addDaysToDateOnly, todayInTimezone, toDateOnly, zonedDateTimeToUtc } from '@planner/shared';
 import type { TimeSlot } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
-import { reminderDeliveries, reminders, tasks, userSettings, users } from '../../db/schema.js';
+import {
+  calendarEvents,
+  calendars,
+  reminderDeliveries,
+  reminders,
+  tasks,
+  userSettings,
+  users,
+} from '../../db/schema.js';
 import { NOTIFICATION_PROVIDER } from './notification.token.js';
 import type { NotificationProvider } from './providers/notification.provider.js';
 import { SLOT_ORDER, timeForSlot, type SlotTimes } from './reminders.service.js';
@@ -12,11 +20,21 @@ import { SLOT_ORDER, timeForSlot, type SlotTimes } from './reminders.service.js'
 const MAX_ATTEMPTS = 3;
 
 /** Текст-заголовок бакета — одинаковый для «настоящих» и «догоняющих» напоминаний слота. */
-const SLOT_HEADER: Record<TimeSlot, string> = {
-  morning: 'Доброе утро. Вы хотели сегодня:',
+const SLOT_HEADER: Record<'day' | 'evening', string> = {
   day: 'Днём Вы хотели:',
   evening: 'Вечером Вы хотели:',
 };
+
+/*
+  Утреннее сообщение — единственное с двумя разделами: «Сегодня» (дела из
+  календаря + задачи с дедлайном сегодня или завтра) и «Напоминания» (то же,
+  что и раньше — напоминания слота и задачи с remindAt). Раздел появляется,
+  только если в нём реально есть строки — иначе сообщение выглядело бы как
+  пустой заголовок без содержания.
+*/
+const MORNING_GREETING = 'Доброе утро.';
+const MORNING_DIGEST_HEADER = 'Сегодня:';
+const MORNING_REMINDERS_HEADER = 'Напоминания:';
 
 interface PlannedDelivery {
   userId: string;
@@ -38,7 +56,10 @@ interface PlannedDelivery {
 
 interface Bucket {
   delivery: PlannedDelivery;
+  /** Напоминания слота и задачи с remindAt — как было всегда. */
   lines: string[];
+  /** Только для утра: дела из календаря и задачи с дедлайном сегодня/завтра. */
+  digestLines: string[];
 }
 
 /**
@@ -164,6 +185,36 @@ export class ReminderSchedulerService {
           onceMissedTaskIds: once?.taskId ? [once.taskId] : [],
         },
         lines: [line],
+        digestLines: [],
+      });
+    };
+
+    /*
+      Тот же бакет по ключу «morning:userId:today», что и bucketFor — календарь
+      и дедлайны попадают в ту же доставку, что и напоминания того же утра, а
+      не улетают вторым отдельным сообщением. once не нужен: сводка не
+      участвует в системе «пропущено/догнать».
+    */
+    const digestFor = (userId: string, today: string, at: Date, line: string): void => {
+      const key = `morning:${userId}:${today}`;
+      const existing = buckets.morning.get(key);
+      if (existing) {
+        existing.digestLines.push(line);
+        return;
+      }
+      buckets.morning.set(key, {
+        delivery: {
+          userId,
+          reminderId: null,
+          taskId: null,
+          scheduledFor: at,
+          idempotencyKey: key,
+          text: '',
+          onceMissedReminderIds: [],
+          onceMissedTaskIds: [],
+        },
+        lines: [],
+        digestLines: [line],
       });
     };
 
@@ -301,7 +352,101 @@ export class ReminderSchedulerService {
       bucketFor('morning', t.userId, today, at, line);
     }
 
-    for (const slot of SLOT_ORDER) {
+    /*
+      Утренняя сводка: дела из календаря на сегодня и задачи с дедлайном
+      сегодня или завтра. И то и другое до сих пор не попадало в Telegram
+      вообще — только показывалось на главной странице веба. Окно выборки —
+      тот же приём cutoffDate/coarseDate, что и выше: широкая, заведомо
+      безопасная граница в SQL, точная проверка «какой сегодня день у этого
+      человека» — уже в JS.
+    */
+    const coarseLow = toDateOnly(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+    const coarseHigh = toDateOnly(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000));
+
+    const calendarRows = await this.db
+      .select({
+        userId: calendarEvents.userId,
+        title: calendarEvents.title,
+        date: calendarEvents.date,
+        time: calendarEvents.time,
+        allDay: calendarEvents.allDay,
+        timezone: users.timezone,
+        morningTime: userSettings.morningTime,
+      })
+      .from(calendarEvents)
+      .innerJoin(calendars, eq(calendars.id, calendarEvents.calendarId))
+      .innerJoin(users, eq(users.id, calendarEvents.userId))
+      .leftJoin(userSettings, eq(userSettings.userId, calendarEvents.userId))
+      .where(
+        and(
+          eq(calendars.enabled, true),
+          gte(calendarEvents.date, coarseLow),
+          lte(calendarEvents.date, coarseHigh),
+        ),
+      )
+      .orderBy(calendarEvents.time);
+
+    for (const row of calendarRows) {
+      const timezone = row.timezone || 'UTC';
+      const today = todayInTimezone(timezone, now);
+      const date = String(row.date).slice(0, 10);
+      if (date !== today) continue;
+
+      const morningTime = row.morningTime ?? '10:00';
+      const at = zonedDateTimeToUtc(today, morningTime, timezone);
+      if (at > now) continue;
+
+      const line = row.allDay ? row.title : `${row.time} — ${row.title}`;
+      digestFor(row.userId, today, at, line);
+    }
+
+    const deadlineTaskRows = await this.db
+      .select({
+        userId: tasks.userId,
+        title: tasks.title,
+        deadline: tasks.deadline,
+        timezone: users.timezone,
+        morningTime: userSettings.morningTime,
+      })
+      .from(tasks)
+      .innerJoin(users, eq(users.id, tasks.userId))
+      .leftJoin(userSettings, eq(userSettings.userId, tasks.userId))
+      .where(
+        and(
+          eq(tasks.status, 'open'),
+          isNotNull(tasks.deadline),
+          gte(tasks.deadline, coarseLow),
+          lte(tasks.deadline, coarseHigh),
+        ),
+      )
+      .orderBy(tasks.deadline);
+
+    for (const row of deadlineTaskRows) {
+      const timezone = row.timezone || 'UTC';
+      const today = todayInTimezone(timezone, now);
+      const tomorrow = addDaysToDateOnly(today, 1);
+      const deadline = String(row.deadline).slice(0, 10);
+      if (deadline !== today && deadline !== tomorrow) continue;
+
+      const morningTime = row.morningTime ?? '10:00';
+      const at = zonedDateTimeToUtc(today, morningTime, timezone);
+      if (at > now) continue;
+
+      const line = `${row.title} — дедлайн ${deadline === today ? 'сегодня' : 'завтра'}`;
+      digestFor(row.userId, today, at, line);
+    }
+
+    for (const bucket of buckets.morning.values()) {
+      const parts: string[] = [];
+      if (bucket.digestLines.length > 0) {
+        parts.push(`${MORNING_DIGEST_HEADER}\n${bucket.digestLines.map((l) => `— ${l}`).join('\n')}`);
+      }
+      if (bucket.lines.length > 0) {
+        parts.push(`${MORNING_REMINDERS_HEADER}\n${bucket.lines.map((l) => `— ${l}`).join('\n')}`);
+      }
+      bucket.delivery.text = `${MORNING_GREETING}\n\n${parts.join('\n\n')}`;
+    }
+    for (const slot of ['day', 'evening'] as const) {
       for (const bucket of buckets[slot].values()) {
         bucket.delivery.text = `${SLOT_HEADER[slot]}\n${bucket.lines.map((l) => `— ${l}`).join('\n')}`;
       }
