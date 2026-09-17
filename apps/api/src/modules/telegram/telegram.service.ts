@@ -136,7 +136,21 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       this.logger.log(`Webhook установлен: ${env.TELEGRAM_WEBHOOK_URL}`);
       return;
     }
-    void this.bot.start({ onStart: () => this.logger.log('Бот запущен в режиме long polling') });
+    /*
+      bot.start() возвращает промис, который висит, пока бот работает, и
+      реджектится, если long polling падает без возможности восстановиться
+      (например, Telegram какое-то время отвечал ошибкой на getUpdates).
+      `void` без .catch() — самый частый источник «то приходит, то нет»:
+      планировщик напоминаний в этом же процессе не зависит от polling и
+      продолжает слать сводки по расписанию, а вот на сообщения от людей
+      бот молча переставал отвечать — причём без единой строки в логах.
+    */
+    this.bot
+      .start({ onStart: () => this.logger.log('Бот запущен в режиме long polling') })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e);
+        this.logger.error(`Long polling остановился без восстановления: ${message}`);
+      });
   }
 
   async onModuleDestroy(): Promise<void> {
