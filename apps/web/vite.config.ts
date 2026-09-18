@@ -7,10 +7,16 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     VitePWA({
+      // Десктоп: файлы и так вшиты в exe, офлайн-кеш не нужен, а service
+      // worker от прошлой сборки может залипнуть в профиле WebView2 и
+      // подсовывать старый бандл поверх нового exe. selfDestroying сносит
+      // такой SW и его кеш при следующем запуске вместо того, чтобы
+      // регистрировать новый.
+      selfDestroying: mode === 'desktop',
       // autoUpdate, а не prompt: интерфейса «доступна новая версия» у нас нет,
       // поэтому при prompt новый service worker вставал в очередь и навсегда
       // оставался ждать, а браузер продолжал отдавать старую сборку из кеша.
@@ -65,4 +71,4 @@ export default defineConfig({
       '/api': { target: process.env.VITE_API_URL ?? 'http://localhost:3000', changeOrigin: true },
     },
   },
-});
+}));

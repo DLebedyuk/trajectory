@@ -1,6 +1,23 @@
 import { api } from '../api/client.js';
 
 /**
+ * Полный сброс вместо простого location.reload(): в desktop-сборке у
+ * WebView2 есть свой профиль, переживающий пересборку exe, и старый service
+ * worker может годами отдавать закэшированный бандл поверх свежего кода.
+ */
+async function hardReload() {
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.unregister()));
+  }
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  }
+  window.location.reload();
+}
+
+/**
  * Состояние неавторизованного пользователя. Показывается вместо приложения,
  * чтобы не мигать пустыми экранами и не делать запросов, которые всё равно
  * вернут 401.
@@ -56,6 +73,10 @@ export function LoginPage({ googleConfigured }: { googleConfigured: boolean }) {
             <code>DEV_AUTH=true</code>.
           </p>
         )}
+
+        <button type="button" className="reload-btn" onClick={() => void hardReload()}>
+          Обновить
+        </button>
       </div>
     </div>
   );
