@@ -122,6 +122,24 @@ describe('утренняя сводка: календарь и дедлайны 
     expect(morning!.indexOf('Сегодня:')).toBeLessThan(morning!.indexOf('Напоминания:'));
   });
 
+  it('задача с remindAt и дедлайном на сегодня попадает в сообщение один раз, а не дважды', async () => {
+    await db.insert(schema.tasks).values({
+      userId: TEST_USER_ID,
+      projectId,
+      title: 'Сдать отчёт',
+      deadline: '2026-09-14',
+      remindAt: '2026-09-14',
+    });
+
+    const sent = await collect(new Date(MORNING_UTC));
+    const morning = sent.find((t) => t.includes('Доброе утро'));
+
+    expect(morning).toBeDefined();
+    expect(morning?.match(/Сдать отчёт/g)?.length).toBe(1);
+    expect(morning).toContain('Сдать отчёт — дедлайн сегодня');
+    expect(morning).not.toContain('Напоминания:');
+  });
+
   it('только календарь и дедлайны, без единого напоминания — раздел «Напоминания» не появляется', async () => {
     const calendarId = await makeCalendar();
     await db.insert(schema.calendarEvents).values({

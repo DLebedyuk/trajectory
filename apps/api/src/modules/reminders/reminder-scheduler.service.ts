@@ -156,6 +156,14 @@ export class ReminderSchedulerService {
       day: new Map(),
       evening: new Map(),
     };
+    /*
+      У задачи remindAt и deadline независимы — можно выставить оба на
+      сегодня. Без этого трекинга такая задача попадала в одно и то же
+      утреннее сообщение дважды: строкой в «Напоминания» (по remindAt) и
+      строкой в «Сегодня» (по дедлайну). Ключ включает today конкретного
+      пользователя — у него уже свой часовой пояс.
+    */
+    const remindedTaskIds = new Set<string>();
 
     const bucketFor = (
       slot: TimeSlot,
@@ -343,6 +351,7 @@ export class ReminderSchedulerService {
             line,
             repeat ? undefined : { taskId: t.id },
           );
+          if (target.slot === 'morning') remindedTaskIds.add(`${t.userId}:${today}:${t.id}`);
         }
         continue;
       }
@@ -350,6 +359,7 @@ export class ReminderSchedulerService {
       const at = zonedDateTimeToUtc(date, slotTimes.morningTime, timezone);
       if (at > now) continue;
       bucketFor('morning', t.userId, today, at, line);
+      remindedTaskIds.add(`${t.userId}:${today}:${t.id}`);
     }
 
     /*
@@ -404,6 +414,7 @@ export class ReminderSchedulerService {
 
     const deadlineTaskRows = await this.db
       .select({
+        id: tasks.id,
         userId: tasks.userId,
         title: tasks.title,
         deadline: tasks.deadline,
@@ -431,6 +442,7 @@ export class ReminderSchedulerService {
       const tomorrow = addDaysToDateOnly(today, 1);
       const deadline = String(row.deadline).slice(0, 10);
       if (deadline !== today && deadline !== tomorrow) continue;
+      if (remindedTaskIds.has(`${row.userId}:${today}:${row.id}`)) continue;
 
       const morningTime = row.morningTime ?? '10:00';
       const at = zonedDateTimeToUtc(today, morningTime, timezone);
