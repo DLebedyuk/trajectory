@@ -54,6 +54,10 @@ export function InboxPage() {
   const [batch, setBatch] = useState<(InboxProposal & { on: boolean })[] | null>(null);
   const [thought, setThought] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  // без этого повторный тап по «Применить» (частый на медленной сети, когда
+  // не видно мгновенного отклика) успевал уйти вторым запросом и заводил
+  // дубль задачи/напоминания раньше, чем первый ответ убирал карточку из списка
+  const [applyingIds, setApplyingIds] = useState<Set<string>>(new Set());
 
   const projectQueries = useQueries({
     queries: (directions.data ?? []).map((d) => ({
@@ -99,6 +103,16 @@ export function InboxPage() {
   });
   const applyOne = useMutation({
     mutationFn: (proposal: InboxProposal) => api.inbox.apply([proposal]),
+    onMutate: (proposal) => {
+      setApplyingIds((prev) => new Set(prev).add(proposal.inboxItemId));
+    },
+    onSettled: (_data, _error, proposal) => {
+      setApplyingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(proposal.inboxItemId);
+        return next;
+      });
+    },
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: qk.inbox });
       toast.show(result.applied ? 'Разобрано' : (result.skipped[0]?.reason ?? 'Не удалось'));
@@ -162,6 +176,7 @@ export function InboxPage() {
                 directionName: directionName(p.directionId),
               }))}
               directions={(directions.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
+              saving={applyingIds.has(item.id)}
               onSave={(proposal) => applyOne.mutate({ ...proposal, inboxItemId: item.id })}
               onDelete={() => remove.mutate(item.id)}
             />
@@ -184,6 +199,7 @@ export function InboxPage() {
             </Button>
             <Button
               variant="primary"
+              disabled={apply.isPending}
               onClick={() =>
                 apply.mutate((batch ?? []).filter((b) => b.on).map(({ on: _on, ...rest }) => rest))
               }
@@ -354,6 +370,7 @@ function InboxCard({
   createdAt,
   projects,
   directions,
+  saving,
   onSave,
   onDelete,
 }: {
@@ -362,6 +379,7 @@ function InboxCard({
   createdAt: string;
   projects: { id: string; title: string; directionName: string }[];
   directions: { id: string; name: string }[];
+  saving: boolean;
   onSave: (proposal: Omit<InboxProposal, 'inboxItemId'> & { inboxItemId: string }) => void;
   onDelete: () => void;
 }) {
@@ -481,6 +499,7 @@ function InboxCard({
         <button
           type="button"
           className="apply"
+          disabled={saving}
           onClick={() =>
             onSave({
               inboxItemId: '',
@@ -497,7 +516,7 @@ function InboxCard({
         >
           Применить
         </button>
-        <button type="button" className="del" onClick={onDelete}>
+        <button type="button" className="del" disabled={saving} onClick={onDelete}>
           Удалить
         </button>
       </div>

@@ -193,38 +193,17 @@ export function ProjectPage() {
             </h4>
 
             <div className="proj-filters">
-              <span className="lbl">Время</span>
-              {DURATIONS.map((d) => (
-                <button
-                  key={d.value}
-                  type="button"
-                  className={`chip${filterState.estimatedDuration === d.value ? ' is-active' : ''}`}
-                  aria-pressed={filterState.estimatedDuration === d.value}
-                  onClick={() => setFilter({ estimatedDuration: d.value })}
-                >
-                  {d.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                className={`chip${filterState.withDeadlineOnly ? ' is-active' : ''}`}
-                aria-pressed={filterState.withDeadlineOnly}
-                onClick={() => setFilter({ withDeadlineOnly: !filterState.withDeadlineOnly })}
+              <select
+                aria-label="Фильтр по времени"
+                value={filterState.estimatedDuration}
+                onChange={(e) => setFilter({ estimatedDuration: e.target.value })}
               >
-                только со сроком
-              </button>
-              <label className="sort">
-                Порядок{' '}
-                <select
-                  aria-label="Порядок"
-                  value={filterState.sort}
-                  onChange={(e) => setFilter({ sort: e.target.value })}
-                >
-                  <option value="manual">вручную</option>
-                  <option value="deadline">сначала ближайшие</option>
-                  <option value="pinned">сначала важные</option>
-                </select>
-              </label>
+                {DURATIONS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {openTasks.length > 0 ? (

@@ -1,8 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, FormField, Modal, useToast } from '@planner/ui';
+import type { TouchWithContext } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { qk } from '../api/queries.js';
+
+/** Из последних касаний оставляем по одному на уникальное «что было» — не журнал, а быстрый доступ к повторяющимся действиям. */
+function dedupeByTitle(touches: TouchWithContext[], max: number): TouchWithContext[] {
+  const seen = new Set<string>();
+  const out: TouchWithContext[] = [];
+  for (const t of touches) {
+    const key = t.title.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+    if (out.length >= max) break;
+  }
+  return out;
+}
 
 /** Запись касания. Фактическое время не спрашиваем — считается сам факт работы. */
 export function TouchModal({
@@ -48,11 +63,19 @@ export function TouchModal({
     queryFn: () => api.projects.listByDirection(dir),
     enabled: open && Boolean(dir),
   });
+  const recentTouches = useQuery({
+    queryKey: qk.touches({ limit: 30 }),
+    queryFn: () => api.touches.list({ limit: 30 }),
+    enabled: open,
+  });
+  const recent = dedupeByTitle(recentTouches.data ?? [], 6);
+
+  const effectiveDir = dir || directionId || '';
 
   const create = useMutation({
     mutationFn: () =>
       api.touches.create({
-        directionId: dir,
+        directionId: effectiveDir,
         projectId: projectId || null,
         date,
         title,
@@ -68,9 +91,8 @@ export function TouchModal({
       setComment('');
       onOpenChange(false);
     },
+    onError: () => toast.show('Не удалось записать касание'),
   });
-
-  const effectiveDir = dir || directionId || '';
 
   return (
     <Modal
@@ -93,6 +115,29 @@ export function TouchModal({
         </>
       }
     >
+      {recent.length > 0 ? (
+        <div className="field">
+          <span className="lbl">Недавние</span>
+          <div className="chips">
+            {recent.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className="chip"
+                onClick={() => {
+                  setDir(t.directionId);
+                  setProjectId(t.projectId ?? '');
+                  setTitle(t.title);
+                }}
+              >
+                <i className="dot" style={{ background: `var(${t.directionColor})` }} />
+                {t.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="field">
         <span className="lbl">Направление</span>
         <div className="chips">

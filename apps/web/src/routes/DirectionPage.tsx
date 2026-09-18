@@ -40,7 +40,7 @@ export function DirectionPage() {
   const direction = useDirection(directionId);
   const projects = useProjects(directionId);
   const heat = useHeatmap(26, directionId);
-  const touches = useTouches({ directionId, limit: 5 });
+  const touches = useTouches({ directionId, limit: 2 });
   const dashboard = useDashboard();
 
   // дата, с которой открыта запись касания: null — закрыто. Клик по пустому

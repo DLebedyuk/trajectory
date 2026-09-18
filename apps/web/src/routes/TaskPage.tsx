@@ -36,6 +36,7 @@ export function TaskPage() {
   const [comment, setComment] = useState('');
   const [itemOpen, setItemOpen] = useState(false);
   const [itemText, setItemText] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!task.data) return;
@@ -188,16 +189,6 @@ export function TaskPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="task-time">Точное время</label>
-              <input
-                id="task-time"
-                className="val"
-                type="time"
-                value={exactTime}
-                onChange={(e) => setExactTime(e.target.value)}
-              />
-            </div>
-            <div className="field">
               <label htmlFor="task-duration">Примерно займёт</label>
               <select
                 id="task-duration"
@@ -277,18 +268,18 @@ export function TaskPage() {
 
         {/*
           Удаление задачи стоит отдельно от всего остального: рядом с
-          «Сохранить» его слишком легко нажать по инерции.
+          «Сохранить» его слишком легко нажать по инерции. Сам клик по кнопке
+          ничего не удаляет — сначала подтверждение в модалке.
         */}
-        <div className="card danger-zone">
-          <div>
-            <b>Удалить задачу</b>
-            <p className="hint">Насовсем, вместе с чек-листом. Отменить будет нечем.</p>
-          </div>
-          <Button variant="ghost" danger onClick={() => remove.mutate()}>
-            <IconTrash />
-            Удалить
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          danger
+          style={{ marginTop: 16 }}
+          onClick={() => setDeleteOpen(true)}
+        >
+          <IconTrash />
+          Удалить задачу
+        </Button>
       </div>
 
       <Modal
@@ -310,6 +301,24 @@ export function TaskPage() {
           <input type="text" value={itemText} onChange={(e) => setItemText(e.target.value)} />
         </FormField>
       </Modal>
+
+      <Modal
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Удалить задачу?"
+        description="Насовсем, вместе с чек-листом. Отменить будет нечем."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
+              Отмена
+            </Button>
+            <Button variant="primary" danger onClick={() => remove.mutate()}>
+              <IconTrash />
+              Удалить
+            </Button>
+          </>
+        }
+      />
 
       {completeDialog}
     </>
