@@ -1,0 +1,242 @@
+/*
+  Публичная страница /onboarding. Только существующие токены из
+  @planner/ui/styles.css: невалидный var() не откатывается к предыдущему
+  значению, а сбрасывает свойство — на этом уже теряли модалку и карту.
+*/
+.onb {
+  min-height: 100vh;
+  background: linear-gradient(170deg, var(--bg) 0%, var(--surface-2) 100%);
+  color: var(--text);
+  padding: 48px 16px 64px;
+  box-sizing: border-box;
+}
+.onb * {
+  box-sizing: border-box;
+}
+.onb > * {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------- первый экран ---------- */
+.onb-hero {
+  text-align: center;
+  padding-bottom: 12px;
+}
+.onb-logo {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  margin: 0 auto 18px;
+  background: linear-gradient(135deg, var(--c-act), var(--c-eng));
+  box-shadow: inset 0 0 0 12px color-mix(in srgb, var(--surface) 75%, transparent);
+}
+.onb-hero h1 {
+  font-family: 'Literata', serif;
+  font-size: 34px;
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+.onb-lead {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-2);
+  max-width: 520px;
+  margin: 0 auto 28px;
+}
+.onb-heat {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 18 / 7;
+  margin: 0 auto;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.onb-heat span {
+  border-radius: 3px;
+  background: var(--heat-empty);
+}
+.onb-heat-caption {
+  font-size: 12px;
+  color: var(--text-3);
+  margin: 8px 0 26px;
+}
+
+/* ---------- кнопка входа ---------- */
+.onb-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 260px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  /* как у кнопки на экране входа: белая в обеих темах, текст фиксирован */
+  background: #fff;
+  color: #1f1f1f;
+  border: 1px solid #dadce0;
+  transition: background var(--transition);
+}
+.onb-cta:hover {
+  background: #f5f5f5;
+}
+.onb-cta--open {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent-border);
+}
+.onb-cta--open:hover {
+  background: var(--accent-hover);
+}
+.onb-g-logo {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* ---------- секции ---------- */
+.onb-section {
+  margin-top: 56px;
+}
+.onb-section h2 {
+  font-family: 'Literata', serif;
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0 0 18px;
+}
+.onb-section h3 {
+  font-family: 'Golos Text', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.onb-section p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-2);
+  margin: 0;
+}
+.onb-section b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.onb-model {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.onb-model > div {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.onb-model-k {
+  font-weight: 600;
+  font-size: 15px;
+}
+.onb-model-v {
+  font-size: 13px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.onb-arrow {
+  align-self: center;
+  color: var(--text-3);
+}
+.onb-note {
+  margin-top: 14px !important;
+}
+
+.onb-steps {
+  list-style: none;
+  counter-reset: onb-step;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.onb-steps li {
+  counter-increment: onb-step;
+  position: relative;
+  padding-left: 46px;
+}
+.onb-steps li::before {
+  content: counter(onb-step);
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.onb-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.onb-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.onb-footer {
+  margin-top: 56px;
+  text-align: center;
+}
+.onb-footer p {
+  font-size: 13px;
+  color: var(--text-3);
+  margin: 14px 0 0;
+}
+
+@media (max-width: 640px) {
+  .onb {
+    padding-top: 32px;
+  }
+  .onb-hero h1 {
+    font-size: 28px;
+  }
+  .onb-model {
+    flex-direction: column;
+  }
+  .onb-arrow {
+    transform: rotate(90deg);
+  }
+  .onb-grid {
+    grid-template-columns: 1fr;
+  }
+  .onb-cta {
+    width: 100%;
+    min-width: 0;
+  }
+}

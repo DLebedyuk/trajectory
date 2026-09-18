@@ -543,6 +543,19 @@
 .login-card .perm-note b {
   color: var(--text-2);
 }
+.login-card .reload-btn {
+  display: block;
+  margin: 14px auto 0;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.login-card .reload-btn:hover {
+  color: var(--text-2);
+}
 
 /* ============ HOME ============ */
 .home-content {
@@ -2643,4 +2656,114 @@ body {
   font-size: 12px;
   color: var(--text-3);
   line-height: 1.4;
+}
+
+/* ============ ПОЕЗДКИ ============ */
+.trip-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.trip-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.trip-card .ttl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.trip-card .stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.trip-list-compact {
+  display: flex;
+  flex-direction: column;
+}
+.trip-compact-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.trip-compact-row:last-child {
+  border-bottom: none;
+}
+.trip-compact-row:hover {
+  color: var(--accent);
+}
+.trip-progress {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.checklist-group {
+  margin-bottom: 12px;
+}
+.qty-tag {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.qty-input {
+  width: 44px;
+  flex-shrink: 0;
+  text-align: center;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: none;
+  font: inherit;
+  color: var(--text);
+}
+.buy-tag {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: none;
+  font-size: 14px;
+  opacity: 0.4;
+  cursor: pointer;
+}
+.buy-tag.is-active {
+  opacity: 1;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.travel-library h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.travel-library h4 .btn {
+  margin-left: auto;
+}
+.travel-lib-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.travel-item-chip.is-archived {
+  opacity: 0.5;
 }

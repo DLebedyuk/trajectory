@@ -24,10 +24,18 @@ import type {
   ReminderToTaskInput,
   Settings,
   SnoozeReminderInput,
+  CreateTravelItemInput,
+  CreateTripChecklistItemInput,
+  CreateTripInput,
   Task,
   TaskFilter,
   TaskWithContext,
   TouchWithContext,
+  TravelCategory,
+  TravelItem,
+  Trip,
+  TripChecklistItem,
+  TripWithStats,
   UpdateDirectionInput,
   UpdateMediaItemInput,
   UpdateMenuItemInput,
@@ -35,6 +43,9 @@ import type {
   UpdateReminderInput,
   UpdateSettingsInput,
   UpdateTaskInput,
+  UpdateTravelItemInput,
+  UpdateTripChecklistItemInput,
+  UpdateTripInput,
   User,
 } from '@planner/contracts';
 
@@ -332,6 +343,36 @@ export const api = {
     pin: (id: string) => post<MediaItem>(`/api/media/${id}/pin`),
     unpin: (id: string) => post<MediaItem>(`/api/media/${id}/unpin`),
     remove: (id: string) => del<{ ok: true }>(`/api/media/${id}`),
+  },
+
+  travel: {
+    categories: () => get<TravelCategory[]>('/api/travel/categories'),
+    createCategory: (name: string) => post<TravelCategory>('/api/travel/categories', { name }),
+    items: (includeArchived = false) =>
+      get<TravelItem[]>('/api/travel/items', { includeArchived }),
+    createItem: (input: CreateTravelItemInput) => post<TravelItem>('/api/travel/items', input),
+    updateItem: (id: string, input: UpdateTravelItemInput) =>
+      patch<TravelItem>(`/api/travel/items/${id}`, input),
+    removeItem: (id: string) => del<{ ok: true }>(`/api/travel/items/${id}`),
+
+    trips: () => get<TripWithStats[]>('/api/travel/trips'),
+    trip: (id: string) => get<Trip>(`/api/travel/trips/${id}`),
+    createTrip: (input: CreateTripInput) => post<Trip>('/api/travel/trips', input),
+    updateTrip: (id: string, input: UpdateTripInput) =>
+      patch<Trip>(`/api/travel/trips/${id}`, input),
+    completeTrip: (id: string) => post<Trip>(`/api/travel/trips/${id}/complete`),
+    removeTrip: (id: string) => del<{ ok: true }>(`/api/travel/trips/${id}`),
+
+    checklist: (tripId: string) =>
+      get<TripChecklistItem[]>(`/api/travel/trips/${tripId}/checklist`),
+    addChecklistItem: (tripId: string, input: CreateTripChecklistItemInput) =>
+      post<TripChecklistItem>(`/api/travel/trips/${tripId}/checklist`, input),
+    updateChecklistItem: (tripId: string, itemId: string, input: UpdateTripChecklistItemInput) =>
+      patch<TripChecklistItem>(`/api/travel/trips/${tripId}/checklist/${itemId}`, input),
+    removeChecklistItem: (tripId: string, itemId: string) =>
+      del<{ ok: true }>(`/api/travel/trips/${tripId}/checklist/${itemId}`),
+    refreshChecklist: (tripId: string) =>
+      post<TripChecklistItem[]>(`/api/travel/trips/${tripId}/refresh-checklist`),
   },
 };
 

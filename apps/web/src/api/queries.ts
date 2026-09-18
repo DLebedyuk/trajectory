@@ -31,6 +31,11 @@ export const qk = {
   media: (kind?: string) => ['media', kind ?? 'all'] as const,
   mediaItem: (id: string) => ['mediaItem', id] as const,
   mediaCategories: ['mediaCategories'] as const,
+  travelCategories: ['travelCategories'] as const,
+  travelItems: ['travelItems'] as const,
+  trips: ['trips'] as const,
+  trip: (id: string) => ['trip', id] as const,
+  tripChecklist: (id: string) => ['tripChecklist', id] as const,
 };
 
 /** Всё, на что влияет смена активной задачи или закрепления. */
@@ -126,6 +131,19 @@ export const useMediaItem = (id: string) =>
 export const useMediaCategories = () =>
   useQuery({ queryKey: qk.mediaCategories, queryFn: api.media.categories });
 export const useSettings = () => useQuery({ queryKey: qk.settings, queryFn: api.settings.get });
+export const useTravelCategories = () =>
+  useQuery({ queryKey: qk.travelCategories, queryFn: api.travel.categories });
+export const useTravelItems = () =>
+  useQuery({ queryKey: qk.travelItems, queryFn: () => api.travel.items() });
+export const useTrips = () => useQuery({ queryKey: qk.trips, queryFn: api.travel.trips });
+export const useTrip = (id: string) =>
+  useQuery({ queryKey: qk.trip(id), queryFn: () => api.travel.trip(id), enabled: Boolean(id) });
+export const useTripChecklist = (id: string) =>
+  useQuery({
+    queryKey: qk.tripChecklist(id),
+    queryFn: () => api.travel.checklist(id),
+    enabled: Boolean(id),
+  });
 
 /** Сделать задачу активной: направление её проекта уходит в фокус автоматически. */
 export function useActivateTask() {

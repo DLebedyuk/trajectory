@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   IconAuto,
   IconBook,
+  IconCalendar,
   IconDirections,
   IconHome,
   IconIdeas,
@@ -26,6 +27,7 @@ const NAV = [
   { to: '/reminders', label: 'Напоминания', badge: 'reminders' as const, Icon: IconBell },
   { to: '/menu', label: 'Меню', Icon: IconIdeas },
   { to: '/media', label: 'Книги и фильмы', Icon: IconBook },
+  { to: '/travel', label: 'Поездки', Icon: IconCalendar },
   { to: '/inbox', label: 'Входящие', badge: 'inbox' as const, Icon: IconInbox },
   { to: '/settings', label: 'Настройки', Icon: IconSettings },
 ];
@@ -55,6 +57,7 @@ const MORE_LINKS = [
     Icon: IconIdeas,
   },
   { to: '/touches', title: 'История касаний', sub: 'Все факты работы по дням', Icon: IconTouch },
+  { to: '/travel', title: 'Поездки', sub: 'Личная база вещей и чек-листы', Icon: IconCalendar },
   {
     // архив живёт кнопкой прямо на этой странице — свой пункт в «Ещё» дублировал бы её
     to: '/reminders',

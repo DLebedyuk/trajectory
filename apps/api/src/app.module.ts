@@ -11,6 +11,7 @@ import { RemindersModule } from './modules/reminders/reminders.module.js';
 import { InboxModule } from './modules/inbox/inbox.module.js';
 import { MenuModule } from './modules/menu/menu.module.js';
 import { MediaModule } from './modules/media/media.module.js';
+import { TravelModule } from './modules/travel/travel.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { DashboardModule } from './modules/dashboard/dashboard.module.js';
@@ -31,6 +32,7 @@ import { CalendarModule } from './modules/calendar/calendar.module.js';
     InboxModule,
     MenuModule,
     MediaModule,
+    TravelModule,
     SettingsModule,
     DashboardModule,
     HealthModule,

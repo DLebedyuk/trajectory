@@ -113,6 +113,13 @@
       "when": 1789327915230,
       "tag": "0015_windy_medusa",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789328111698,
+      "tag": "0016_stiff_king_cobra",
+      "breakpoints": true
     }
   ]
 }

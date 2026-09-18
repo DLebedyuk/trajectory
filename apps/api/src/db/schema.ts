@@ -413,6 +413,106 @@ export const mediaItems = pgTable(
   (t) => ({ byUser: index('media_user_idx').on(t.userId, t.kind) }),
 );
 
+export const travelCategories = pgTable(
+  'travel_categories',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 60 }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => ({ byUser: uniqueIndex('travel_categories_user_name_idx').on(t.userId, t.name) }),
+);
+
+export const travelItems = pgTable(
+  'travel_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 200 }).notNull(),
+    categoryId: uuid('category_id').references(() => travelCategories.id, {
+      onDelete: 'set null',
+    }),
+    /** Фиксированный набор тегов (см. @planner/contracts travelTag). */
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    alwaysInclude: boolean('always_include').notNull().default(false),
+    archived: boolean('archived').notNull().default(false),
+    createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byUser: index('travel_items_user_idx').on(t.userId, t.archived) }),
+);
+
+export const trips = pgTable(
+  'trips',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Необязательно: если пусто, на экране показывается city ?? country. */
+    name: varchar('name', { length: 200 }),
+    country: varchar('country', { length: 120 }).notNull(),
+    city: varchar('city', { length: 120 }),
+    startDate: date('start_date').notNull(),
+    endDate: date('end_date').notNull(),
+    purposes: jsonb('purposes').$type<string[]>().notNull().default([]),
+    transport: jsonb('transport').$type<string[]>().notNull().default([]),
+    conditions: jsonb('conditions')
+      .$type<{
+        canLaundry: boolean;
+        needsLaptop: boolean;
+        seaOrPool: boolean;
+        activeOutdoor: boolean;
+        specialEvent: boolean;
+        comment: string | null;
+      }>()
+      .notNull()
+      .default({
+        canLaundry: false,
+        needsLaptop: false,
+        seaOrPool: false,
+        activeOutdoor: false,
+        specialEvent: false,
+        comment: null,
+      }),
+    status: varchar('status', { length: 10 }).notNull().default('planning'),
+    /** Момент первой генерации чек-листа — пока пусто, кнопка предлагает создать, а не обновить. */
+    checklistGeneratedAt: timestamp('checklist_generated_at', { withTimezone: true }),
+    createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byUser: index('trips_user_idx').on(t.userId, t.startDate) }),
+);
+
+export const tripChecklistItems = pgTable(
+  'trip_checklist_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tripId: uuid('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    /** Пункт из личной базы — если вещь потом удалят, пункт в чек-листе останется. */
+    travelItemId: uuid('travel_item_id').references(() => travelItems.id, {
+      onDelete: 'set null',
+    }),
+    title: varchar('title', { length: 200 }).notNull(),
+    categoryId: uuid('category_id').references(() => travelCategories.id, {
+      onDelete: 'set null',
+    }),
+    packed: boolean('packed').notNull().default(false),
+    needToBuy: boolean('need_to_buy').notNull().default(false),
+    quantity: smallint('quantity').notNull().default(1),
+    note: text('note'),
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => ({ byTrip: index('trip_checklist_items_trip_idx').on(t.tripId, t.sortOrder) }),
+);
+
 /**
  * Подключённые календари и их события. В первой итерации наполняются seed-ом:
  * синхронизация с Google Calendar и Яндекс Календарём — следующий этап.
