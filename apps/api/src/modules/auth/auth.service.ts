@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { DB, type Database } from '../../db/db.module.js';
 import { oauthStates, sessions, userFocus, users, userSettings } from '../../db/schema.js';
 import { env } from '../../config/env.js';
@@ -26,7 +26,11 @@ export class AuthService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
   /** Одноразовый state живёт 10 минут и сгорает после первого использования. */
-  async createState(purpose: 'login' | 'calendar', userId?: string, redirectTo?: string) {
+  async createState(
+    purpose: 'login' | 'login-desktop' | 'calendar' | 'desktop-exchange',
+    userId?: string,
+    redirectTo?: string,
+  ) {
     const state = randomBytes(24).toString('base64url');
     await this.db.insert(oauthStates).values({
       state,
@@ -38,14 +42,23 @@ export class AuthService {
     return state;
   }
 
-  async consumeState(state: string, purpose: 'login' | 'calendar') {
+  async consumeState(state: string, purpose: 'calendar' | 'desktop-exchange') {
+    return this.consumeStateByPurposes(state, [purpose]);
+  }
+
+  /** Вход из десктопа начинается с purpose='login-desktop' — колбэк принимает оба варианта. */
+  async consumeLoginState(state: string) {
+    return this.consumeStateByPurposes(state, ['login', 'login-desktop']);
+  }
+
+  private async consumeStateByPurposes(state: string, purposes: string[]) {
     const [row] = await this.db
       .update(oauthStates)
       .set({ usedAt: new Date() })
       .where(
         and(
           eq(oauthStates.state, state),
-          eq(oauthStates.purpose, purpose),
+          inArray(oauthStates.purpose, purposes),
           isNull(oauthStates.usedAt),
           gt(oauthStates.expiresAt, new Date()),
         ),
@@ -53,6 +66,23 @@ export class AuthService {
       .returning();
     if (!row) throw ApiException.unauthorized('Ссылка входа устарела. Попробуйте ещё раз.');
     return row;
+  }
+
+  /**
+   * Второй шаг входа из десктопа: колбэк Google открывается в системном
+   * браузере, а не в WebView, поэтому кука сессии, выставленная там, до
+   * приложения не доходит. Вместо неё — короткоживущий одноразовый код в
+   * deep-link (traektoria://auth-callback?code=...), который WebView сразу
+   * меняет на настоящую сессию через POST /api/auth/desktop-exchange.
+   */
+  async createDesktopExchangeCode(userId: string): Promise<string> {
+    return this.createState('desktop-exchange', userId);
+  }
+
+  async consumeDesktopExchangeCode(code: string): Promise<string> {
+    const row = await this.consumeState(code, 'desktop-exchange');
+    if (!row.userId) throw ApiException.unauthorized('Код входа повреждён. Попробуйте ещё раз.');
+    return row.userId;
   }
 
   /**

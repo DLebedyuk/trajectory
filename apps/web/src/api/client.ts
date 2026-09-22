@@ -189,6 +189,11 @@ export const api = {
     /** Переход на Google — обычная навигация, не fetch. */
     loginUrl: (redirectTo?: string) =>
       `${BASE}/api/auth/google${redirectTo ? `?redirectTo=${encodeURIComponent(redirectTo)}` : ''}`,
+    /** Десктоп: открывается в системном браузере, а не в окне приложения — см. LoginPage. */
+    desktopLoginUrl: () => `${BASE}/api/auth/google?desktop=1`,
+    /** Меняет одноразовый код из deep-link (?code=...) на настоящую сессию. */
+    desktopExchange: (code: string) =>
+      post<{ ok: true }>(`/api/auth/desktop-exchange?code=${encodeURIComponent(code)}`),
     logout: () => post<{ ok: true }>('/api/auth/logout'),
   },
 

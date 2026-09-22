@@ -1,7 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Минимальный набор прав: только окно приложения. Доступ к файловой системе и оболочке намеренно не выдаётся.",
+  "description": "Минимальный набор прав: окно приложения, deep-link для возврата из Google-входа и открытие ссылки входа в системном браузере — больше файловая система и оболочка не трогаются.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-start-dragging"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "deep-link:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://yourtrajectory.app/*" }]
+    }
+  ]
 }

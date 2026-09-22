@@ -57,14 +57,23 @@ export class AuthController {
   }
 
   @Get('google')
-  async start(@Res() res: Response, @Query('redirectTo') redirectTo?: string) {
+  async start(
+    @Res() res: Response,
+    @Query('redirectTo') redirectTo?: string,
+    // desktop=1 — вход начат из Tauri-обёртки. Google откроется в системном
+    // браузере (embedded WebView он для OAuth не пускает), поэтому колбэк
+    // не должен возвращаться на сайт — см. callback() ниже.
+    @Query('desktop') desktop?: string,
+  ) {
     if (!isGoogleAuthConfigured) {
       throw ApiException.validation(
         'Вход через Google не настроен: не заданы GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET.',
       );
     }
     // проверяем на входе, чтобы в базу не попал чужой адрес
-    const state = await this.auth.createState('login', undefined, safeRedirect(redirectTo));
+    const state = desktop
+      ? await this.auth.createState('login-desktop')
+      : await this.auth.createState('login', undefined, safeRedirect(redirectTo));
     res.redirect(
       this.google.authorizeUrl({
         state,
@@ -86,18 +95,45 @@ export class AuthController {
       res.redirect(`${env.APP_BASE_URL}/?auth=denied`);
       return;
     }
-    const stateRow = await this.auth.consumeState(state, 'login');
+    const stateRow = await this.auth.consumeLoginState(state);
     const tokens = await this.google.exchangeCode(code, env.GOOGLE_AUTH_REDIRECT_URI);
     if (!tokens.idToken) throw ApiException.unauthorized('Google не вернул ID-токен');
 
     const profile = this.google.profileFromIdToken(tokens.idToken);
     const user = await this.auth.upsertGoogleUser(profile);
-    const { token, ttlMs } = await this.auth.createSession(user.id, req.headers['user-agent']);
     await this.auth.purgeExpired();
 
+    if (stateRow.purpose === 'login-desktop') {
+      // Эта вкладка живёт в системном браузере — кука сессии здесь бесполезна,
+      // до WebView приложения она не доедет. Вместо неё — одноразовый код,
+      // который приложение тут же обменяет на сессию сам, уже из своего окна.
+      const code = await this.auth.createDesktopExchangeCode(user.id);
+      res.redirect(`traektoria://auth-callback?code=${code}`);
+      return;
+    }
+
+    const { token, ttlMs } = await this.auth.createSession(user.id, req.headers['user-agent']);
     res.setHeader('Set-Cookie', sessionCookie(token, ttlMs));
     // и на выходе тоже: строка в базе могла появиться до этой проверки
     res.redirect(safeRedirect(stateRow.redirectTo));
+  }
+
+  /**
+   * Второй шаг входа из десктопа: WebView меняет одноразовый код из deep-link
+   * на настоящую сессию — см. AuthService.createDesktopExchangeCode.
+   */
+  @Post('desktop-exchange')
+  async desktopExchange(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('code') code?: string,
+  ) {
+    if (!code) throw ApiException.validation('Код входа обязателен.');
+    const userId = await this.auth.consumeDesktopExchangeCode(code);
+    const { token, ttlMs } = await this.auth.createSession(userId, req.headers['user-agent']);
+    await this.auth.purgeExpired();
+    res.setHeader('Set-Cookie', sessionCookie(token, ttlMs));
+    res.status(200).json({ ok: true });
   }
 
   @Post('logout')
