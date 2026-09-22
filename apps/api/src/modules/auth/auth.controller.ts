@@ -7,16 +7,26 @@ import { safeRedirect } from '../../common/safe-redirect.js';
 import { AuthService, SESSION_COOKIE } from './auth.service.js';
 import { GOOGLE_OAUTH, LOGIN_SCOPES, type GoogleOAuthClient } from './google-oauth.js';
 
-/** Кука сессии: недоступна из JS, не уходит на чужие сайты, в проде — только по HTTPS. */
-function sessionCookie(token: string, maxAgeMs: number): string {
+/**
+ * Кука сессии: недоступна из JS, в проде — только по HTTPS.
+ *
+ * SameSite=Lax по умолчанию: сайт и API — один origin, cross-site кука ни к
+ * чему. Десктоп — другое дело: WebView2 живёт на http://tauri.localhost, а
+ * API — на API-домене, и это cross-site fetch с точки зрения браузера. Кука
+ * с SameSite=Lax в такой fetch не попадает вообще (Lax пускает только
+ * top-level навигацию), поэтому обмен кода в AuthController.desktopExchange
+ * молча ничего не даёт без SameSite=None — а он обязателен только с Secure,
+ * иначе браузер куку целиком отбросит.
+ */
+function sessionCookie(token: string, maxAgeMs: number, crossSite = false): string {
   const parts = [
     `${SESSION_COOKIE}=${token}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
+    `SameSite=${crossSite ? 'None' : 'Lax'}`,
     `Max-Age=${Math.floor(maxAgeMs / 1000)}`,
   ];
-  if (env.NODE_ENV === 'production') parts.push('Secure');
+  if (env.NODE_ENV === 'production' || crossSite) parts.push('Secure');
   return parts.join('; ');
 }
 
@@ -132,7 +142,7 @@ export class AuthController {
     const userId = await this.auth.consumeDesktopExchangeCode(code);
     const { token, ttlMs } = await this.auth.createSession(userId, req.headers['user-agent']);
     await this.auth.purgeExpired();
-    res.setHeader('Set-Cookie', sessionCookie(token, ttlMs));
+    res.setHeader('Set-Cookie', sessionCookie(token, ttlMs, true));
     res.status(200).json({ ok: true });
   }
 
