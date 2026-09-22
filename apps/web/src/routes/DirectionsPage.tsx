@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  ConfirmModal,
   DEFAULT_DIRECTION_COLOR,
   DIRECTION_COLORS,
   FormField,
   Heatmap,
   IconPlus,
+  IconTrash,
   Modal,
   PageHeader,
   useToast,
@@ -30,6 +32,7 @@ export function DirectionsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState(DEFAULT_DIRECTION_COLOR);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -54,6 +57,17 @@ export function DirectionsPage() {
       setName('');
       setCreateOpen(false);
     },
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.directions.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.directions });
+      void qc.invalidateQueries({ queryKey: qk.dashboard });
+      toast.show('Направление удалено');
+      setDeleteTarget(null);
+    },
+    onError: () => toast.show('Не удалось удалить направление'),
   });
 
   if (directions.isLoading) return <Loading what="Загружаю направления" />;
@@ -103,6 +117,18 @@ export function DirectionsPage() {
                     {d.name}
                   </button>
                   {isFocus ? <span className="focus-badge">в фокусе</span> : null}
+                  <button
+                    type="button"
+                    className="row-del"
+                    aria-label={`Удалить направление: ${d.name}`}
+                    title="Удалить"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget({ id: d.id, name: d.name });
+                    }}
+                  >
+                    <IconTrash />
+                  </button>
                 </div>
                 <div className="stats">
                   {total} {plural(total, 'касание', 'касания', 'касаний')} · за неделю{' '}
@@ -189,6 +215,15 @@ export function DirectionsPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title={`Удалить направление «${deleteTarget?.name}»?`}
+        description="Вместе с ним удалятся все его проекты и задачи. Касания и статистика останутся."
+        pending={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </>
   );
 }

@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  ConfirmModal,
   EmptyState,
   FormField,
   IconPin,
   IconPinFilled,
   IconPlus,
+  IconTrash,
   Modal,
   PageHeader,
   useToast,
@@ -47,6 +49,7 @@ export function MediaPage() {
   const [categoryId, setCategoryId] = useState('');
   const [newGenre, setNewGenre] = useState('');
   const [emoji, setEmoji] = useState('📗');
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   // Сериалы живут на вкладке фильмов — по смыслу это одна полка.
   const media = useMedia();
@@ -107,6 +110,17 @@ export function MediaPage() {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: (id: string) => api.media.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['media'] });
+      void qc.invalidateQueries({ queryKey: qk.dashboard });
+      toast.show('Удалено');
+      setDeleteTarget(null);
+    },
+    onError: () => toast.show('Не удалось удалить'),
+  });
+
   if (media.isLoading) return <Loading what="Загружаю полку" />;
   if (media.isError) return <ErrorBox error={media.error} />;
 
@@ -146,14 +160,25 @@ export function MediaPage() {
         <span className={`status-badge ${STATUS_CLASS[m.status]}`}>
           {MEDIA_STATUS_LABELS[m.kind][m.status]}
         </span>
-        <button
-          type="button"
-          className={`pin${m.pinned ? ' is-pinned' : ''}`}
-          aria-label={m.pinned ? `Открепить «${m.title}»` : `Закрепить «${m.title}»`}
-          onClick={() => togglePin.mutate(m)}
-        >
-          {m.pinned ? <IconPinFilled /> : <IconPin />}
-        </button>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <button
+            type="button"
+            className={`pin${m.pinned ? ' is-pinned' : ''}`}
+            aria-label={m.pinned ? `Открепить «${m.title}»` : `Закрепить «${m.title}»`}
+            onClick={() => togglePin.mutate(m)}
+          >
+            {m.pinned ? <IconPinFilled /> : <IconPin />}
+          </button>
+          <button
+            type="button"
+            className="row-del"
+            aria-label={`Удалить «${m.title}»`}
+            title="Удалить"
+            onClick={() => setDeleteTarget({ id: m.id, title: m.title })}
+          >
+            <IconTrash />
+          </button>
+        </span>
       </div>
 
       <div className="ttl">{m.title}</div>
@@ -354,6 +379,14 @@ export function MediaPage() {
           статус можно поменять прямо на полке.
         </p>
       </Modal>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title={`Удалить «${deleteTarget?.title}»?`}
+        pending={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </>
   );
 }

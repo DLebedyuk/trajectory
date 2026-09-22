@@ -22,6 +22,7 @@ describe('важная задача', () => {
         onOpen={() => undefined}
         onComplete={() => undefined}
         onTogglePin={onTogglePin}
+        onDelete={() => undefined}
       />,
     );
 
@@ -38,6 +39,7 @@ describe('важная задача', () => {
         onOpen={() => undefined}
         onComplete={() => undefined}
         onTogglePin={onTogglePin}
+        onDelete={() => undefined}
       />,
     );
     expect(screen.getByRole('button', { name: /^Снять отметку «важная»: / })).toBeInTheDocument();
@@ -52,6 +54,7 @@ describe('важная задача', () => {
         onOpen={() => undefined}
         onComplete={() => undefined}
         onTogglePin={() => undefined}
+        onDelete={() => undefined}
       />,
     );
     expect(screen.queryByText(/бэклог/i)).not.toBeInTheDocument();

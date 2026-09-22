@@ -1,6 +1,7 @@
 export * from './Button.js';
 export * from './Checkbox.js';
 export * from './Modal.js';
+export * from './ConfirmModal.js';
 export * from './Dropdown.js';
 export * from './FormField.js';
 export * from './EmptyState.js';

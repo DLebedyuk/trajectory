@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import type {
   CreateDirectionInput,
   Direction,
@@ -7,7 +7,7 @@ import type {
   UpdateDirectionInput,
 } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
-import { directions, touches } from '../../db/schema.js';
+import { directions, projects, tasks, touches, userFocus } from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { dateOnly, isoRequired, iso } from '../../common/mappers.js';
 
@@ -39,8 +39,12 @@ export class DirectionsService {
       .from(directions)
       .where(
         includeArchived
-          ? eq(directions.userId, userId)
-          : and(eq(directions.userId, userId), isNull(directions.archivedAt)),
+          ? and(eq(directions.userId, userId), isNull(directions.deletedAt))
+          : and(
+              eq(directions.userId, userId),
+              isNull(directions.archivedAt),
+              isNull(directions.deletedAt),
+            ),
       )
       .orderBy(asc(directions.sortOrder), asc(directions.createdAt));
 
@@ -66,7 +70,9 @@ export class DirectionsService {
     const [row] = await this.db
       .select()
       .from(directions)
-      .where(and(eq(directions.userId, userId), eq(directions.id, id)))
+      .where(
+        and(eq(directions.userId, userId), eq(directions.id, id), isNull(directions.deletedAt)),
+      )
       .limit(1);
     if (!row) throw ApiException.notFound('Направление');
     return toDirection(row);
@@ -143,6 +149,60 @@ export class DirectionsService {
       .returning();
     if (!row) throw ApiException.notFound('Направление');
     return toDirection(row);
+  }
+
+  /**
+   * Удаление: направление и всё, что под ним (проекты, задачи), помечаются
+   * deletedAt — не пропадают из базы, только перестают где-либо
+   * показываться. Касания не трогаем: это факт работы, он остаётся
+   * привязанным к направлению независимо от судьбы его проектов.
+   */
+  async remove(userId: string, id: string): Promise<{ ok: true }> {
+    await this.get(userId, id);
+    const now = new Date();
+    await this.db.transaction(async (tx) => {
+      const ownProjects = await tx
+        .select({ id: projects.id })
+        .from(projects)
+        .where(and(eq(projects.userId, userId), eq(projects.directionId, id)));
+      const projectIds = ownProjects.map((p) => p.id);
+
+      if (projectIds.length > 0) {
+        await tx
+          .update(tasks)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(and(eq(tasks.userId, userId), inArray(tasks.projectId, projectIds)));
+        await tx
+          .update(projects)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(and(eq(projects.userId, userId), inArray(projects.id, projectIds)));
+      }
+
+      await tx
+        .update(directions)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(eq(directions.userId, userId), eq(directions.id, id)));
+
+      const [focus] = await tx.select().from(userFocus).where(eq(userFocus.userId, userId));
+      if (focus) {
+        const patch: { focusDirectionId?: null; activeTaskId?: null } = {};
+        if (focus.focusDirectionId === id) patch.focusDirectionId = null;
+        if (focus.activeTaskId) {
+          const [t] = await tx
+            .select({ projectId: tasks.projectId })
+            .from(tasks)
+            .where(eq(tasks.id, focus.activeTaskId));
+          if (t && projectIds.includes(t.projectId)) patch.activeTaskId = null;
+        }
+        if (Object.keys(patch).length > 0) {
+          await tx
+            .update(userFocus)
+            .set({ ...patch, updatedAt: now })
+            .where(eq(userFocus.userId, userId));
+        }
+      }
+    });
+    return { ok: true };
   }
 
   /** Последние касания направления — нужны его странице. */

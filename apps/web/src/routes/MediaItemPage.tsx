@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, FormField, IconPin, IconPinFilled, PageHeader, useToast } from '@planner/ui';
+import {
+  Button,
+  ConfirmModal,
+  FormField,
+  IconPin,
+  IconPinFilled,
+  PageHeader,
+  useToast,
+} from '@planner/ui';
 import { api } from '../api/client.js';
 import { qk, useMediaCategories, useMediaItem } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
@@ -18,6 +26,7 @@ export function MediaItemPage() {
   const [comment, setComment] = useState('');
   const [link, setLink] = useState('');
   const [startedAt, setStartedAt] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!item.data) return;
@@ -149,12 +158,20 @@ export function MediaItemPage() {
             <Button size="sm" variant="primary" onClick={() => save.mutate()}>
               Сохранить
             </Button>
-            <Button size="sm" variant="ghost" danger onClick={() => remove.mutate()}>
+            <Button size="sm" variant="ghost" danger onClick={() => setDeleteOpen(true)}>
               Удалить
             </Button>
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={`Удалить «${m.title}»?`}
+        pending={remove.isPending}
+        onConfirm={() => remove.mutate()}
+      />
     </>
   );
 }

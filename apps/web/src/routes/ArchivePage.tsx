@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, EmptyState, PageHeader, useToast } from '@planner/ui';
+import { Button, ConfirmModal, EmptyState, IconTrash, PageHeader, useToast } from '@planner/ui';
 import { humanDate, plural, todayInTimezone } from '@planner/shared';
 import { api } from '../api/client.js';
 import {
@@ -24,12 +25,25 @@ const counted = (n: number) =>
 export function DirectionArchivePage() {
   const { directionId = '' } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const toast = useToast();
   const dashboard = useDashboard();
   const direction = useDirection(directionId);
   const done = useDoneTasks(directionId, true);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
   const tasks = done.data ?? [];
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.tasks.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.doneTasks(directionId) });
+      toast.show('Задача удалена');
+      setDeleteTarget(null);
+    },
+    onError: () => toast.show('Не удалось удалить задачу'),
+  });
 
   if (done.isPending) return <Loading what="Загружаю завершённые задачи" />;
   if (done.isError) return <ErrorBox error={done.error} onRetry={() => void done.refetch()} />;
@@ -66,11 +80,28 @@ export function DirectionArchivePage() {
               <span className="date mono">
                 {t.completedAt ? humanDate(t.completedAt.slice(0, 10), today) : ''}
               </span>
-              <span />
+              <button
+                type="button"
+                className="row-del"
+                aria-label={`Удалить задачу: ${t.title}`}
+                title="Удалить"
+                onClick={() => setDeleteTarget({ id: t.id, title: t.title })}
+              >
+                <IconTrash />
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title={`Удалить задачу «${deleteTarget?.title}»?`}
+        description="Насовсем, вместе с чек-листом. Отменить будет нечем."
+        pending={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </>
   );
 }
@@ -85,6 +116,7 @@ export function ProjectArchivePage() {
   const dashboard = useDashboard();
   const project = useProject(projectId);
   const done = useTasks(projectId, { status: 'done' }, true);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
   const tasks = done.data ?? [];
@@ -98,6 +130,17 @@ export function ProjectArchivePage() {
     },
     // завершённый проект возврат задачи не разрешает — сервер объяснит почему
     onError: (e) => toast.show(e instanceof Error ? e.message : 'Не удалось вернуть задачу'),
+  });
+
+  const remove = useMutation({
+    mutationFn: (taskId: string) => api.tasks.remove(taskId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['tasks', projectId] });
+      void qc.invalidateQueries({ queryKey: qk.project(projectId) });
+      toast.show('Задача удалена');
+      setDeleteTarget(null);
+    },
+    onError: () => toast.show('Не удалось удалить задачу'),
   });
 
   if (done.isPending) return <Loading what="Загружаю завершённые задачи" />;
@@ -128,13 +171,33 @@ export function ProjectArchivePage() {
               <span className="date mono">
                 {t.completedAt ? humanDate(t.completedAt.slice(0, 10), today) : ''}
               </span>
-              <Button size="sm" variant="ghost" onClick={() => reopen.mutate(t.id)}>
-                Вернуть
-              </Button>
+              <span className="archive-row-actions">
+                <Button size="sm" variant="ghost" onClick={() => reopen.mutate(t.id)}>
+                  Вернуть
+                </Button>
+                <button
+                  type="button"
+                  className="row-del"
+                  aria-label={`Удалить задачу: ${t.title}`}
+                  title="Удалить"
+                  onClick={() => setDeleteTarget({ id: t.id, title: t.title })}
+                >
+                  <IconTrash />
+                </button>
+              </span>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+        title={`Удалить задачу «${deleteTarget?.title}»?`}
+        description="Насовсем, вместе с чек-листом. Отменить будет нечем."
+        pending={remove.isPending}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+      />
     </>
   );
 }

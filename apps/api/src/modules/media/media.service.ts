@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { CreateMediaItemInput, MediaItem, UpdateMediaItemInput } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import { mediaCategories, mediaItems } from '../../db/schema.js';
@@ -33,7 +33,7 @@ export class MediaService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
   async list(userId: string, kind?: string, categoryId?: string): Promise<MediaItem[]> {
-    const conditions = [eq(mediaItems.userId, userId)];
+    const conditions = [eq(mediaItems.userId, userId), isNull(mediaItems.deletedAt)];
     if (kind) conditions.push(eq(mediaItems.kind, kind));
     if (categoryId) conditions.push(eq(mediaItems.categoryId, categoryId));
     const rows = await this.db
@@ -50,7 +50,13 @@ export class MediaService {
       .select({ item: mediaItems, categoryName: mediaCategories.name })
       .from(mediaItems)
       .leftJoin(mediaCategories, eq(mediaCategories.id, mediaItems.categoryId))
-      .where(and(eq(mediaItems.userId, userId), eq(mediaItems.pinned, true)))
+      .where(
+        and(
+          eq(mediaItems.userId, userId),
+          eq(mediaItems.pinned, true),
+          isNull(mediaItems.deletedAt),
+        ),
+      )
       .orderBy(asc(mediaItems.kind), desc(mediaItems.updatedAt));
     return rows.map((r) => toItem(r.item, r.categoryName));
   }
@@ -60,7 +66,9 @@ export class MediaService {
       .select({ item: mediaItems, categoryName: mediaCategories.name })
       .from(mediaItems)
       .leftJoin(mediaCategories, eq(mediaCategories.id, mediaItems.categoryId))
-      .where(and(eq(mediaItems.userId, userId), eq(mediaItems.id, id)));
+      .where(
+        and(eq(mediaItems.userId, userId), eq(mediaItems.id, id), isNull(mediaItems.deletedAt)),
+      );
     if (!row) throw ApiException.notFound('Книга или фильм');
     return toItem(row.item, row.categoryName);
   }
@@ -126,9 +134,12 @@ export class MediaService {
     return this.get(userId, id);
   }
 
+  /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
   async remove(userId: string, id: string): Promise<{ ok: true }> {
+    await this.get(userId, id);
     await this.db
-      .delete(mediaItems)
+      .update(mediaItems)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(mediaItems.userId, userId), eq(mediaItems.id, id)));
     return { ok: true };
   }

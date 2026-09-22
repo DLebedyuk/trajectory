@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNotNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import type {
   CreateTaskInput,
   Task,
@@ -45,7 +45,11 @@ export class TasksService {
   ) {}
 
   async listByProject(userId: string, projectId: string, filter: TaskFilter = {}): Promise<Task[]> {
-    const conditions = [eq(tasks.userId, userId), eq(tasks.projectId, projectId)];
+    const conditions = [
+      eq(tasks.userId, userId),
+      eq(tasks.projectId, projectId),
+      isNull(tasks.deletedAt),
+    ];
     conditions.push(eq(tasks.status, filter.status ?? 'open'));
     if (filter.estimatedDuration)
       conditions.push(eq(tasks.estimatedDuration, filter.estimatedDuration));
@@ -100,7 +104,12 @@ export class TasksService {
 
   /** Закреплённые открытые задачи пользователя вместе с проектом и направлением. */
   async listPinned(userId: string, directionId?: string): Promise<TaskWithContext[]> {
-    const conditions = [eq(tasks.userId, userId), eq(tasks.pinned, true), eq(tasks.status, 'open')];
+    const conditions = [
+      eq(tasks.userId, userId),
+      eq(tasks.pinned, true),
+      eq(tasks.status, 'open'),
+      isNull(tasks.deletedAt),
+    ];
     if (directionId) conditions.push(eq(projects.directionId, directionId));
     const rows = await this.db
       .select({ id: tasks.id })
@@ -138,6 +147,7 @@ export class TasksService {
           eq(tasks.userId, userId),
           eq(tasks.status, 'open'),
           isNotNull(tasks.deadline),
+          isNull(tasks.deletedAt),
           condition,
         ),
       )
@@ -164,6 +174,7 @@ export class TasksService {
           eq(tasks.userId, userId),
           eq(tasks.status, 'done'),
           eq(projects.directionId, directionId),
+          isNull(tasks.deletedAt),
         ),
       )
       .orderBy(desc(tasks.completedAt));
@@ -276,7 +287,7 @@ export class TasksService {
     const [row] = await this.db
       .select()
       .from(tasks)
-      .where(and(eq(tasks.userId, userId), eq(tasks.id, id)))
+      .where(and(eq(tasks.userId, userId), eq(tasks.id, id), isNull(tasks.deletedAt)))
       .limit(1);
     if (!row) throw ApiException.notFound('Задача');
     return row;
@@ -362,10 +373,21 @@ export class TasksService {
     return toTask(row as Row);
   }
 
+  /**
+   * Мягкое удаление: строка остаётся в базе, но нигде не показывается —
+   * работает и для завершённых задач. Касание, записанное при завершении
+   * именно этой задачи, удаляется по-настоящему вместе с ней: иначе
+   * карта касаний хранила бы запись о работе над задачей, которой
+   * человек сам сказал, что её не должно было быть.
+   */
   async remove(userId: string, id: string): Promise<{ ok: true }> {
     await this.assertExists(userId, id);
     await this.focus.clearIfActive(userId, id);
-    await this.db.delete(tasks).where(and(eq(tasks.userId, userId), eq(tasks.id, id)));
+    await this.touches.removeForTask(userId, id);
+    await this.db
+      .update(tasks)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(tasks.userId, userId), eq(tasks.id, id)));
     return { ok: true };
   }
 

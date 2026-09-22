@@ -236,6 +236,7 @@ export const api = {
     update: (id: string, input: UpdateDirectionInput) =>
       patch<Direction>(`/api/directions/${id}`, input),
     archive: (id: string) => post<Direction>(`/api/directions/${id}/archive`),
+    remove: (id: string) => del<{ ok: true }>(`/api/directions/${id}`),
   },
 
   projects: {
@@ -250,6 +251,7 @@ export const api = {
     pause: (id: string) => post<Project>(`/api/projects/${id}/pause`),
     resume: (id: string) => post<Project>(`/api/projects/${id}/resume`),
     complete: (id: string) => post<Project>(`/api/projects/${id}/complete`),
+    remove: (id: string) => del<{ ok: true }>(`/api/projects/${id}`),
   },
 
   tasks: {

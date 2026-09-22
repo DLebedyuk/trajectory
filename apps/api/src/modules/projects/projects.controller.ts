@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -81,5 +82,10 @@ export class ProjectsController {
   @Post(':id/complete')
   complete(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.service.complete(userId, id);
+  }
+
+  @Delete(':id')
+  remove(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.service.remove(userId, id);
   }
 }

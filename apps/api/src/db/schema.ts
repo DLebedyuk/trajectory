@@ -160,6 +160,8 @@ export const directions = pgTable(
     // которые не тянут на задачу, но должны лежать рядом с направлением
     notes: jsonb('notes').$type<string[]>().notNull().default([]),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
+    /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: now(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -188,6 +190,8 @@ export const projects = pgTable(
     pinned: boolean('pinned').notNull().default(false),
     createdAt: now(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -221,6 +225,8 @@ export const tasks = pgTable(
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: now(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
+    /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -408,6 +414,8 @@ export const mediaItems = pgTable(
     status: varchar('status', { length: 10 }).notNull().default('want'),
     rating: smallint('rating').notNull().default(0),
     createdAt: now(),
+    /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ byUser: index('media_user_idx').on(t.userId, t.kind) }),

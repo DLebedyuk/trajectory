@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Focus, TaskWithContext } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import { directions, projects, taskChecklistItems, tasks, userFocus } from '../../db/schema.js';
@@ -29,7 +29,7 @@ export class FocusService {
       .from(tasks)
       .innerJoin(projects, eq(projects.id, tasks.projectId))
       .innerJoin(directions, eq(directions.id, projects.directionId))
-      .where(and(eq(tasks.userId, userId), eq(tasks.id, taskId)))
+      .where(and(eq(tasks.userId, userId), eq(tasks.id, taskId), isNull(tasks.deletedAt)))
       .limit(1);
     if (!row) return null;
     const checklist = await this.db

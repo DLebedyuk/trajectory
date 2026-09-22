@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  ConfirmModal,
   FormField,
   IconCheck,
   IconPin,
@@ -302,22 +303,13 @@ export function TaskPage() {
         </FormField>
       </Modal>
 
-      <Modal
+      <ConfirmModal
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Удалить задачу?"
         description="Насовсем, вместе с чек-листом. Отменить будет нечем."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
-              Отмена
-            </Button>
-            <Button variant="primary" danger onClick={() => remove.mutate()}>
-              <IconTrash />
-              Удалить
-            </Button>
-          </>
-        }
+        pending={remove.isPending}
+        onConfirm={() => remove.mutate()}
       />
 
       {completeDialog}

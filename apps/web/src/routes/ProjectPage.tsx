@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  ConfirmModal,
   FormField,
   IconPause,
   IconPlus,
@@ -68,6 +69,9 @@ export function ProjectPage() {
   const [deadline, setDeadline] = useState('');
   const [duration, setDuration] = useState('');
   const [note, setNote] = useState('');
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState<{ id: string; title: string } | null>(
+    null,
+  );
 
   const activeTaskId = dashboard.data?.focus.activeTaskId ?? null;
   // Активная задача — глобальное состояние; в списке она просто подсвечена.
@@ -124,6 +128,18 @@ export function ProjectPage() {
         notes: (project.data?.notes ?? []).filter((_, i) => i !== index),
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.project(projectId) }),
+  });
+
+  const removeTask = useMutation({
+    mutationFn: (id: string) => api.tasks.remove(id),
+    onSuccess: () => {
+      invalidateFocusScope(qc, projectId);
+      void qc.invalidateQueries({ queryKey: ['tasks', projectId] });
+      void qc.invalidateQueries({ queryKey: qk.project(projectId) });
+      toast.show('Задача удалена');
+      setDeleteTaskTarget(null);
+    },
+    onError: () => toast.show('Не удалось удалить задачу'),
   });
 
   if (project.isLoading) return <Loading what="Загружаю проект" />;
@@ -216,6 +232,7 @@ export function ProjectPage() {
                   onOpen={() => navigate(`/tasks/${t.id}`)}
                   onComplete={() => askComplete(t.id, t.title)}
                   onTogglePin={() => togglePin.mutate({ taskId: t.id, pinned: t.pinned })}
+                  onDelete={() => setDeleteTaskTarget({ id: t.id, title: t.title })}
                 />
               ))
             ) : (
@@ -322,6 +339,15 @@ export function ProjectPage() {
       </Modal>
 
       {completeDialog}
+
+      <ConfirmModal
+        open={deleteTaskTarget !== null}
+        onOpenChange={(v) => !v && setDeleteTaskTarget(null)}
+        title={`Удалить задачу «${deleteTaskTarget?.title}»?`}
+        description="Насовсем, вместе с чек-листом. Отменить будет нечем."
+        pending={removeTask.isPending}
+        onConfirm={() => deleteTaskTarget && removeTask.mutate(deleteTaskTarget.id)}
+      />
     </div>
   );
 }

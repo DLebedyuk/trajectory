@@ -1,4 +1,4 @@
-import { IconPin, IconPinFilled } from '@planner/ui';
+import { IconPin, IconPinFilled, IconTrash } from '@planner/ui';
 import { DURATION_LABEL, formatLongDate } from '@planner/shared';
 import type { Task } from '@planner/contracts';
 
@@ -19,6 +19,7 @@ export function TaskLine({
   onOpen,
   onComplete,
   onTogglePin,
+  onDelete,
 }: {
   task: Task;
   isActive: boolean;
@@ -26,6 +27,7 @@ export function TaskLine({
   onOpen: () => void;
   onComplete: () => void;
   onTogglePin: () => void;
+  onDelete: () => void;
 }) {
   const done = task.checklist.filter((c) => c.completed).length;
   const isDone = task.status === 'done';
@@ -63,6 +65,15 @@ export function TaskLine({
         onClick={onTogglePin}
       >
         {task.pinned ? <IconPinFilled /> : <IconPin />}
+      </button>
+      <button
+        type="button"
+        className="row-del"
+        aria-label={`Удалить задачу: ${task.title}`}
+        title="Удалить"
+        onClick={onDelete}
+      >
+        <IconTrash />
       </button>
     </div>
   );

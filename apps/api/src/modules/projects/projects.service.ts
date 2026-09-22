@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type {
   CreateProjectInput,
   Project,
@@ -41,7 +41,13 @@ export class ProjectsService {
     const rows = await this.db
       .select()
       .from(projects)
-      .where(and(eq(projects.userId, userId), eq(projects.directionId, directionId)))
+      .where(
+        and(
+          eq(projects.userId, userId),
+          eq(projects.directionId, directionId),
+          isNull(projects.deletedAt),
+        ),
+      )
       .orderBy(asc(projects.sortOrder), asc(projects.createdAt));
 
     const [focus] = await this.db.select().from(userFocus).where(eq(userFocus.userId, userId));
@@ -80,7 +86,7 @@ export class ProjectsService {
     const [row] = await this.db
       .select()
       .from(projects)
-      .where(and(eq(projects.userId, userId), eq(projects.id, id)))
+      .where(and(eq(projects.userId, userId), eq(projects.id, id), isNull(projects.deletedAt)))
       .limit(1);
     if (!row) throw ApiException.notFound('Проект');
     return toProject(row);
@@ -188,7 +194,9 @@ export class ProjectsService {
     const rows = await this.db
       .select()
       .from(projects)
-      .where(and(eq(projects.userId, userId), eq(projects.pinned, true)))
+      .where(
+        and(eq(projects.userId, userId), eq(projects.pinned, true), isNull(projects.deletedAt)),
+      )
       .orderBy(asc(projects.sortOrder));
     return rows.map(toProject);
   }
@@ -253,5 +261,41 @@ export class ProjectsService {
         .where(and(eq(projects.userId, userId), eq(projects.id, id)));
     });
     return this.get(userId, id);
+  }
+
+  /**
+   * Удаление: проект и все его задачи помечаются deletedAt — остаются в
+   * базе, но нигде не показываются. Касания не трогаем: они принадлежат
+   * направлению независимо от судьбы проекта.
+   */
+  async remove(userId: string, id: string): Promise<{ ok: true }> {
+    await this.get(userId, id);
+    const now = new Date();
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(tasks)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(eq(tasks.userId, userId), eq(tasks.projectId, id)));
+
+      await tx
+        .update(projects)
+        .set({ deletedAt: now, pinned: false, updatedAt: now })
+        .where(and(eq(projects.userId, userId), eq(projects.id, id)));
+
+      const [focus] = await tx.select().from(userFocus).where(eq(userFocus.userId, userId));
+      if (focus?.activeTaskId) {
+        const [t] = await tx
+          .select({ projectId: tasks.projectId })
+          .from(tasks)
+          .where(eq(tasks.id, focus.activeTaskId));
+        if (t?.projectId === id) {
+          await tx
+            .update(userFocus)
+            .set({ activeTaskId: null, updatedAt: now })
+            .where(eq(userFocus.userId, userId));
+        }
+      }
+    });
+    return { ok: true };
   }
 }

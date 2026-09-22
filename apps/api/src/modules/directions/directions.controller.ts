@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -58,5 +59,10 @@ export class DirectionsController {
   @Post(':id/restore')
   restore(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.service.restore(userId, id);
+  }
+
+  @Delete(':id')
+  remove(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.service.remove(userId, id);
   }
 }

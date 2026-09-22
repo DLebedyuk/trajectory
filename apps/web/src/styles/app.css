@@ -1138,7 +1138,7 @@
 /* ============ ARCHIVE ============ */
 .archive-row {
   display: grid;
-  grid-template-columns: 1fr 200px 100px 28px;
+  grid-template-columns: 1fr 200px 100px minmax(28px, auto);
   gap: 12px;
   align-items: center;
   padding: 10px 12px;
@@ -1146,6 +1146,11 @@
   border: 1px solid var(--line);
   border-radius: 9px;
   margin-bottom: 5px;
+}
+.archive-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .archive-row .ttl {
   font-size: 13px;

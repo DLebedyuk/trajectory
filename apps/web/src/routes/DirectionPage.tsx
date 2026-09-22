@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
+  ConfirmModal,
   FormField,
   Heatmap,
   IconPin,
@@ -55,6 +56,10 @@ export function DirectionPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [deleteProjectTarget, setDeleteProjectTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
 
@@ -91,6 +96,17 @@ export function DirectionPage() {
       setNoteOpen(false);
     },
   });
+  const removeProject = useMutation({
+    mutationFn: (id: string) => api.projects.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.projects(directionId) });
+      void qc.invalidateQueries({ queryKey: qk.direction(directionId) });
+      toast.show('Проект удалён');
+      setDeleteProjectTarget(null);
+    },
+    onError: () => toast.show('Не удалось удалить проект'),
+  });
+
   const removeNote = useMutation({
     mutationFn: (index: number) =>
       api.directions.update(directionId, {
@@ -160,6 +176,18 @@ export function DirectionPage() {
             {p.pinned ? <IconPinFilled /> : <IconPin />}
           </button>
         ) : null}
+        <button
+          type="button"
+          className="row-del"
+          aria-label={`Удалить проект: ${p.title}`}
+          title="Удалить"
+          onClick={(e) => {
+            e.stopPropagation();
+            setDeleteProjectTarget({ id: p.id, title: p.title });
+          }}
+        >
+          <IconTrash />
+        </button>
         <span className="stats">
           {p.openTaskCount
             ? `${p.openTaskCount} ${plural(p.openTaskCount, 'задача', 'задачи', 'задач')}`
@@ -424,6 +452,15 @@ export function DirectionPage() {
           <textarea rows={2} value={outcome} onChange={(e) => setOutcome(e.target.value)} />
         </FormField>
       </Modal>
+
+      <ConfirmModal
+        open={deleteProjectTarget !== null}
+        onOpenChange={(v) => !v && setDeleteProjectTarget(null)}
+        title={`Удалить проект «${deleteProjectTarget?.title}»?`}
+        description="Вместе с ним удалятся все его задачи. Касания и статистика направления останутся."
+        pending={removeProject.isPending}
+        onConfirm={() => deleteProjectTarget && removeProject.mutate(deleteProjectTarget.id)}
+      />
     </div>
   );
 }
