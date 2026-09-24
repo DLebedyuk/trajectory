@@ -113,6 +113,7 @@ describe('телеграм: подтверждение неоднозначно�
     expect(reply.actions?.map((a) => a.data)).toEqual([
       'remindyes:reminder-1',
       'remindedit:reminder-1',
+      'delete:reminder-1',
     ]);
   });
 
@@ -127,12 +128,13 @@ describe('телеграм: подтверждение неоднозначно�
     expect(reply.text).toContain('Напомню');
   });
 
-  it('«Да» на подтверждении открывает быстрые действия, ничего не пересоздавая', async () => {
+  it('«Да» на подтверждении просто отвечает «Записал» — без кнопок и без пересоздания', async () => {
     const service = makeService();
     const reply = await service.handleAction(USER_ID, CHAT_ID, 'remindyes:reminder-1', TODAY);
 
     expect(create).not.toHaveBeenCalled();
-    expect(reply.actions?.map((a) => a.data)).toEqual(['done:reminder-1', 'delete:reminder-1']);
+    expect(reply.text).toBe('Записал.');
+    expect(reply.actions).toBeUndefined();
   });
 
   it('«Изменить» ждёт свободный текст и правит то же напоминание, а не создаёт новое', async () => {

@@ -50,11 +50,6 @@ export interface BotReply {
   toast?: string;
 }
 
-const reminderActions = (reminderId: string): { label: string; data: string }[] => [
-  { label: 'Готово', data: `done:${reminderId}` },
-  { label: 'Удалить', data: `delete:${reminderId}` },
-];
-
 /**
  * Telegram-бот на grammY. Разбор фраз детерминированный (@planner/shared),
  * внешний ИИ не подключается. Бот пользуется теми же application services,
@@ -208,15 +203,6 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       .onConflictDoNothing();
     this.logger.warn(`DEV: Telegram ${telegramUserId} связан с seed-пользователем ${user.id}`);
     return user.id;
-  }
-
-  private actionKeyboard(reminderId: string): InlineKeyboard {
-    const keyboard = new InlineKeyboard();
-    reminderActions(reminderId).forEach((a, i) => {
-      keyboard.text(a.label, a.data);
-      if (i % 2 === 1) keyboard.row();
-    });
-    return keyboard;
   }
 
   /**
@@ -382,9 +368,11 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       });
     }
 
-    // «Да» на подтверждении создания/правки — просто открывает быстрые действия
+    // «Да» на подтверждении создания/правки — сохранено уже при создании,
+    // остаётся только сказать об этом. Никаких кнопок следом: «Готово» тут
+    // читалось как «настроила» и молча отправляло напоминание в архив
     if (action === 'remindyes') {
-      return { text: 'Хорошо.', actions: reminderActions(value) };
+      return { text: 'Записал.' };
     }
 
     // «Изменить» — ждём свободный текст с новым временем, а не жмём в кнопки
@@ -441,8 +429,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
 
   /**
    * Единая карточка подтверждения — что для создания, что для правки.
-   * Ответ ровно два: «Да» (ничего решать не надо — сохранено уже сейчас,
-   * кнопка открывает быстрые действия) и «Изменить» (просто написать когда).
+   * Ответа три: «Да» (сохранено уже сейчас, бот просто отвечает «Записал»),
+   * «Изменить» (просто написать когда) и «Удалить».
    * Дата/время в тексте — то, что реально сохранил сервис, а не что просили:
    * прошедший слот мог уехать на завтра, «ближайший» — подобраться сам.
    */
@@ -457,6 +445,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       actions: [
         { label: 'Да', data: `remindyes:${reminder.id}` },
         { label: 'Изменить', data: `remindedit:${reminder.id}` },
+        { label: 'Удалить', data: `delete:${reminder.id}` },
       ],
     };
   }
