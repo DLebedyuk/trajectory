@@ -1888,7 +1888,9 @@
 */
 html,
 body {
-  overflow-x: hidden;
+  /* clip, а не hidden: hidden на обоих делает body отдельным контейнером
+     прокрутки, и sticky-панель слева уезжает вместе со страницей */
+  overflow-x: clip;
 }
 .scroll-x {
   overflow-x: auto;

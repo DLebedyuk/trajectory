@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from './render.js';
 import { makeDashboard, makeFocus, makeTask } from './fixtures.js';
@@ -71,5 +71,22 @@ describe('хвост просроченного на главной', () => {
     const toggle = await screen.findByRole('button', { name: /Просрочено: 1/ });
     await user.click(toggle);
     expect(await screen.findByText('Старая задача про сайт')).toBeInTheDocument();
+  });
+
+  it('просроченные задачи живут своей карточкой, а не в ленте «Сегодня»', async () => {
+    dashboard.mockResolvedValue(
+      makeDashboard({
+        dueTasks: [],
+        overdueTasks: [
+          makeTask({ id: 'old-1', title: 'Старая задача про сайт', deadline: '2026-07-01' }),
+        ],
+      }),
+    );
+    renderWithProviders(<HomePage />);
+
+    const card = await screen.findByRole('region', { name: 'Просроченные задачи' });
+    expect(within(card).getByRole('button', { name: /Просрочено: 1/ })).toBeInTheDocument();
+    const today = screen.getByRole('region', { name: 'Сегодня' });
+    expect(within(today).queryByText(/Просрочено/)).not.toBeInTheDocument();
   });
 });

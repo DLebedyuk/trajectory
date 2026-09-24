@@ -1,15 +1,12 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconBell, IconCalendar } from '@planner/ui';
-import { formatLongDate, plural } from '@planner/shared';
+import { plural } from '@planner/shared';
 import type { Reminder, TaskWithContext } from '@planner/contracts';
 import type { CalendarEventView } from '../api/client.js';
 
 export interface TodayBlockProps {
   events: CalendarEventView[];
   tasks: TaskWithContext[];
-  /** Задачи, чей срок прошёл. Показываются свёрнутыми и по желанию. */
-  overdue: TaskWithContext[];
   reminders: Reminder[];
   onCompleteTask: (id: string) => void;
   onCompleteReminder: (id: string) => void;
@@ -43,14 +40,12 @@ function Check({
 /**
  * «Сегодня» — лента дня по времени: события календаря, задачи со сроком и
  * напоминания с точным временем. Напоминания без времени во времени не
- * стоят, поэтому живут отдельной плашкой справа (SoftRemindersCard).
- * Просроченное свёрнуто: оно должно быть доступно, но не должно давить
- * сверху каждый день.
+ * стоят, поэтому живут отдельной плашкой (SoftRemindersCard). Просроченные
+ * задачи сюда не входят — у них своя карточка под фокусом (OverdueTasksCard).
  */
 export function TodayBlock({
   events,
   tasks,
-  overdue,
   reminders,
   onCompleteTask,
   onCompleteReminder,
@@ -59,7 +54,6 @@ export function TodayBlock({
   const timed = reminders
     .filter((r) => r.scheduledTime)
     .sort((a, b) => ((a.scheduledTime ?? '') < (b.scheduledTime ?? '') ? -1 : 1));
-  const [overdueOpen, setOverdueOpen] = useState(false);
   const total = events.length + tasks.length + timed.length;
 
   return (
@@ -123,30 +117,6 @@ export function TodayBlock({
         </div>
       ))}
 
-      {overdue.length > 0 ? (
-        <div>
-          <button
-            type="button"
-            className="overdue-toggle"
-            aria-expanded={overdueOpen}
-            onClick={() => setOverdueOpen((v) => !v)}
-          >
-            Просрочено: {overdue.length} {overdueOpen ? '· свернуть' : '· посмотреть'}
-          </button>
-          {overdueOpen
-            ? overdue.map((t) => (
-                <div className="t-row" key={t.id}>
-                  <span className="time mono">{t.deadline ? formatLongDate(t.deadline) : '—'}</span>
-                  <Check label={`Выполнить: ${t.title}`} onDone={() => onCompleteTask(t.id)} />
-                  <Link className="ttl" to={`/tasks/${t.id}`}>
-                    {t.title}
-                  </Link>
-                  <span className="meta">{t.projectTitle}</span>
-                </div>
-              ))
-            : null}
-        </div>
-      ) : null}
     </section>
   );
 }

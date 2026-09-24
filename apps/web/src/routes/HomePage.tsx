@@ -9,6 +9,7 @@ import { useCompleteTaskDialog } from '../features/CompleteTaskDialog.js';
 import { TodayBlock } from '../features/TodayBlock.js';
 import { SoftRemindersCard } from '../features/SoftRemindersCard.js';
 import { FocusCard } from '../features/FocusCard.js';
+import { OverdueTasksCard } from '../features/OverdueTasksCard.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
 import { PickPinnedProjectModal } from '../features/PickPinnedProjectModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
@@ -119,7 +120,6 @@ export function HomePage() {
           <TodayBlock
             events={data.events}
             tasks={data.dueTasks}
-            overdue={data.overdueTasks}
             reminders={data.todayReminders}
             onCompleteTask={(id) => askComplete(id)}
             onCompleteReminder={(id) => completeReminder.mutate(id)}
@@ -145,6 +145,8 @@ export function HomePage() {
             onChangeDirection={() => setDirOpen(true)}
             onClearFocus={() => setDirection.mutate({ directionId: null, onConflict: 'clearTask' })}
           />
+
+          <OverdueTasksCard tasks={data.overdueTasks} onComplete={(id) => askComplete(id)} />
 
           <div className="card">
             <h4>
