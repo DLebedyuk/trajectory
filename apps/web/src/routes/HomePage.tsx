@@ -13,9 +13,9 @@ import {
 } from '../api/queries.js';
 import { useCompleteTaskDialog } from '../features/CompleteTaskDialog.js';
 import { TodayBlock } from '../features/TodayBlock.js';
-import { SoftRemindersCard } from '../features/SoftRemindersCard.js';
 import { FocusCard } from '../features/FocusCard.js';
-import { OverdueTasksCard } from '../features/OverdueTasksCard.js';
+import { DeadlinesCard } from '../features/DeadlinesCard.js';
+import { RemindersCard } from '../features/RemindersCard.js';
 import { HabitsCard } from '../features/HabitsCard.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
 import { PickPinnedProjectModal } from '../features/PickPinnedProjectModal.js';
@@ -129,19 +129,12 @@ export function HomePage() {
 
       <div className="two-col">
         <div className="home-main">
-          <TodayBlock
-            events={data.events}
-            tasks={data.dueTasks}
-            reminders={data.todayReminders}
-            onCompleteTask={(id) => askComplete(id)}
-            onCompleteReminder={(id) => completeReminder.mutate(id)}
-            completingReminderIds={completingReminderIds}
-          />
+          <TodayBlock events={data.events} />
 
-          <SoftRemindersCard
-            reminders={data.todayReminders}
-            onComplete={(id) => completeReminder.mutate(id)}
-            completingIds={completingReminderIds}
+          <DeadlinesCard
+            due={data.dueTasks}
+            overdue={data.overdueTasks}
+            onComplete={(id) => askComplete(id)}
           />
 
           <FocusCard
@@ -157,8 +150,6 @@ export function HomePage() {
             onChangeDirection={() => setDirOpen(true)}
             onClearFocus={() => setDirection.mutate({ directionId: null, onConflict: 'clearTask' })}
           />
-
-          <OverdueTasksCard tasks={data.overdueTasks} onComplete={(id) => askComplete(id)} />
 
           <div className="card">
             <h4>
@@ -240,6 +231,12 @@ export function HomePage() {
         </div>
 
         <aside className="right-col">
+          <RemindersCard
+            reminders={data.todayReminders}
+            onComplete={(id) => completeReminder.mutate(id)}
+            completingIds={completingReminderIds}
+          />
+
           <div className="card menu-invite">
             <div>
               <div className="menu-invite-title">Хочется чего-нибудь совсем другого?</div>

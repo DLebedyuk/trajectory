@@ -1,75 +1,22 @@
-import { Link } from 'react-router-dom';
-import { IconBell, IconCalendar } from '@planner/ui';
+import { IconCalendar } from '@planner/ui';
 import { plural } from '@planner/shared';
-import type { Reminder, TaskWithContext } from '@planner/contracts';
 import type { CalendarEventView } from '../api/client.js';
 
-export interface TodayBlockProps {
-  events: CalendarEventView[];
-  tasks: TaskWithContext[];
-  reminders: Reminder[];
-  onCompleteTask: (id: string) => void;
-  onCompleteReminder: (id: string) => void;
-  /** Id завершающихся напоминаний — их кнопки блокируются на время запроса. */
-  completingReminderIds?: Set<string>;
-}
-
-const EMPTY_IDS: Set<string> = new Set();
-
-/** Кружок «выполнить». Событие календаря выполнить нельзя — у него нет кружка. */
-function Check({
-  label,
-  onDone,
-  disabled,
-}: {
-  label: string;
-  onDone: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className="check"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onDone}
-    />
-  );
-}
-
 /**
- * «Сегодня» — лента дня по времени: события календаря, задачи со сроком и
- * напоминания с точным временем. Напоминания без времени во времени не
- * стоят, поэтому живут отдельной плашкой (SoftRemindersCard). Просроченные
- * задачи сюда не входят — у них своя карточка под фокусом (OverdueTasksCard).
+ * «Сегодня» — только календарь: события подключённых календарей по времени.
+ * Задачи со сроком живут своей карточкой ниже (DeadlinesCard), напоминания —
+ * справа (RemindersCard): это три разных вида дел, и в одной ленте они
+ * смешивались до неразличимости.
  */
-export function TodayBlock({
-  events,
-  tasks,
-  reminders,
-  onCompleteTask,
-  onCompleteReminder,
-  completingReminderIds = EMPTY_IDS,
-}: TodayBlockProps) {
-  const timed = reminders
-    .filter((r) => r.scheduledTime)
-    .sort((a, b) => ((a.scheduledTime ?? '') < (b.scheduledTime ?? '') ? -1 : 1));
-  const total = events.length + tasks.length + timed.length;
-
+export function TodayBlock({ events }: { events: CalendarEventView[] }) {
   return (
     <section className="card today-block" aria-label="Сегодня">
-      <h4>
-        Сегодня
-        <span className="today-links">
-          <Link to="/reminders">Все напоминания</Link>
-          <Link to="/reminders/archive">Архив за 7 дней</Link>
-        </span>
-      </h4>
+      <h4>Сегодня</h4>
 
       <p className="hint today-sub">
-        {total > 0
-          ? `${total} ${plural(total, 'пункт', 'пункта', 'пунктов')} — события, сроки и напоминания`
-          : 'Свободный день. Можно взять что-нибудь из фокуса или ничего не брать.'}
+        {events.length > 0
+          ? `${events.length} ${plural(events.length, 'событие', 'события', 'событий')} в календаре`
+          : 'В календаре на сегодня пусто.'}
       </p>
 
       {events.map((e) => (
@@ -86,37 +33,6 @@ export function TodayBlock({
           </span>
         </div>
       ))}
-
-      {timed.map((r) => (
-        <div className="t-row" key={r.id}>
-          <span className="time mono">{r.scheduledTime}</span>
-          <Check
-            label={`Выполнить напоминание: ${r.text}`}
-            onDone={() => onCompleteReminder(r.id)}
-            disabled={completingReminderIds.has(r.id)}
-          />
-          <span className="ttl">{r.text}</span>
-          <span className="meta">
-            <IconBell /> напоминание{r.repeatRule ? ' · повторяется' : ''}
-          </span>
-        </div>
-      ))}
-
-      {tasks.length > 0 ? <p className="today-group-label">Дедлайны</p> : null}
-      {tasks.map((t) => (
-        <div className="t-row" key={t.id}>
-          <span className="time mono">{t.exactTime ?? 'до конца дня'}</span>
-          <Check label={`Выполнить: ${t.title}`} onDone={() => onCompleteTask(t.id)} />
-          <Link className="ttl" to={`/tasks/${t.id}`}>
-            {t.title}
-          </Link>
-          <span className="meta">
-            <i className="dir-dot" style={{ ['--c' as string]: `var(${t.directionColor})` }} />
-            {t.projectTitle} · {t.directionName}
-          </span>
-        </div>
-      ))}
-
     </section>
   );
 }

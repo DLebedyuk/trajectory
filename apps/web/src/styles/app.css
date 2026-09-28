@@ -799,35 +799,13 @@
   color: var(--text-3);
   margin: 10px 0 2px;
 }
-/* «Не забыть сегодня» — отдельная плашка правой колонки */
-.notime-card .notime-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 7px 0;
-  font-size: 13px;
-  border-bottom: 1px solid var(--line);
+.today-group-label.is-overdue {
+  color: var(--warn);
 }
-.notime-card .notime-row:last-child {
-  border-bottom: none;
+/* правая колонка узкая — колонка часов у напоминаний поуже */
+.reminders-card .t-row .time {
+  width: 38px;
 }
-.notime-card .notime-row .ttl {
-  color: var(--text);
-}
-/* раньше не было вообще никакого правила — кружок «выполнить» был нулевого
-   размера и невидим */
-.notime-card .notime-row .check {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--text);
-  flex-shrink: 0;
-  cursor: pointer;
-}
-.notime-card .notime-row .check:hover {
-  background: var(--surface-2);
-}
-
 /* Pinned row */
 .pinned-row {
   display: flex;
