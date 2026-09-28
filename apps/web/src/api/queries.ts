@@ -130,7 +130,8 @@ export const useMediaItem = (id: string) =>
   useQuery({ queryKey: qk.mediaItem(id), queryFn: () => api.media.get(id), enabled: Boolean(id) });
 export const useMediaCategories = () =>
   useQuery({ queryKey: qk.mediaCategories, queryFn: api.media.categories });
-export const useSettings = () => useQuery({ queryKey: qk.settings, queryFn: api.settings.get });
+export const useSettings = () =>
+  useQuery({ queryKey: qk.settings, queryFn: () => api.settings.get() });
 export const useTravelCategories = () =>
   useQuery({ queryKey: qk.travelCategories, queryFn: api.travel.categories });
 export const useTravelItems = () =>
@@ -187,8 +188,15 @@ export function useToggleProjectPin() {
 export function useCompleteTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, withTouch }: { taskId: string; withTouch: boolean }) =>
-      api.tasks.complete(taskId, withTouch),
+    mutationFn: ({
+      taskId,
+      withTouch,
+      touchDate,
+    }: {
+      taskId: string;
+      withTouch: boolean;
+      touchDate?: string;
+    }) => api.tasks.complete(taskId, withTouch, touchDate),
     onSuccess: (_data, { taskId }) => {
       invalidateFocusScope(qc);
       void qc.invalidateQueries({ queryKey: qk.task(taskId) });

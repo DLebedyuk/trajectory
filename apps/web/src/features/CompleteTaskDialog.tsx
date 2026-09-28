@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Checkbox, Modal } from '@planner/ui';
-import { useCompleteTask } from '../api/queries.js';
+import { Button, Checkbox, FormField, Modal } from '@planner/ui';
+import { todayInTimezone } from '@planner/shared';
+import { useCompleteTask, useSettings } from '../api/queries.js';
 
 interface Pending {
   id: string;
@@ -19,6 +20,9 @@ interface Pending {
  * Галочка включена по умолчанию: задача и есть занятие, просто запланированное,
  * и снимать её приходится реже, чем ставить.
  *
+ * День касания выбирается тут же: задачу могли сделать вчера, а закрыть в
+ * приложении только сегодня. По умолчанию — сегодня, будущее недоступно.
+ *
  * Задачу закрывают из трёх мест, поэтому диалог живёт в хуке: страница зовёт
  * askComplete и рисует dialog у себя, а поведение остаётся одно на всех.
  */
@@ -27,14 +31,18 @@ export function useCompleteTaskDialog(): {
   dialog: ReactNode;
 } {
   const complete = useCompleteTask();
+  const settings = useSettings();
   const [pending, setPending] = useState<Pending | null>(null);
   const [withTouch, setWithTouch] = useState(true);
+  const [touchDate, setTouchDate] = useState('');
+  // часовой пояс из настроек, а не браузера: так же считает «сегодня» сервер
+  const today = todayInTimezone(settings.data?.timezone ?? 'UTC');
 
   const close = (): void => setPending(null);
 
   const confirm = (): void => {
     if (!pending) return;
-    complete.mutate({ taskId: pending.id, withTouch });
+    complete.mutate({ taskId: pending.id, withTouch, touchDate: touchDate || today });
     close();
   };
 
@@ -74,8 +82,25 @@ export function useCompleteTaskDialog(): {
           <small>Появится в карте направления — так же, как записанное руками.</small>
         </span>
       </div>
+      {withTouch ? (
+        <FormField label="День касания">
+          <input
+            type="date"
+            value={touchDate || today}
+            max={today}
+            onChange={(e) => setTouchDate(e.target.value)}
+          />
+        </FormField>
+      ) : null}
     </Modal>
   );
 
-  return { askComplete: (id, title) => setPending({ id, title }), dialog };
+  return {
+    askComplete: (id, title) => {
+      // каждый новый диалог начинается с сегодняшнего дня, а не с прошлого выбора
+      setTouchDate('');
+      setPending({ id, title });
+    },
+    dialog,
+  };
 }

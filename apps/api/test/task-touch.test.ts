@@ -88,6 +88,24 @@ describe('касание из закрытой задачи', () => {
     });
   });
 
+  it('касание ложится на выбранный день — задачу могли сделать вчера', async () => {
+    const task = await makeTask();
+    await tasksService.complete(TEST_USER_ID, task.id, true, '2026-01-15');
+    const rows = await touches();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.date).toBe('2026-01-15');
+  });
+
+  it('касание в будущем не записывается, задача остаётся открытой', async () => {
+    const task = await makeTask();
+    await expect(
+      tasksService.complete(TEST_USER_ID, task.id, true, '2999-01-01'),
+    ).rejects.toThrow();
+    expect(await touches()).toHaveLength(0);
+    const [row] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, task.id));
+    expect(row?.status).toBe('open');
+  });
+
   it('повторное закрытие не плодит дубли', async () => {
     const task = await makeTask();
     await tasksService.complete(TEST_USER_ID, task.id, true);

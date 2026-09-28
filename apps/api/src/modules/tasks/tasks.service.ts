@@ -301,41 +301,55 @@ export class TasksService {
    * «позвонить в поликлинику». Массовое закрытие задач при завершении проекта
    * идёт мимо этого метода и касаний не создаёт — это уборка, а не занятие.
    */
-  async complete(userId: string, id: string, withTouch = false): Promise<Task> {
+  async complete(
+    userId: string,
+    id: string,
+    withTouch = false,
+    touchDate?: string,
+  ): Promise<Task> {
     await this.assertExists(userId, id);
+    const today = await this.todayFor(userId);
+    // касание — факт сделанного, будущего факта не бывает
+    if (withTouch && touchDate && touchDate > today) {
+      throw ApiException.validation('Касание не может быть в будущем');
+    }
     const [row] = await this.db
       .update(tasks)
       .set({ status: 'done', completedAt: new Date(), pinned: false, updatedAt: new Date() })
       .where(and(eq(tasks.userId, userId), eq(tasks.id, id)))
       .returning();
     await this.focus.clearIfActive(userId, id);
-    if (withTouch) await this.recordTouch(userId, row as Row);
+    if (withTouch) await this.recordTouch(userId, row as Row, touchDate ?? today);
     return toTask(row as Row);
   }
 
   /**
    * Направление у касания берётся через проект задачи: собственного поля
-   * направления у задачи нет и быть не должно. Дата — сегодняшняя в часовом
-   * поясе человека, иначе поздний вечер попадёт во вчерашнюю или завтрашнюю
-   * клетку карты.
+   * направления у задачи нет и быть не должно. Дата — выбранная при закрытии
+   * или сегодняшняя в часовом поясе человека (не UTC), иначе поздний вечер
+   * попадёт во вчерашнюю или завтрашнюю клетку карты.
    */
-  private async recordTouch(userId: string, task: Row): Promise<void> {
+  private async todayFor(userId: string): Promise<string> {
+    const [user] = await this.db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, userId));
+    return todayInTimezone(user?.timezone ?? 'UTC');
+  }
+
+  private async recordTouch(userId: string, task: Row, date: string): Promise<void> {
     const [project] = await this.db
       .select({ directionId: projects.directionId })
       .from(projects)
       .where(and(eq(projects.userId, userId), eq(projects.id, task.projectId)));
     if (!project) return;
-    const [user] = await this.db
-      .select({ timezone: users.timezone })
-      .from(users)
-      .where(eq(users.id, userId));
     await this.touches.createForTask({
       userId,
       taskId: task.id,
       directionId: project.directionId,
       projectId: task.projectId,
       title: task.title,
-      date: todayInTimezone(user?.timezone ?? 'UTC'),
+      date,
     });
   }
 

@@ -102,7 +102,8 @@ export class TasksController {
     @Param('id') id: string,
     @Body(zodBody(completeTaskSchema)) body: unknown,
   ) {
-    return this.service.complete(userId, id, (body as CompleteTaskInput).withTouch);
+    const { withTouch, touchDate } = body as CompleteTaskInput;
+    return this.service.complete(userId, id, withTouch, touchDate);
   }
 
   @Post(':id/reopen')
