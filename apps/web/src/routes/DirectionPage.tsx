@@ -20,6 +20,7 @@ import {
   qk,
   useDashboard,
   useDirection,
+  useHabits,
   useHeatmap,
   useProjects,
   useToggleProjectPin,
@@ -42,12 +43,17 @@ export function DirectionPage() {
   const projects = useProjects(directionId);
   const heat = useHeatmap(26, directionId);
   const touches = useTouches({ directionId, limit: 2 });
+  const habits = useHabits(directionId);
   const dashboard = useDashboard();
 
   // дата, с которой открыта запись касания: null — закрыто. Клик по пустому
   // дню на карте открывает сразу её, а не карточку «касаний не было»
   const [touchDate, setTouchDate] = useState<string | null>(null);
   const [day, setDay] = useState<string | null>(null);
+  // название касания из привычки; null — обычная запись касания
+  const [touchTitle, setTouchTitle] = useState<string | null>(null);
+  const [habitOpen, setHabitOpen] = useState(false);
+  const [habitTitle, setHabitTitle] = useState('');
   const [projectOpen, setProjectOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [outcome, setOutcome] = useState('');
@@ -62,6 +68,22 @@ export function DirectionPage() {
   } | null>(null);
 
   const today = dashboard.data?.today ?? todayInTimezone('UTC');
+
+  const addHabit = useMutation({
+    mutationFn: () => api.habits.create({ directionId, title: habitTitle }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['habits'] });
+      toast.show('Привычка добавлена');
+      setHabitTitle('');
+      setHabitOpen(false);
+    },
+    onError: () => toast.show('Не удалось добавить привычку'),
+  });
+  const removeHabit = useMutation({
+    mutationFn: (id: string) => api.habits.remove(id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['habits'] }),
+    onError: () => toast.show('Не удалось удалить привычку'),
+  });
 
   const createProject = useMutation({
     mutationFn: () =>
@@ -346,6 +368,49 @@ export function DirectionPage() {
 
         {/* Заметки направления — тот же блок, что внутри проекта, только уровнем выше */}
         <aside className="right-col">
+          {/* Привычки — «чем заняться, когда есть время». Без сроков и статуса;
+              клик записывает касание, а на главной они собраны со всех направлений */}
+          <div className="card">
+            <h4>
+              Привычки
+              <Button size="sm" variant="ghost" onClick={() => setHabitOpen(true)}>
+                <IconPlus />
+                Привычка
+              </Button>
+            </h4>
+            {(habits.data ?? []).length > 0 ? (
+              (habits.data ?? []).map((h) => (
+                <div className="note-row" key={h.id}>
+                  <button
+                    type="button"
+                    className="habit-row"
+                    title={`Записать касание: ${h.title}`}
+                    onClick={() => {
+                      setTouchTitle(h.title);
+                      setTouchDate(today);
+                    }}
+                  >
+                    <span className="ttl">{h.title}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="row-del"
+                    aria-label={`Удалить привычку: ${h.title}`}
+                    title="Удалить"
+                    onClick={() => removeHabit.mutate(h.id)}
+                  >
+                    <IconTrash />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="hint">
+                То, чем приятно заняться, когда выдалось время, — без расписания и обязательств.
+                Например: «попеть за пианино», «почитать».
+              </p>
+            )}
+          </div>
+
           <div className="card">
             <h4>
               Заметки
@@ -381,10 +446,15 @@ export function DirectionPage() {
 
       <TouchModal
         open={touchDate !== null}
-        onOpenChange={(v) => !v && setTouchDate(null)}
+        onOpenChange={(v) => {
+          if (v) return;
+          setTouchDate(null);
+          setTouchTitle(null);
+        }}
         directionId={directionId}
         today={today}
         initialDate={touchDate ?? undefined}
+        initialTitle={touchTitle ?? undefined}
       />
       <DayTouchesModal
         date={day}
@@ -404,6 +474,36 @@ export function DirectionPage() {
       />
 
       {conflictModal}
+
+      <Modal
+        open={habitOpen}
+        onOpenChange={setHabitOpen}
+        title="Новая привычка"
+        description="Чем приятно заняться, когда есть время. Ни срока, ни расписания у неё нет."
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setHabitOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!habitTitle.trim() || addHabit.isPending}
+              onClick={() => addHabit.mutate()}
+            >
+              Сохранить
+            </Button>
+          </>
+        }
+      >
+        <FormField label="Что">
+          <input
+            type="text"
+            value={habitTitle}
+            onChange={(e) => setHabitTitle(e.target.value)}
+            placeholder="Попеть за пианино"
+          />
+        </FormField>
+      </Modal>
 
       <Modal
         open={noteOpen}

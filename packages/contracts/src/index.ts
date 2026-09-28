@@ -10,3 +10,4 @@ export * from './menu.js';
 export * from './media.js';
 export * from './settings.js';
 export * from './travel.js';
+export * from './habit.js';

@@ -26,6 +26,7 @@ export function TouchModal({
   directionId,
   today,
   initialDate,
+  initialTitle,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -33,6 +34,8 @@ export function TouchModal({
   today: string;
   /** Дата, с которой открыли модалку — например, клик по пустому дню на карте касаний. */
   initialDate?: string;
+  /** Текст «Что было» заранее — например, касание из привычки. */
+  initialTitle?: string;
 }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -49,9 +52,9 @@ export function TouchModal({
     setDate(initialDate ?? today);
     setDir(directionId ?? '');
     setProjectId('');
-    setTitle('');
+    setTitle(initialTitle ?? '');
     setComment('');
-  }, [open, initialDate, today, directionId]);
+  }, [open, initialDate, initialTitle, today, directionId]);
 
   const directions = useQuery({
     queryKey: qk.directions,

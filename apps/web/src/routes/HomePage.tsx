@@ -4,12 +4,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Heatmap, IconBell, IconPlus, IconThought, Modal, useToast } from '@planner/ui';
 import { formatLongDate, humanDate, plural } from '@planner/shared';
 import { api } from '../api/client.js';
-import { invalidateFocusScope, qk, useDashboard, useDirections } from '../api/queries.js';
+import {
+  invalidateFocusScope,
+  qk,
+  useDashboard,
+  useDirections,
+  useHabits,
+} from '../api/queries.js';
 import { useCompleteTaskDialog } from '../features/CompleteTaskDialog.js';
 import { TodayBlock } from '../features/TodayBlock.js';
 import { SoftRemindersCard } from '../features/SoftRemindersCard.js';
 import { FocusCard } from '../features/FocusCard.js';
 import { OverdueTasksCard } from '../features/OverdueTasksCard.js';
+import { HabitsCard } from '../features/HabitsCard.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
 import { PickPinnedProjectModal } from '../features/PickPinnedProjectModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
@@ -25,6 +32,7 @@ export function HomePage() {
   const toast = useToast();
   const dashboard = useDashboard();
   const directions = useDirections();
+  const habits = useHabits();
   const { askComplete, dialog: completeDialog } = useCompleteTaskDialog();
 
   const [pickOpen, setPickOpen] = useState(false);
@@ -33,6 +41,10 @@ export function HomePage() {
   // дата, с которой открыта запись касания: null — закрыто. Клик по пустому
   // дню на карте открывает сразу её, а не карточку «касаний не было»
   const [touchDate, setTouchDate] = useState<string | null>(null);
+  // касание из привычки: направление и название подставлены заранее
+  const [touchHabit, setTouchHabit] = useState<{ directionId: string; title: string } | null>(
+    null,
+  );
   const [remindOpen, setRemindOpen] = useState(false);
   const [thoughtOpen, setThoughtOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -235,6 +247,14 @@ export function HomePage() {
             </div>
             <Button onClick={() => navigate('/menu')}>Открыть меню</Button>
           </div>
+
+          <HabitsCard
+            habits={habits.data ?? []}
+            onPick={(h) => {
+              setTouchHabit({ directionId: h.directionId, title: h.title });
+              setTouchDate(data.today);
+            }}
+          />
         </aside>
       </div>
 
@@ -303,9 +323,15 @@ export function HomePage() {
       />
       <TouchModal
         open={touchDate !== null}
-        onOpenChange={(v) => !v && setTouchDate(null)}
+        onOpenChange={(v) => {
+          if (v) return;
+          setTouchDate(null);
+          setTouchHabit(null);
+        }}
         today={data.today}
         initialDate={touchDate ?? undefined}
+        directionId={touchHabit?.directionId}
+        initialTitle={touchHabit?.title}
       />
       <ReminderModal open={remindOpen} onOpenChange={setRemindOpen} today={data.today} />
       <QuickThoughtModal open={thoughtOpen} onOpenChange={setThoughtOpen} />

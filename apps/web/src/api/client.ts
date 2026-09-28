@@ -1,6 +1,7 @@
 import type {
   ApplyInboxResult,
   CreateDirectionInput,
+  CreateHabitInput,
   CreateInboxItemInput,
   CreateMediaItemInput,
   CreateMenuItemInput,
@@ -11,6 +12,7 @@ import type {
   Direction,
   DirectionWithStats,
   Focus,
+  HabitWithContext,
   Heatmap,
   InboxItem,
   InboxProposal,
@@ -290,6 +292,13 @@ export const api = {
     clearDirection: () => del<Focus>('/api/focus/direction'),
     setActiveTask: (taskId: string | null) => put<Focus>('/api/focus/active-task', { taskId }),
     clearActiveTask: () => del<Focus>('/api/focus/active-task'),
+  },
+
+  habits: {
+    list: (directionId?: string) => get<HabitWithContext[]>('/api/habits', { directionId }),
+    create: (input: CreateHabitInput) => post<HabitWithContext>('/api/habits', input),
+    rename: (id: string, title: string) => patch<HabitWithContext>(`/api/habits/${id}`, { title }),
+    remove: (id: string) => del<{ id: string }>(`/api/habits/${id}`),
   },
 
   touches: {

@@ -7,6 +7,7 @@ import { ProjectsModule } from './modules/projects/projects.module.js';
 import { TasksModule } from './modules/tasks/tasks.module.js';
 import { FocusModule } from './modules/focus/focus.module.js';
 import { TouchesModule } from './modules/touches/touches.module.js';
+import { HabitsModule } from './modules/habits/habits.module.js';
 import { RemindersModule } from './modules/reminders/reminders.module.js';
 import { InboxModule } from './modules/inbox/inbox.module.js';
 import { MenuModule } from './modules/menu/menu.module.js';
@@ -28,6 +29,7 @@ import { CalendarModule } from './modules/calendar/calendar.module.js';
     TasksModule,
     FocusModule,
     TouchesModule,
+    HabitsModule,
     RemindersModule,
     InboxModule,
     MenuModule,

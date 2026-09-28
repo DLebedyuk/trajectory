@@ -22,6 +22,7 @@ export const qk = {
   pinnedProjects: ['pinnedProjects'] as const,
   doneTasks: (directionId: string) => ['doneTasks', directionId] as const,
   touches: (query: unknown) => ['touches', query] as const,
+  habits: (directionId?: string) => ['habits', directionId ?? 'all'] as const,
   heatmap: (weeks: number, directionId?: string) =>
     ['heatmap', weeks, directionId ?? 'all'] as const,
   reminders: ['reminders'] as const,
@@ -114,6 +115,9 @@ export const useHeatmap = (weeks: number, directionId?: string) =>
     queryKey: qk.heatmap(weeks, directionId),
     queryFn: () => api.touches.heatmap(weeks, directionId),
   });
+/** Привычки: без directionId — все, для главной; с ним — одного направления. */
+export const useHabits = (directionId?: string) =>
+  useQuery({ queryKey: qk.habits(directionId), queryFn: () => api.habits.list(directionId) });
 export const useTouches = (query: { directionId?: string; limit?: number }) =>
   useQuery({ queryKey: qk.touches(query), queryFn: () => api.touches.list(query) });
 export const useReminders = () =>

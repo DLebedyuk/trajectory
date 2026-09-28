@@ -2776,3 +2776,42 @@ body {
 .travel-item-chip.is-archived {
   opacity: 0.5;
 }
+
+/* ============ ПРИВЫЧКИ ============ */
+.habit-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.habit-row:last-child {
+  border-bottom: none;
+}
+.habit-row .ttl {
+  flex: 1;
+  min-width: 0;
+}
+.habit-row .meta {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.habit-row:hover .ttl {
+  color: var(--accent);
+}
+.habits-card .hint {
+  margin-bottom: 4px;
+}
+/* в списке направления строка привычки живёт внутри note-row рядом с корзиной */
+.note-row .habit-row {
+  padding: 0;
+  border-bottom: none;
+}

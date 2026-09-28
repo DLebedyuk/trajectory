@@ -250,6 +250,31 @@ export const taskChecklistItems = pgTable(
   (t) => ({ byTask: index('checklist_task_idx').on(t.taskId, t.sortOrder) }),
 );
 
+/*
+  Привычки — то, чем приятно заняться, когда выдалось время: «попеть за
+  пианино», «почитать». Не проект и не задача: без сроков, без статуса и
+  без обязательности. Живут внутри направления, а отмечаются касанием.
+*/
+export const habits = pgTable(
+  'habits',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    directionId: uuid('direction_id')
+      .notNull()
+      .references(() => directions.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 200 }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: now(),
+    /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byDirection: index('habits_direction_idx').on(t.directionId, t.sortOrder) }),
+);
+
 export const touches = pgTable(
   'touches',
   {
