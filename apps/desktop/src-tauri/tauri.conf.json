@@ -6,8 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm --filter @planner/web dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "pnpm --filter @planner/web build:desktop",
-    "frontendDist": "../../web/dist"
+    "frontendDist": "https://yourtrajectory.app"
   },
   "app": {
     "windows": [

@@ -1,8 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Минимальный набор прав: окно приложения, deep-link для возврата из Google-входа и открытие ссылки входа в системном браузере — больше файловая система и оболочка не трогаются.",
+  "description": "Минимальный набор прав: окно приложения, deep-link для возврата из Google-входа и открытие ссылки входа в системном браузере — больше файловая система и оболочка не трогаются. Окно открывает сайт с сервера (см. frontendDist в tauri.conf.json), поэтому права выданы и этому адресу: иначе вход через браузер не сможет ни открыть ссылку, ни услышать возврат по deep-link.",
   "windows": ["main"],
+  "remote": { "urls": ["https://yourtrajectory.app/*"] },
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

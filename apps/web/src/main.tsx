@@ -8,6 +8,7 @@ import '@planner/ui/styles.css';
 import './styles/app.css';
 import { App } from './App.js';
 import { applyTheme, useUiStore } from './store/ui.js';
+import { IS_DESKTOP } from './desktop.js';
 
 applyTheme(useUiStore.getState().theme);
 
@@ -17,9 +18,10 @@ applyTheme(useUiStore.getState().theme);
   не появилось». registerSW при autoUpdate сам перезагружает страницу, как
   только новая версия взяла управление. Вкладка PWA живёт днями, поэтому
   раз в час ещё и спрашиваем сервер, нет ли новой сборки.
-  На десктопе service worker не нужен (см. selfDestroying в vite.config).
+  В десктопе service worker не нужен: программа и так каждый раз открывает
+  сайт с сервера, а кэш WebView2 переживает перезапуски и умеет залипать.
 */
-if (import.meta.env.MODE !== 'desktop') {
+if (!IS_DESKTOP) {
   void import('virtual:pwa-register').then(({ registerSW }) => {
     registerSW({
       immediate: true,

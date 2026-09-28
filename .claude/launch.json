@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@planner/api",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "api-local",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "$env:DATABASE_URL='postgres://postgres:postgres@localhost:5432/planner'; $env:DEV_AUTH='true'; $env:TELEGRAM_MODE='off'; pnpm --filter @planner/api dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@planner/web",
+        "dev"
+      ],
+      "port": 5173
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Палитра направлений</title>
+<style>
+  :root{--bg:#f4f1ea;--surface:#fff;--text:#1f1f1f;--text-2:#4a4a4a;--line:#e5e1d5}
+  body{margin:0;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 20px 48px}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px}
+  p.sub{color:var(--text-2);margin:0 0 24px;font-size:13px}
+  h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#7b7b7b;font-weight:600;margin:28px 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .sw{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;gap:10px;align-items:center}
+  .dot{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-weight:600;font-family:Georgia,serif}
+  .nm{font-size:13px;font-weight:500}
+  .hex{font-size:11px;color:#7b7b7b;font-family:ui-monospace,Menlo,monospace}
+  .new{border-color:#b9cdb0}
+  .dark{background:#1a1a1f;color:#f0eee8;border-radius:14px;padding:18px 16px;margin-top:10px}
+  .dark .sw{background:#232328;border-color:#36363e}
+  .dark .hex{color:#84827c}
+  .cells{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+  .cell{width:22px;height:22px;border-radius:5px}
+  .legend{font-size:12px;color:var(--text-2);margin:6px 0 0}
+</style></head><body><div class="wrap">
+<h1>Палитра направлений — 16 цветов</h1>
+<p class="sub">Пять текущих остаются как есть, чтобы уже назначенные цвета не поехали. Одиннадцать новых подобраны в том же приглушённом ключе: та же насыщенность и светлота, разные тона.</p>
+<div id="out"></div>
+<h2>Как они лягут на карту касаний</h2>
+<p class="legend">Одно касание в день — 48% прозрачности, два — 70%, три и больше — 95%.</p>
+<div class="cells" id="cells"></div>
+</div>
+<script>
+const cur=[["--d-act","Тёплый красный","#c05a6e"],["--d-voice","Охра","#be8a3c"],["--d-vocal","Фиолетовый","#8b6bc8"],["--d-eng","Зелёный","#3e8f86"],["--d-phys","Синий","#4c74b0"]];
+const add=[["--d-terra","Терракота","#c4735a"],["--d-olive","Оливковый","#8f9440"],["--d-grass","Травяной","#5f9152"],["--d-emerald","Изумрудный","#3f9166"],["--d-sea","Голубой","#4695b5"],["--d-indigo","Индиго","#5a63ab"],["--d-orchid","Орхидея","#a865ab"],["--d-berry","Ягодный","#b4548c"],["--d-taupe","Тауп","#8c7a68"],["--d-slate","Грифельный","#6b7f92"],["--d-smoke","Дымчато-лиловый","#7a7288"]];
+const card=(list,cls)=>`<div class="grid">`+list.map(([v,n,h])=>`<div class="sw ${cls}"><div class="dot" style="background:${h}">${n[0]}</div><div><div class="nm">${n}</div><div class="hex">${h}</div></div></div>`).join('')+`</div>`;
+document.getElementById('out').innerHTML =
+  `<h2>Уже есть</h2>${card(cur,'')}<h2>Добавляю</h2>${card(add,'new')}<h2>Те же цвета на тёмном фоне</h2><div class="dark">${card(cur.concat(add),'')}</div>`;
+const hexToRgba=(h,a)=>{const n=h.slice(1);return `rgba(${parseInt(n.slice(0,2),16)},${parseInt(n.slice(2,4),16)},${parseInt(n.slice(4,6),16)},${a})`};
+document.getElementById('cells').innerHTML = cur.concat(add).map(([v,n,h])=>[0.48,0.7,0.95].map(a=>`<div class="cell" title="${n}" style="background:${hexToRgba(h,a)}"></div>`).join('')).join('<div style="width:10px"></div>');
+</script></body></html>

@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client.js';
 import { qk } from '../api/queries.js';
-
-/** Только desktop-сборка: собрана в mode=desktop, см. apps/web/.env.desktop и vite.config.ts. */
-const IS_DESKTOP = import.meta.env.MODE === 'desktop';
+import { IS_DESKTOP } from '../desktop.js';
 
 /**
  * Полный сброс вместо простого location.reload(): в desktop-сборке у
