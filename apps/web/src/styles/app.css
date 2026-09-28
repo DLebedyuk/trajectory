@@ -936,7 +936,9 @@
 /* ============ DIRECTIONS LIST ============ */
 .dir-list-row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr;
+  /* колонка карты — ровно по её ширине: иначе полугодовая карта не влезала
+     в 1.2fr и под ней появлялась полоса прокрутки */
+  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
   gap: 20px;
   align-items: center;
   background: var(--surface);

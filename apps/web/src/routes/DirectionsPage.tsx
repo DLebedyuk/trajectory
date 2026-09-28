@@ -137,7 +137,7 @@ export function DirectionsPage() {
               </div>
             </div>
 
-            <div className="map-cell scroll-x">
+            <div className="map-cell">
               <Heatmap
                 days={heat?.days ?? []}
                 today={today}
