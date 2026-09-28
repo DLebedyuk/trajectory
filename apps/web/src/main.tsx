@@ -11,6 +11,25 @@ import { applyTheme, useUiStore } from './store/ui.js';
 
 applyTheme(useUiStore.getState().theme);
 
+/*
+  Без явной регистрации новый service worker тихо вставал в фоне, а вкладка
+  продолжала показывать старую сборку до второй перезагрузки — «обновила,
+  не появилось». registerSW при autoUpdate сам перезагружает страницу, как
+  только новая версия взяла управление. Вкладка PWA живёт днями, поэтому
+  раз в час ещё и спрашиваем сервер, нет ли новой сборки.
+  На десктопе service worker не нужен (см. selfDestroying в vite.config).
+*/
+if (import.meta.env.MODE !== 'desktop') {
+  void import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({
+      immediate: true,
+      onRegisteredSW(_url, registration) {
+        if (registration) setInterval(() => void registration.update(), 60 * 60 * 1000);
+      },
+    });
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 },

@@ -4,7 +4,7 @@
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true,
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals", "@testing-library/jest-dom"],
     "paths": {
       "@planner/contracts": ["../../packages/contracts/src/index.ts"],
       "@planner/shared": ["../../packages/shared/src/index.ts"],

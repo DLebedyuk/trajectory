@@ -799,15 +799,6 @@
   color: var(--text-3);
   margin: 10px 0 2px;
 }
-.today-block .overdue-toggle {
-  font-size: 12px;
-  color: var(--warn);
-  margin-top: 8px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
 /* «Не забыть сегодня» — отдельная плашка правой колонки */
 .notime-card .notime-row {
   display: flex;
@@ -1930,10 +1921,21 @@ body {
   margin-top: 4px;
   min-height: 44px;
 }
-/* лист — часть мобильной оболочки: на десктопе его вызвать нечем */
+/*
+  На десктопе лист раньше прятался целиком — «его вызвать нечем». Но кнопка
+  «Добавить» на главной открывает тот же лист, и на широком экране она молча
+  ничего не делала. Теперь это небольшое окно по центру вместо выезда снизу.
+*/
 @media (min-width: 901px) {
   .sheet-backdrop {
-    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .plus-sheet {
+    width: 380px;
+    border-radius: 14px;
+    padding-bottom: 14px;
+    box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.45);
   }
 }
 
