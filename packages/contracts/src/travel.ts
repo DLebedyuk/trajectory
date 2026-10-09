@@ -71,6 +71,20 @@ export const updateTravelItemSchema = createTravelItemSchema.partial().extend({
 });
 export type UpdateTravelItemInput = z.infer<typeof updateTravelItemSchema>;
 
+export const importTravelItemsSchema = z.object({
+  categoryId: uuid.nullish(),
+  /** Если задано — категория создаётся (или берётся существующая с таким именем). */
+  newCategoryName: z.string().min(1).max(60).nullish(),
+  names: z.array(z.string().min(1).max(200)).min(1).max(300),
+});
+export type ImportTravelItemsInput = z.infer<typeof importTravelItemsSchema>;
+
+export interface ImportTravelItemsResult {
+  created: number;
+  skipped: number;
+  categoryId: string | null;
+}
+
 export const tripPurpose = z.enum(['rest', 'work', 'study', 'guests', 'other']);
 export type TripPurpose = z.infer<typeof tripPurpose>;
 export const TRIP_PURPOSE_LABELS: Record<TripPurpose, string> = {

@@ -1,8 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, sql } from 'drizzle-orm';
-import type { CreateTravelItemInput, TravelItem, UpdateTravelItemInput } from '@planner/contracts';
+import type {
+  CreateTravelItemInput,
+  ImportTravelItemsInput,
+  ImportTravelItemsResult,
+  TravelItem,
+  UpdateTravelItemInput,
+} from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
-import { travelCategories, travelItems } from '../../db/schema.js';
+import { seedMarkers, travelCategories, travelItems } from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { isoRequired } from '../../common/mappers.js';
 
@@ -27,6 +33,8 @@ const toItem = (r: Row, categoryName: string | null): TravelItem => ({
  * (см. ensureDefaults), а не через dev-only db/seed.ts, который наполняет
  * только демо-аккаунт.
  */
+const DEFAULTS_MARKER = 'travel-defaults-v1';
+
 const DEFAULT_CATEGORIES = [
   'Документы',
   'Деньги',
@@ -85,32 +93,53 @@ const DEFAULT_ITEMS: {
 export class TravelItemsService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
-  /** Заводит стартовый набор категорий и вещей при первом заходе пользователя в раздел. */
+  /**
+   * Заводит стартовый набор один раз на пользователя. Признак «уже заводили» —
+   * маркер в seed_markers, а не наличие категорий: иначе после удаления всех
+   * категорий набор вернулся бы. Транзакция с advisory-локом нужна, потому что
+   * экран запрашивает вещи и категории параллельно.
+   */
   async ensureDefaults(userId: string): Promise<void> {
-    const [{ value } = { value: 0 }] = await this.db
-      .select({ value: sql<number>`count(*)` })
-      .from(travelCategories)
-      .where(eq(travelCategories.userId, userId));
-    if (Number(value) > 0) return;
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`travel-defaults:${userId}`}))`);
+      const [marker] = await tx
+        .select()
+        .from(seedMarkers)
+        .where(and(eq(seedMarkers.userId, userId), eq(seedMarkers.marker, DEFAULTS_MARKER)));
+      if (marker) return;
 
-    const catIds: Record<string, string> = {};
-    for (const [i, name] of DEFAULT_CATEGORIES.entries()) {
-      const [row] = await this.db
-        .insert(travelCategories)
-        .values({ userId, name, sortOrder: i })
-        .onConflictDoNothing()
-        .returning();
-      if (row) catIds[name] = (row as { id: string }).id;
-    }
-    await this.db.insert(travelItems).values(
-      DEFAULT_ITEMS.map((d) => ({
-        userId,
-        name: d.name,
-        categoryId: catIds[d.category] ?? null,
-        tags: d.tags ?? [],
-        alwaysInclude: d.alwaysInclude ?? false,
-      })),
-    );
+      // у тех, кто зашёл в раздел до появления маркера, данные уже есть — только отмечаем
+      const [cats] = await tx
+        .select({ value: sql<number>`count(*)` })
+        .from(travelCategories)
+        .where(eq(travelCategories.userId, userId));
+      const [items] = await tx
+        .select({ value: sql<number>`count(*)` })
+        .from(travelItems)
+        .where(eq(travelItems.userId, userId));
+      const hasData = Number(cats?.value ?? 0) > 0 || Number(items?.value ?? 0) > 0;
+
+      if (!hasData) {
+        const catIds: Record<string, string> = {};
+        for (const [i, name] of DEFAULT_CATEGORIES.entries()) {
+          const [row] = await tx
+            .insert(travelCategories)
+            .values({ userId, name, sortOrder: i })
+            .returning();
+          catIds[name] = (row as { id: string }).id;
+        }
+        await tx.insert(travelItems).values(
+          DEFAULT_ITEMS.map((d) => ({
+            userId,
+            name: d.name,
+            categoryId: catIds[d.category] ?? null,
+            tags: d.tags ?? [],
+            alwaysInclude: d.alwaysInclude ?? false,
+          })),
+        );
+      }
+      await tx.insert(seedMarkers).values({ userId, marker: DEFAULTS_MARKER });
+    });
   }
 
   async categories(userId: string) {
@@ -133,6 +162,57 @@ export class TravelItemsService {
       .onConflictDoNothing()
       .returning();
     return row ?? (await this.categories(userId)).find((c) => c.name === name);
+  }
+
+  /** Вещи и пункты чек-листов этой категории остаются — просто без категории (FK set null). */
+  async removeCategory(userId: string, id: string): Promise<{ ok: true }> {
+    await this.db
+      .delete(travelCategories)
+      .where(and(eq(travelCategories.userId, userId), eq(travelCategories.id, id)));
+    return { ok: true };
+  }
+
+  /**
+   * Быстрый импорт списком. Всё импортированное — «всегда в чек-листе»: условий
+   * в таком списке нет. Названия, которые уже есть в базе (без учёта регистра),
+   * пропускаются, чтобы повторный импорт не плодил дубли.
+   */
+  async importItems(userId: string, input: ImportTravelItemsInput): Promise<ImportTravelItemsResult> {
+    await this.ensureDefaults(userId);
+
+    let categoryId: string | null = null;
+    if (input.newCategoryName?.trim()) {
+      categoryId = (await this.createCategory(userId, input.newCategoryName.trim()))?.id ?? null;
+    } else if (input.categoryId) {
+      const [cat] = await this.db
+        .select()
+        .from(travelCategories)
+        .where(and(eq(travelCategories.userId, userId), eq(travelCategories.id, input.categoryId)));
+      if (!cat) throw ApiException.notFound('Категория');
+      categoryId = cat.id;
+    }
+
+    const existing = await this.db
+      .select({ name: travelItems.name })
+      .from(travelItems)
+      .where(and(eq(travelItems.userId, userId), eq(travelItems.archived, false)));
+    const seen = new Set(existing.map((e) => e.name.trim().toLowerCase()));
+
+    const fresh: string[] = [];
+    for (const raw of input.names) {
+      const name = raw.trim();
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      fresh.push(name);
+    }
+
+    if (fresh.length > 0) {
+      await this.db
+        .insert(travelItems)
+        .values(fresh.map((name) => ({ userId, name, categoryId, tags: [], alwaysInclude: true })));
+    }
+    return { created: fresh.length, skipped: input.names.length - fresh.length, categoryId };
   }
 
   async list(userId: string, includeArchived = false): Promise<TravelItem[]> {

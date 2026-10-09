@@ -2744,8 +2744,23 @@ body {
   align-items: center;
   gap: 8px;
 }
-.travel-library h4 .btn {
+.travel-library h4 .travel-lib-actions {
   margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+.travel-lib-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.travel-lib-head .row-del {
+  padding: 2px 4px;
+  font-size: 13px;
+  opacity: 0.55;
+}
+.travel-lib-head .row-del:hover {
+  opacity: 1;
 }
 .travel-lib-group {
   display: flex;

@@ -1,15 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Checkbox, FormField, Modal, useToast } from '@planner/ui';
-import { TRAVEL_TAG_LABELS, travelTag, type TravelItem, type TravelTag } from '@planner/contracts';
+import { Button, FormField, Modal, useToast } from '@planner/ui';
+import type { TravelItem } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { qk, useTravelCategories } from '../api/queries.js';
-
-/**
- * «Всегда» — не тег для выбора, а отдельный флаг alwaysInclude: показывать
- * оба способа сказать одно и то же было бы избыточно (см. план раздела).
- */
-const PICKABLE_TAGS = travelTag.options.filter((t): t is Exclude<TravelTag, 'always'> => t !== 'always');
 
 export function TravelItemModal({
   item,
@@ -27,16 +21,12 @@ export function TravelItemModal({
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [tags, setTags] = useState<TravelTag[]>([]);
-  const [alwaysInclude, setAlwaysInclude] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setName(item?.name ?? '');
     setCategoryId(item?.categoryId ?? '');
     setNewCategoryName('');
-    setTags(item?.tags.filter((t) => t !== 'always') ?? []);
-    setAlwaysInclude(item?.alwaysInclude ?? false);
   }, [open, item]);
 
   const invalidate = () => {
@@ -52,8 +42,16 @@ export function TravelItemModal({
       } else if (categoryId === 'new') {
         finalCategoryId = null;
       }
-      const payload = { name: name.trim(), categoryId: finalCategoryId, tags, alwaysInclude };
-      return item ? api.travel.updateItem(item.id, payload) : api.travel.createItem(payload);
+      // у вещи нет условий: новая вещь попадает в каждый чек-лист, а у редактируемой
+      // условия, заведённые стартовым набором, остаются как были
+      return item
+        ? api.travel.updateItem(item.id, { name: name.trim(), categoryId: finalCategoryId })
+        : api.travel.createItem({
+            name: name.trim(),
+            categoryId: finalCategoryId,
+            tags: [],
+            alwaysInclude: true,
+          });
     },
     onSuccess: () => {
       invalidate();
@@ -71,9 +69,6 @@ export function TravelItemModal({
       onOpenChange(false);
     },
   });
-
-  const toggleTag = (t: TravelTag) =>
-    setTags((prev) => (prev.includes(t) ? prev.filter((v) => v !== t) : [...prev, t]));
 
   return (
     <Modal
@@ -120,31 +115,6 @@ export function TravelItemModal({
           />
         </FormField>
       ) : null}
-
-      <div className="field">
-        <Checkbox
-          checked={alwaysInclude}
-          onChange={() => setAlwaysInclude((v) => !v)}
-          label="Всегда добавлять в чек-лист"
-        />
-      </div>
-
-      <div className="field">
-        <span className="lbl">Добавлять при условиях</span>
-        <div className="chips">
-          {PICKABLE_TAGS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={`chip${tags.includes(t) ? ' is-active' : ''}`}
-              aria-pressed={tags.includes(t)}
-              onClick={() => toggleTag(t)}
-            >
-              {TRAVEL_TAG_LABELS[t]}
-            </button>
-          ))}
-        </div>
-      </div>
     </Modal>
   );
 }

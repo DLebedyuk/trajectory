@@ -14,6 +14,8 @@ import type {
   Focus,
   HabitWithContext,
   Heatmap,
+  ImportTravelItemsInput,
+  ImportTravelItemsResult,
   InboxItem,
   InboxProposal,
   MediaCategory,
@@ -364,6 +366,9 @@ export const api = {
   travel: {
     categories: () => get<TravelCategory[]>('/api/travel/categories'),
     createCategory: (name: string) => post<TravelCategory>('/api/travel/categories', { name }),
+    removeCategory: (id: string) => del<{ ok: true }>(`/api/travel/categories/${id}`),
+    importItems: (input: ImportTravelItemsInput) =>
+      post<ImportTravelItemsResult>('/api/travel/items/import', input),
     items: (includeArchived = false) =>
       get<TravelItem[]>('/api/travel/items', { includeArchived }),
     createItem: (input: CreateTravelItemInput) => post<TravelItem>('/api/travel/items', input),

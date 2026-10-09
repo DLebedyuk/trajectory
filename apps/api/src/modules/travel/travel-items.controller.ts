@@ -14,6 +14,7 @@ import { ApiTags } from '@nestjs/swagger';
 import {
   createTravelCategorySchema,
   createTravelItemSchema,
+  importTravelItemsSchema,
   updateTravelItemSchema,
 } from '@planner/contracts';
 import { CurrentUser, AuthGuard } from '../../common/current-user.js';
@@ -37,6 +38,16 @@ export class TravelItemsController {
     @Body(zodBody(createTravelCategorySchema)) body: unknown,
   ) {
     return this.service.createCategory(userId, (body as { name: string }).name);
+  }
+
+  @Delete('categories/:id')
+  removeCategory(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.service.removeCategory(userId, id);
+  }
+
+  @Post('items/import')
+  importItems(@CurrentUser() userId: string, @Body(zodBody(importTravelItemsSchema)) body: unknown) {
+    return this.service.importItems(userId, body as never);
   }
 
   @Get('items')
