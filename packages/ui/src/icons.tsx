@@ -118,6 +118,15 @@ export const IconDirections = (p: SVGProps<SVGSVGElement>) => (
     <path d="M12.8 7.2 8.9 8.9 7.2 12.8l3.9-1.7z" />
   </svg>
 );
+/** Обзор: четыре плитки — общая картина проектов. */
+export const IconOverview = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...nav(p)}>
+    <rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1.2" />
+    <rect x="11" y="3.5" width="5.5" height="5.5" rx="1.2" />
+    <rect x="3.5" y="11" width="5.5" height="5.5" rx="1.2" />
+    <rect x="11" y="11" width="5.5" height="5.5" rx="1.2" />
+  </svg>
+);
 export const IconIdeas = (p: SVGProps<SVGSVGElement>) => (
   <svg {...nav(p)}>
     <path d="M10 2.8v1.6M4.9 4.9l1.1 1.1M2.8 10h1.6M15.1 4.9 14 6M17.2 10h-1.6" />

@@ -8,9 +8,19 @@ interface UiState {
   sidebarOpen: boolean;
   /** Локальные фильтры задач проекта — не серверное состояние. */
   taskFilter: { estimatedDuration: string; withDeadlineOnly: boolean; sort: string };
+  /**
+   * Вид «Обзора». Сортировка по приоритету — только способ показать список:
+   * сохранённый ручной порядок она не трогает.
+   */
+  overview: {
+    scope: 'pinned' | 'all';
+    sort: 'manual' | 'priority';
+    priority: 'any' | 'high' | 'normal' | 'low' | 'none';
+  };
   setTheme: (theme: Theme) => void;
   toggleSidebar: () => void;
   setTaskFilter: (patch: Partial<UiState['taskFilter']>) => void;
+  setOverview: (patch: Partial<UiState['overview']>) => void;
 }
 
 /**
@@ -26,6 +36,8 @@ export const useUiStore = create<UiState>()(
       setTheme: (theme) => set({ theme }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setTaskFilter: (patch) => set((s) => ({ taskFilter: { ...s.taskFilter, ...patch } })),
+      overview: { scope: 'pinned', sort: 'manual', priority: 'any' },
+      setOverview: (patch) => set((s) => ({ overview: { ...s.overview, ...patch } })),
     }),
     { name: 'planner-ui' },
   ),

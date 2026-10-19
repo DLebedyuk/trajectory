@@ -11,7 +11,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { createProjectSchema, updateProjectSchema } from '@planner/contracts';
+import {
+  createProjectSchema,
+  overviewScope,
+  reorderSchema,
+  updateProjectSchema,
+} from '@planner/contracts';
 import { CurrentUser, AuthGuard } from '../../common/current-user.js';
 import { zodBody } from '../../common/zod.pipe.js';
 import { ProjectsService } from './projects.service.js';
@@ -27,6 +32,12 @@ export class ProjectsController {
   list(@CurrentUser() userId: string, @Query('directionId') directionId?: string) {
     if (!directionId) throw ApiException.validation('Нужен параметр directionId');
     return this.service.listByDirection(userId, directionId);
+  }
+
+  // выше ':id' — иначе Nest примет «reorder» за идентификатор проекта
+  @Patch('reorder')
+  reorder(@CurrentUser() userId: string, @Body(zodBody(reorderSchema)) body: unknown) {
+    return this.service.reorder(userId, (body as { ids: string[] }).ids);
   }
 
   @Get(':id')
@@ -66,5 +77,20 @@ export class ProjectsController {
   @Delete(':id')
   remove(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.service.remove(userId, id);
+  }
+}
+
+/** Вкладка «Обзор»: общая картина проектов поверх всех направлений. */
+@ApiTags('overview')
+@UseGuards(AuthGuard)
+@Controller('api/overview')
+export class OverviewController {
+  constructor(@Inject(ProjectsService) private readonly service: ProjectsService) {}
+
+  @Get()
+  get(@CurrentUser() userId: string, @Query('scope') scope?: string) {
+    const parsed = overviewScope.safeParse(scope ?? 'pinned');
+    if (!parsed.success) throw ApiException.validation('scope: pinned или all');
+    return this.service.overview(userId, parsed.data);
   }
 }

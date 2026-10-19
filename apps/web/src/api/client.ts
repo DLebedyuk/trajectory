@@ -22,6 +22,8 @@ import type {
   MediaItem,
   MenuFilter,
   MenuItem,
+  Overview,
+  OverviewScope,
   Project,
   ProjectWithFlags,
   Reminder,
@@ -225,6 +227,7 @@ export const api = {
   },
 
   dashboard: () => get<DashboardData>('/api/dashboard'),
+  overview: (scope: OverviewScope) => get<Overview>('/api/overview', { scope }),
 
   me: () => get<User>('/api/me'),
   settings: {
@@ -252,6 +255,7 @@ export const api = {
     resume: (id: string) => post<Project>(`/api/projects/${id}/resume`),
     complete: (id: string) => post<Project>(`/api/projects/${id}/complete`),
     remove: (id: string) => del<{ ok: true }>(`/api/projects/${id}`),
+    reorder: (ids: string[]) => patch<{ ok: true }>('/api/projects/reorder', { ids }),
   },
 
   tasks: {
@@ -365,8 +369,7 @@ export const api = {
     removeCategory: (id: string) => del<{ ok: true }>(`/api/travel/categories/${id}`),
     importItems: (input: ImportTravelItemsInput) =>
       post<ImportTravelItemsResult>('/api/travel/items/import', input),
-    items: (includeArchived = false) =>
-      get<TravelItem[]>('/api/travel/items', { includeArchived }),
+    items: (includeArchived = false) => get<TravelItem[]>('/api/travel/items', { includeArchived }),
     createItem: (input: CreateTravelItemInput) => post<TravelItem>('/api/travel/items', input),
     updateItem: (id: string, input: UpdateTravelItemInput) =>
       patch<TravelItem>(`/api/travel/items/${id}`, input),

@@ -7,6 +7,7 @@ import { LoginPage } from './routes/LoginPage.js';
 import { OnboardingPage } from './routes/OnboardingPage.js';
 import { HomePage } from './routes/HomePage.js';
 import { DirectionsPage } from './routes/DirectionsPage.js';
+import { OverviewPage } from './routes/OverviewPage.js';
 import { DirectionPage } from './routes/DirectionPage.js';
 import { ProjectPage } from './routes/ProjectPage.js';
 import { TaskPage } from './routes/TaskPage.js';
@@ -43,6 +44,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/directions" element={<DirectionsPage />} />
+        <Route path="/overview" element={<OverviewPage />} />
         <Route path="/directions/:directionId" element={<DirectionPage />} />
         <Route path="/directions/:directionId/touches" element={<TouchesPage />} />
         <Route path="/directions/:directionId/archive" element={<DirectionArchivePage />} />

@@ -1,13 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type {
   CreateProjectInput,
+  Overview,
+  OverviewScope,
   Project,
   ProjectWithFlags,
   UpdateProjectInput,
 } from '@planner/contracts';
+import { todayInTimezone } from '@planner/shared';
 import { DB, type Database } from '../../db/db.module.js';
-import { directions, projects, tasks, userFocus } from '../../db/schema.js';
+import { directions, projects, tasks, userFocus, users } from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { dateOnly, iso, isoRequired } from '../../common/mappers.js';
 
@@ -23,6 +26,8 @@ const toProject = (r: Row): Project => ({
   deadline: dateOnly(r.deadline),
   sortOrder: r.sortOrder,
   notes: r.notes ?? [],
+  pinned: r.pinned,
+  priority: (r.priority ?? null) as Project['priority'],
   createdAt: isoRequired(r.createdAt),
   completedAt: iso(r.completedAt),
   updatedAt: isoRequired(r.updatedAt),
@@ -118,6 +123,8 @@ export class ProjectsService {
         status: input.status,
         deadline: input.deadline ?? null,
         notes: input.notes,
+        pinned: input.pinned ?? false,
+        priority: input.priority ?? null,
         sortOrder: Number(value),
       })
       .returning();
@@ -125,7 +132,14 @@ export class ProjectsService {
   }
 
   async update(userId: string, id: string, input: UpdateProjectInput): Promise<Project> {
-    await this.get(userId, id);
+    const current = await this.get(userId, id);
+    // завершённый проект в обзоре не показывается — закрепить его значило бы
+    // получить закрепление, которое нигде не видно
+    if (input.pinned && current.status === 'archived') {
+      throw ApiException.validation(
+        'Завершённый проект нельзя закрепить. Сначала верните его из архива.',
+      );
+    }
     // перенос в чужое направление недопустим: направление проверяем так же, как при создании
     if (input.directionId !== undefined) await this.assertOwnDirection(userId, input.directionId);
     const [row] = await this.db
@@ -140,11 +154,165 @@ export class ProjectsService {
         // archive/restore, вместе с каскадом по задачам и снятием фокуса
         ...(input.deadline !== undefined ? { deadline: input.deadline ?? null } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
+        ...(input.priority !== undefined ? { priority: input.priority ?? null } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(projects.userId, userId), eq(projects.id, id)))
       .returning();
     return toProject(row as Row);
+  }
+
+  /**
+   * Ручной порядок проектов одного направления. Можно передать только часть
+   * проектов — например, закреплённые: они меняются местами между собой, а
+   * остальные остаются на своих позициях. Затем весь список направления
+   * получает sortOrder подряд, чтобы старые одинаковые значения не делали
+   * порядок случайным.
+   */
+  async reorder(userId: string, ids: string[]): Promise<{ ok: true }> {
+    if (new Set(ids).size !== ids.length) throw ApiException.validation('Проекты повторяются');
+
+    await this.db.transaction(async (tx) => {
+      const picked = await tx
+        .select({ id: projects.id, directionId: projects.directionId })
+        .from(projects)
+        .where(
+          and(eq(projects.userId, userId), inArray(projects.id, ids), isNull(projects.deletedAt)),
+        );
+      if (picked.length !== ids.length) throw ApiException.notFound('Проект');
+      const directionId = picked[0]!.directionId;
+      if (picked.some((p) => p.directionId !== directionId)) {
+        throw ApiException.validation('Порядок меняется внутри одного направления');
+      }
+
+      const all = await tx
+        .select({ id: projects.id })
+        .from(projects)
+        .where(and(eq(projects.userId, userId), eq(projects.directionId, directionId)))
+        .orderBy(asc(projects.sortOrder), asc(projects.createdAt));
+
+      const chosen = new Set(ids);
+      let next = 0;
+      const order = all.map((p) => (chosen.has(p.id) ? ids[next++]! : p.id));
+
+      for (const [index, id] of order.entries()) {
+        await tx
+          .update(projects)
+          .set({ sortOrder: index })
+          .where(and(eq(projects.userId, userId), eq(projects.id, id)));
+      }
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Общая картина для вкладки «Обзор». Проекты — те же строки, что и в
+   * направлениях, только с направлением и счётчиками задач. Завершённые
+   * проекты и архивные направления сюда не попадают: это картина того,
+   * что сейчас живо. Счётчики наверху не зависят от scope.
+   */
+  async overview(userId: string, scope: OverviewScope): Promise<Overview> {
+    const [user] = await this.db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, userId));
+    const today = todayInTimezone(user?.timezone ?? 'UTC');
+
+    const rows = await this.db
+      .select({ project: projects, direction: directions })
+      .from(projects)
+      .innerJoin(directions, eq(directions.id, projects.directionId))
+      .where(
+        and(
+          eq(projects.userId, userId),
+          isNull(projects.deletedAt),
+          ne(projects.status, 'archived'),
+          isNull(directions.deletedAt),
+          isNull(directions.archivedAt),
+        ),
+      )
+      .orderBy(
+        asc(directions.sortOrder),
+        asc(directions.createdAt),
+        asc(projects.sortOrder),
+        asc(projects.createdAt),
+      );
+
+    const projectIds = rows.map((r) => r.project.id);
+    const agg = projectIds.length
+      ? await this.db
+          .select({
+            projectId: tasks.projectId,
+            open: sql<number>`count(*) filter (where ${tasks.status} = 'open')`,
+            done: sql<number>`count(*) filter (where ${tasks.status} = 'done')`,
+            overdue: sql<number>`count(*) filter (where ${tasks.status} = 'open' and ${tasks.deadline} < ${today})`,
+            nextDeadline: sql<
+              string | null
+            >`(min(${tasks.deadline}) filter (where ${tasks.status} = 'open'))::text`,
+          })
+          .from(tasks)
+          .where(
+            and(
+              eq(tasks.userId, userId),
+              inArray(tasks.projectId, projectIds),
+              isNull(tasks.deletedAt),
+            ),
+          )
+          .groupBy(tasks.projectId)
+      : [];
+    const byProject = new Map(agg.map((a) => [a.projectId, a]));
+
+    const [focus] = await this.db.select().from(userFocus).where(eq(userFocus.userId, userId));
+    let activeProjectId: string | null = null;
+    if (focus?.activeTaskId) {
+      const [t] = await this.db
+        .select({ projectId: tasks.projectId })
+        .from(tasks)
+        .where(eq(tasks.id, focus.activeTaskId));
+      activeProjectId = t?.projectId ?? null;
+    }
+
+    const [{ value: directionCount } = { value: 0 }] = await this.db
+      .select({ value: sql<number>`count(*)` })
+      .from(directions)
+      .where(
+        and(
+          eq(directions.userId, userId),
+          isNull(directions.deletedAt),
+          isNull(directions.archivedAt),
+        ),
+      );
+
+    const all = rows.map(({ project, direction }) => {
+      const a = byProject.get(project.id);
+      const own = dateOnly(project.deadline);
+      const fromTasks = a?.nextDeadline ?? null;
+      // даты YYYY-MM-DD сравниваются как строки
+      const nextDeadline =
+        own && fromTasks ? (own < fromTasks ? own : fromTasks) : (own ?? fromTasks);
+      return {
+        ...toProject(project),
+        directionName: direction.name,
+        directionColor: direction.color,
+        openTaskCount: Number(a?.open ?? 0),
+        doneTaskCount: Number(a?.done ?? 0),
+        overdueTaskCount: Number(a?.overdue ?? 0),
+        nextDeadline,
+        hasActiveTask: activeProjectId === project.id,
+      };
+    });
+
+    return {
+      stats: {
+        directions: Number(directionCount),
+        projects: all.length,
+        pinned: all.filter((p) => p.pinned).length,
+        openTasks: all.reduce((n, p) => n + p.openTaskCount, 0),
+        overdueTasks: all.reduce((n, p) => n + p.overdueTaskCount, 0),
+      },
+      projects: scope === 'pinned' ? all.filter((p) => p.pinned) : all,
+    };
   }
 
   private async setStatus(userId: string, id: string, status: Project['status']): Promise<Project> {
@@ -154,6 +322,7 @@ export class ProjectsService {
       .set({
         status,
         completedAt: status === 'archived' ? new Date() : null,
+        ...(status === 'archived' ? { pinned: false } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(projects.userId, userId), eq(projects.id, id)))
@@ -200,7 +369,9 @@ export class ProjectsService {
 
       await tx
         .update(projects)
-        .set({ status: 'archived', completedAt: new Date(), updatedAt: new Date() })
+        // завершённый проект уходит из обзора: закрепление снимается,
+        // приоритет остаётся — вернётся проект из архива с ним же
+        .set({ status: 'archived', completedAt: new Date(), pinned: false, updatedAt: new Date() })
         .where(and(eq(projects.userId, userId), eq(projects.id, id)));
     });
     return this.get(userId, id);

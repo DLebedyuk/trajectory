@@ -28,6 +28,7 @@ import { TouchModal } from '../features/TouchModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DirectionSettingsModal } from '../features/DirectionSettingsModal.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
+import { PinButton, PriorityMark, PriorityPicker } from '../features/ProjectMeta.js';
 
 /** Страница направления. Задачи здесь не показываются — только проекты. */
 export function DirectionPage() {
@@ -148,21 +149,25 @@ export function DirectionPage() {
   if (!d) return null;
 
   const list = projects.data ?? [];
-  const active = list.filter((p) => p.status === 'active');
-  const paused = list.filter((p) => p.status === 'paused');
+  // закреплённые — первыми, внутри своей группы; сам порядок ручной (sortOrder)
+  const pinnedFirst = (a: (typeof list)[number], b: (typeof list)[number]) =>
+    Number(b.pinned) - Number(a.pinned);
+  const active = list.filter((p) => p.status === 'active').sort(pinnedFirst);
+  const paused = list.filter((p) => p.status === 'paused').sort(pinnedFirst);
   const archived = list.filter((p) => p.status === 'archived');
   const total = heat.data?.total ?? 0;
   const isFocus = dashboard.data?.focus.focusDirectionId === directionId;
   const dirColor = `var(${d.color})`;
 
   /*
-    Карточка проекта — div, а не button: внутри живёт кнопка удаления,
-    а кнопка в кнопке недопустима. Клик по карточке открывает проект.
+    Карточка проекта — div, а не button: внутри живут кнопки удаления,
+    приоритета и закрепления, а кнопка в кнопке недопустима. Клик по
+    карточке открывает проект.
   */
   const projectCard = (p: (typeof list)[number], modifier?: 'is-paused' | 'is-completed') => (
     <div
       key={p.id}
-      className={`dir-project-card${modifier ? ` ${modifier}` : ''}`}
+      className={`dir-project-card${modifier ? ` ${modifier}` : ''}${p.pinned ? ' is-pinned' : ''}`}
       style={{ ['--c' as string]: dirColor }}
       onClick={() => navigate(`/projects/${p.id}`)}
     >
@@ -189,6 +194,14 @@ export function DirectionPage() {
           {p.pinnedCount ? ` · важных ${p.pinnedCount}` : ''}
           {p.deadline ? ` · срок ${formatLongDate(p.deadline)}` : ''}
         </span>
+        {p.status === 'archived' ? (
+          <PriorityMark priority={p.priority} />
+        ) : (
+          <>
+            <PriorityPicker projectId={p.id} title={p.title} priority={p.priority} />
+            <PinButton projectId={p.id} title={p.title} pinned={p.pinned} />
+          </>
+        )}
       </span>
       {p.desiredOutcome ? <span className="goal">{p.desiredOutcome}</span> : null}
     </div>

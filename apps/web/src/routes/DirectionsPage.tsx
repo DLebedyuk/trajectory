@@ -79,17 +79,20 @@ export function DirectionsPage() {
         title="Направления"
         subtitle="Проекты и задачи живут внутри направлений."
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
-            <IconPlus />
-            Новое направление
-          </Button>
+          <>
+            {/* на телефоне «Обзор» не помещается в нижнюю панель — вход отсюда и из «Ещё» */}
+            <Button onClick={() => navigate('/overview')}>Обзор</Button>
+            <Button onClick={() => setCreateOpen(true)}>
+              <IconPlus />
+              Новое направление
+            </Button>
+          </>
         }
       />
 
       {(directions.data ?? []).map((d, index) => {
         const heat = heatmaps[index]?.data as
-          | { days: never[]; total?: number; weekTotal?: number }
-          | undefined;
+          { days: never[]; total?: number; weekTotal?: number } | undefined;
         const isFocus = dashboard.data?.focus.focusDirectionId === d.id;
         const total = heat?.total ?? 0;
 
@@ -145,7 +148,6 @@ export function DirectionsPage() {
                 showWeekdays={false}
               />
             </div>
-
           </div>
         );
       })}

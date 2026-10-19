@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from './client.js';
-import type { TaskFilter } from '@planner/contracts';
+import type {
+  Overview,
+  OverviewScope,
+  Project,
+  ProjectWithFlags,
+  TaskFilter,
+} from '@planner/contracts';
 
 /** Ключи запросов. Инвалидация точечная: обновляем только связанное. */
 export const qk = {
@@ -16,6 +22,7 @@ export const qk = {
   direction: (id: string) => ['direction', id] as const,
   projects: (directionId: string) => ['projects', directionId] as const,
   project: (id: string) => ['project', id] as const,
+  overview: (scope: OverviewScope) => ['overview', scope] as const,
   tasks: (projectId: string, filter?: TaskFilter) => ['tasks', projectId, filter ?? {}] as const,
   task: (id: string) => ['task', id] as const,
   pinnedTasks: (directionId?: string) => ['pinnedTasks', directionId ?? 'all'] as const,
@@ -87,6 +94,91 @@ export const useProjects = (directionId: string) =>
     queryFn: () => api.projects.listByDirection(directionId),
     enabled: Boolean(directionId),
   });
+/**
+ * Обзор собирает задачи всех проектов, а задачи меняются из десятка мест —
+ * поэтому свежий запрос при каждом открытии, а не точечная инвалидация.
+ */
+export const useOverview = (scope: OverviewScope) =>
+  useQuery({
+    queryKey: qk.overview(scope),
+    queryFn: () => api.overview(scope),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
+
+type ProjectMeta = Partial<Pick<Project, 'pinned' | 'priority'>>;
+
+/**
+ * Закрепление и приоритет — одна мутация: оба поля меняются одним касанием
+ * и сразу видны везде, где показан проект. Оптимистично: ответ сервера
+ * лишь подтверждает то, что уже нарисовано.
+ */
+export function useUpdateProjectMeta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...meta }: { id: string } & ProjectMeta) => api.projects.update(id, meta),
+    onMutate: async ({ id, ...meta }) => {
+      await qc.cancelQueries({ queryKey: ['projects'] });
+      await qc.cancelQueries({ queryKey: ['overview'] });
+      const prevProjects = qc.getQueriesData<ProjectWithFlags[]>({ queryKey: ['projects'] });
+      const prevOverview = qc.getQueriesData<Overview>({ queryKey: ['overview'] });
+      qc.setQueriesData<ProjectWithFlags[]>({ queryKey: ['projects'] }, (list) =>
+        list?.map((p) => (p.id === id ? { ...p, ...meta } : p)),
+      );
+      qc.setQueriesData<Overview>({ queryKey: ['overview'] }, (o) =>
+        o ? { ...o, projects: o.projects.map((p) => (p.id === id ? { ...p, ...meta } : p)) } : o,
+      );
+      return { prevProjects, prevOverview };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prevProjects.forEach(([key, data]) => qc.setQueryData(key, data));
+      ctx?.prevOverview.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+    onSettled: (_d, _e, { id }) => {
+      void qc.invalidateQueries({ queryKey: ['projects'] });
+      void qc.invalidateQueries({ queryKey: ['overview'] });
+      void qc.invalidateQueries({ queryKey: qk.project(id) });
+    },
+  });
+}
+
+/** Ручной порядок проектов внутри одного направления. */
+export function useReorderProjects() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => api.projects.reorder(ids),
+    // переставленные встают на места друг друга, остальные не двигаются —
+    // как и на сервере; без этого карточка на миг прыгала бы обратно
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: ['overview'] });
+      await qc.cancelQueries({ queryKey: ['projects'] });
+      const permute = <T extends { id: string }>(list: T[]): T[] => {
+        const byId = new Map(list.map((p) => [p.id, p]));
+        if (!ids.every((id) => byId.has(id))) return list;
+        const chosen = new Set(ids);
+        let next = 0;
+        return list.map((p) => (chosen.has(p.id) ? byId.get(ids[next++]!)! : p));
+      };
+      const prevProjects = qc.getQueriesData<ProjectWithFlags[]>({ queryKey: ['projects'] });
+      const prevOverview = qc.getQueriesData<Overview>({ queryKey: ['overview'] });
+      qc.setQueriesData<ProjectWithFlags[]>({ queryKey: ['projects'] }, (l) => l && permute(l));
+      qc.setQueriesData<Overview>(
+        { queryKey: ['overview'] },
+        (o) => o && { ...o, projects: permute(o.projects) },
+      );
+      return { prevProjects, prevOverview };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prevProjects.forEach(([key, data]) => qc.setQueryData(key, data));
+      ctx?.prevOverview.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['projects'] });
+      void qc.invalidateQueries({ queryKey: ['overview'] });
+    },
+  });
+}
+
 /** Архив направления: завершённые задачи всех его проектов. */
 export const useDoneTasks = (directionId: string, enabled = true) =>
   useQuery({

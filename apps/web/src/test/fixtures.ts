@@ -59,6 +59,8 @@ export const makeProject = (over: Partial<Project> = {}): Project => ({
   deadline: null,
   sortOrder: 0,
   notes: [],
+  pinned: false,
+  priority: null,
   createdAt: iso,
   completedAt: null,
   updatedAt: iso,

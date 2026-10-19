@@ -12,6 +12,13 @@ export type EstimatedDuration = z.infer<typeof estimatedDuration>;
 export const projectStatus = z.enum(['active', 'paused', 'archived']);
 export type ProjectStatus = z.infer<typeof projectStatus>;
 
+/**
+ * Приоритет проекта. Задаётся только вручную; «без приоритета» — это null,
+ * а не четвёртое значение, чтобы старые проекты не требовали миграции данных.
+ */
+export const projectPriority = z.enum(['high', 'normal', 'low']);
+export type ProjectPriority = z.infer<typeof projectPriority>;
+
 export const taskStatus = z.enum(['open', 'done']);
 export type TaskStatus = z.infer<typeof taskStatus>;
 

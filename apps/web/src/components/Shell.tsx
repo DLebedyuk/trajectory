@@ -11,6 +11,7 @@ import {
   IconInbox,
   IconLogout,
   IconMoon,
+  IconOverview,
   IconSettings,
   IconSun,
   IconBell,
@@ -24,6 +25,7 @@ import { applyTheme, useUiStore, watchSystemTheme } from '../store/ui.js';
 const NAV = [
   { to: '/', label: 'Главная', end: true, Icon: IconHome },
   { to: '/directions', label: 'Направления', Icon: IconDirections },
+  { to: '/overview', label: 'Обзор', Icon: IconOverview },
   { to: '/reminders', label: 'Напоминания', badge: 'reminders' as const, Icon: IconBell },
   { to: '/menu', label: 'Меню', Icon: IconIdeas },
   { to: '/media', label: 'Книги и фильмы', Icon: IconBook },
@@ -50,6 +52,12 @@ const MOBILE_NAV_RIGHT = [{ to: '/directions', label: 'Направления', 
  * настройки.
  */
 const MORE_LINKS = [
+  {
+    to: '/overview',
+    title: 'Обзор',
+    sub: 'Закреплённые проекты всех направлений',
+    Icon: IconOverview,
+  },
   {
     to: '/menu',
     title: 'Меню возможностей',

@@ -2767,3 +2767,377 @@ body {
   padding: 0;
   border-bottom: none;
 }
+
+/* ── Приоритет проекта ─────────────────────────────────────────────
+   Без цвета: высокий читается весом и стрелкой, низкий — приглушённостью.
+   Цветной была бы каждая карточка, а приоритет — не тревога. */
+.prio {
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.prio.is-high {
+  color: var(--text);
+  font-weight: 600;
+}
+.prio.is-low {
+  color: var(--text-3);
+}
+.prio-picker {
+  display: inline-flex;
+}
+.prio-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 3px 7px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.prio-btn:hover,
+.prio-btn[data-state='open'] {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+/* «приоритет» без значения — подсказка, видна только при наведении на карточку */
+.prio-btn.is-empty {
+  opacity: 0;
+}
+.dir-project-card:hover .prio-btn.is-empty,
+.ov-card:hover .prio-btn.is-empty,
+.prio-btn.is-empty:focus-visible,
+.prio-btn.is-empty[data-state='open'] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .prio-btn.is-empty {
+    opacity: 1;
+  }
+}
+/* закреплённый проект в направлении: полоса направления слева остаётся, рамка — спокойная */
+.dir-project-card.is-pinned {
+  border-color: var(--accent-border);
+  border-left-color: var(--c);
+}
+.dir-project-card .pin {
+  width: 24px;
+  height: 24px;
+}
+
+/* ── Обзор ──────────────────────────────────────────────────────── */
+.overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ov-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.ov-stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ov-stat .v {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ov-stat .l {
+  font-size: 11.5px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ov-stat.is-warn .v {
+  color: var(--danger);
+}
+.ov-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.ov-toolbar .seg button {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.ov-toolbar > button:last-child {
+  margin-left: auto;
+}
+.ov-filter {
+  margin-top: -4px;
+}
+.ov-order-hint {
+  margin: 0;
+}
+.ov-empty-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ov-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ov-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ov-group-head .nm {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.ov-group-head .nm:hover {
+  color: var(--accent);
+}
+.ov-group-head .ct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ov-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ov-item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  transition: transform 160ms ease;
+}
+.ov-item.is-dragging {
+  transition: none;
+}
+.ov-item.is-dragging .ov-card {
+  box-shadow: var(--shadow);
+}
+.ov-order {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.ov-handle {
+  /* без этого палец на ручке начнёт прокрутку страницы, а не перетаскивание */
+  touch-action: none;
+  cursor: grab;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: 15px;
+  letter-spacing: -3px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  user-select: none;
+}
+.ov-item.is-dragging .ov-handle {
+  cursor: grabbing;
+  color: var(--text);
+}
+.ov-arrow {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  width: 26px;
+  height: 22px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.ov-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ov-card {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--c);
+  border-radius: 11px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ov-card.is-paused {
+  border-left-style: dashed;
+}
+.ov-card.is-paused .nm {
+  color: var(--text-2);
+}
+.ov-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ov-expand {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  color: var(--text);
+}
+.ov-expand:disabled {
+  cursor: default;
+}
+.ov-expand .chev {
+  flex-shrink: 0;
+  color: var(--text-3);
+  /* свёрнута — смотрит вправо, раскрыта — вниз */
+  transform: rotate(-90deg);
+  transition: transform 150ms ease;
+}
+.ov-card.is-open .ov-expand .chev {
+  transform: none;
+}
+.ov-expand .nm {
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ov-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.ov-actions .pin {
+  width: 24px;
+  height: 24px;
+}
+.ov-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 4px;
+  padding-left: 20px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.ov-meta .dir {
+  color: var(--text-2);
+}
+.ov-meta .tag {
+  font-size: 10.5px;
+  padding: 1px 6px;
+}
+.ov-meta .is-overdue,
+.ov-task .dl.is-overdue {
+  color: var(--danger);
+}
+.ov-tasks {
+  display: flex;
+  flex-direction: column;
+  margin: 6px 0 0 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.ov-task {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 6px;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.ov-task:hover {
+  background: var(--surface-2);
+}
+.ov-task .ttl {
+  overflow-wrap: anywhere;
+}
+.ov-task .dl {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ov-open-project {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+}
+@media (max-width: 700px) {
+  .ov-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .ov-stat {
+    padding: 10px 12px;
+  }
+  .ov-stat .v {
+    font-size: 19px;
+  }
+  .ov-stat .l {
+    white-space: normal;
+  }
+  /* «Закреплённые / Все» — своей строкой, сортировка и «Упорядочить» — рядом под ней */
+  .ov-toolbar .ov-scope {
+    flex: 1 1 100%;
+  }
+  .ov-toolbar .ov-sort {
+    flex: 1;
+  }
+  .ov-filter {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ov-filter .chip {
+    flex-shrink: 0;
+  }
+  .ov-meta,
+  .ov-tasks {
+    padding-left: 0;
+    margin-left: 0;
+  }
+}
