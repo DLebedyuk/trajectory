@@ -1,13 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { Button, OverflowMenu } from '@planner/ui';
 import { DURATION_LABEL, formatLongDate } from '@planner/shared';
-import type { Focus, Project } from '@planner/contracts';
+import type { Focus } from '@planner/contracts';
 
 export interface FocusCardProps {
   focus: Focus;
-  /** Закреплённый проект направления в фокусе. Один или ни одного. */
-  pinnedProject: Project | null;
-  onOpenPinned: () => void;
   onComplete: () => void;
   onPickTask: () => void;
   onClearActive: () => void;
@@ -16,9 +13,7 @@ export interface FocusCardProps {
 }
 
 /**
- * Блок фокуса. Показывает связку направление → закреплённый проект →
- * активная задача. Закреплённый проект принадлежит направлению, а не
- * приложению: меняется фокус — меняется и он, выбирать заново не нужно.
+ * Блок фокуса. Показывает связку направление → проект → активная задача.
  *
  * Частые действия — выполнить и открыть — остаются кнопками. Редкие уезжают
  * в «···», но не исчезают: «Убрать активную» и «Очистить фокус» — разные
@@ -26,8 +21,6 @@ export interface FocusCardProps {
  */
 export function FocusCard({
   focus,
-  pinnedProject,
-  onOpenPinned,
   onComplete,
   onPickTask,
   onClearActive,
@@ -65,18 +58,10 @@ export function FocusCard({
     ? [
         { label: 'Выбрать другую задачу', onSelect: onPickTask },
         { label: 'Убрать активную задачу', onSelect: onClearActive },
-        {
-          label: pinnedProject ? 'Сменить закреплённый проект' : 'Закрепить проект',
-          onSelect: onOpenPinned,
-        },
         { label: 'Сменить направление', onSelect: onChangeDirection },
         { label: 'Очистить фокус', onSelect: onClearFocus },
       ]
     : [
-        {
-          label: pinnedProject ? 'Сменить закреплённый проект' : 'Закрепить проект',
-          onSelect: onOpenPinned,
-        },
         { label: 'Сменить направление', onSelect: onChangeDirection },
         { label: 'Очистить фокус', onSelect: onClearFocus },
       ];
@@ -97,23 +82,7 @@ export function FocusCard({
           {direction.name.charAt(0)}
         </span>
         <span>{direction.name}</span>
-        {pinnedProject ? (
-          <>
-            <span className="sep">→</span>
-            <button
-              type="button"
-              className="proj"
-              onClick={() => navigate(`/projects/${pinnedProject.id}`)}
-            >
-              {pinnedProject.title}
-            </button>
-          </>
-        ) : null}
-        {/*
-          Задача может лежать в другом проекте направления, чем закреплённый —
-          тогда показываем оба звена, иначе связка врала бы.
-        */}
-        {task && task.projectId !== pinnedProject?.id ? (
+        {task ? (
           <>
             <span className="sep">→</span>
             <button

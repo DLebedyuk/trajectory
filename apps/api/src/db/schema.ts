@@ -13,7 +13,6 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 
 const now = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -184,10 +183,6 @@ export const projects = pgTable(
     deadline: date('deadline'),
     sortOrder: integer('sort_order').notNull().default(0),
     notes: jsonb('notes').$type<string[]>().notNull().default([]),
-    // закреплённый проект направления. Ограничение «не больше одного»
-    // держит база частичным уникальным индексом, а не только код: иначе
-    // две вкладки легко создадут два закреплённых проекта в одном направлении
-    pinned: boolean('pinned').notNull().default(false),
     createdAt: now(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
@@ -196,9 +191,6 @@ export const projects = pgTable(
   },
   (t) => ({
     byDirection: index('projects_direction_idx').on(t.directionId, t.sortOrder),
-    onePinnedPerDirection: uniqueIndex('projects_pinned_direction_uidx')
-      .on(t.directionId)
-      .where(sql`${t.pinned}`),
   }),
 );
 

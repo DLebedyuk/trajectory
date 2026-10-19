@@ -124,16 +124,6 @@ describe('вертикальный срез: направление → прое
     expect(pinned.body[0].directionName).toBe('Озвучка');
   });
 
-  it('на главной показывается закреплённый проект направления в фокусе', async () => {
-    // важные задачи — дело проекта, на главную они не выносятся
-    await api.post(`/api/tasks/${taskId}/pin`);
-    await api.post(`/api/projects/${projectId}/pin`);
-    await api.put('/api/focus/direction').send({ directionId, onConflict: 'keepTask' });
-
-    const dashboard = await api.get('/api/dashboard');
-    expect(dashboard.body.pinnedProject?.id).toBe(projectId);
-    expect(dashboard.body.pinnedTasks).toBeUndefined();
-  });
 
   it('8-9. выполнение активной задачи убирает её из активного и из важных', async () => {
     const res = await api.post(`/api/tasks/${taskId}/complete`);

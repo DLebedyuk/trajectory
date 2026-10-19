@@ -907,7 +907,7 @@
   display: grid;
   /* колонка карты — ровно по её ширине: иначе полугодовая карта не влезала
      в 1.2fr и под ней появлялась полоса прокрутки */
-  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) max-content;
   gap: 20px;
   align-items: center;
   background: var(--surface);
@@ -956,32 +956,6 @@
 }
 .dir-list-row .map-cell .heatmap .cell {
   border-radius: 2px;
-}
-.dir-list-row .pinned-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.dir-list-row .pinned-cell .pt {
-  font-size: 12px;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.dir-list-row .pinned-cell .pt .dir-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--c);
-}
-.dir-list-row .pinned-cell .pt small {
-  font-size: 10px;
-  color: var(--text-3);
-}
-.dir-list-row .pinned-cell .more {
-  font-size: 11px;
-  color: var(--text-3);
 }
 .dir-list-row:hover {
   border-color: var(--accent);
@@ -1064,15 +1038,6 @@
 }
 .dir-project-card .stats {
   margin-left: auto;
-}
-/* закрепление проекта — общий .pin (см. ниже), тут только отступ от заголовка */
-.dir-project-card .pin {
-  margin-left: 4px;
-}
-/* закреплённый проект: полоса направления слева остаётся, добавляется рамка */
-.dir-project-card.is-pinned {
-  border-color: var(--accent);
-  border-left-color: var(--c);
 }
 .dir-project-card.is-paused {
   border-left-style: dashed;
@@ -2136,16 +2101,6 @@ body {
 .dir-list-row .map-cell {
   min-width: 0;
 }
-.dir-list-row .pinned-cell .pt {
-  background: none;
-  border: none;
-  padding: 0;
-  text-align: left;
-  align-items: baseline;
-}
-.dir-list-row .pinned-cell .pt:hover span {
-  color: var(--accent);
-}
 @media (max-width: 1080px) {
   .dir-list-row {
     grid-template-columns: minmax(0, 1fr);
@@ -2262,6 +2217,8 @@ body {
 .note-row span {
   flex: 1;
   min-width: 0;
+  /* ссылка без пробелов иначе не переносится и уезжает под корзину */
+  overflow-wrap: anywhere;
 }
 
 /* ============ ЗАДАЧА: производные ============ */

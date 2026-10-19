@@ -134,7 +134,6 @@ describe('целостность архива проектов', () => {
     const completed = await projects.complete(TEST_USER_ID, project.id);
 
     expect(completed.status).toBe('archived');
-    expect(completed.pinned).toBe(false);
     expect(completed.completedAt).not.toBeNull();
 
     const [focus] = await db

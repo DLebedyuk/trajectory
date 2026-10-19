@@ -10,7 +10,6 @@ import { TasksService } from '../tasks/tasks.service.js';
 import { RemindersService } from '../reminders/reminders.service.js';
 import { MediaService } from '../media/media.service.js';
 import { TouchesService } from '../touches/touches.service.js';
-import { ProjectsService } from '../projects/projects.service.js';
 
 /**
  * Один запрос для главной страницы: «Сегодня», фокус, закреплённый проект
@@ -28,7 +27,6 @@ export class DashboardController {
     @Inject(RemindersService) private readonly reminders: RemindersService,
     @Inject(MediaService) private readonly media: MediaService,
     @Inject(TouchesService) private readonly touches: TouchesService,
-    @Inject(ProjectsService) private readonly projects: ProjectsService,
   ) {}
 
   @Get()
@@ -47,17 +45,6 @@ export class DashboardController {
         this.touches.heatmap(userId, 26),
       ],
     );
-
-    /*
-      Закреплённый проект — один на направление, а на главной показывается
-      тот, что принадлежит направлению в фокусе. Меняется фокус — меняется
-      и проект; отдельной «главной» сущности приложение не хранит.
-    */
-    const pinnedProject = focus.focusDirectionId
-      ? ((await this.projects.listPinned(userId)).find(
-          (p) => p.directionId === focus.focusDirectionId,
-        ) ?? null)
-      : null;
 
     // События подключённых календарей. Пока это моковые данные из seed —
     // реальная синхронизация с Google и Яндексом требует OAuth и бэкенда.
@@ -88,7 +75,6 @@ export class DashboardController {
       dueTasks,
       overdueTasks,
       todayReminders,
-      pinnedProject,
       pinnedMedia,
       heatmap,
     };

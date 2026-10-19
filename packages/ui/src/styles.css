@@ -163,8 +163,10 @@ select {
   направления в --accent-base, остальные оттенки выводятся из него.
   Поэтому новое направление, созданное пользователем, красит интерфейс так же
   правильно, как исходные пять. Без фокуса берётся нейтральный цвет.
+  Объявлено на корне, а не на .app-shell: модалки и меню рендерятся порталом
+  в body, вне оболочки, и иначе оставались бы нейтрального цвета.
 */
-.app-shell {
+:root {
   --accent: var(--accent-base, var(--d-neutral));
   --accent-hover: color-mix(in srgb, var(--accent) 84%, #000);
   --accent-soft: color-mix(in srgb, var(--accent) 12%, var(--surface));
@@ -177,7 +179,7 @@ select {
   оттенок не добирает контраста. Мягкая заливка становится полупрозрачной,
   иначе она светлее фона и «выпрыгивает».
 */
-.theme-dark .app-shell {
+.theme-dark {
   --accent: color-mix(in srgb, var(--accent-base, var(--d-neutral)) 76%, #fff);
   --accent-hover: color-mix(in srgb, var(--accent) 82%, #fff);
   --accent-soft: color-mix(in srgb, var(--accent-base, var(--d-neutral)) 20%, transparent);

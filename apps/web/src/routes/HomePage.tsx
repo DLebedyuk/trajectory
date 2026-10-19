@@ -18,7 +18,6 @@ import { DeadlinesCard } from '../features/DeadlinesCard.js';
 import { RemindersCard } from '../features/RemindersCard.js';
 import { HabitsCard } from '../features/HabitsCard.js';
 import { PickTaskModal } from '../features/PickTaskModal.js';
-import { PickPinnedProjectModal } from '../features/PickPinnedProjectModal.js';
 import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 import { TouchModal } from '../features/TouchModal.js';
@@ -48,7 +47,6 @@ export function HomePage() {
   const [remindOpen, setRemindOpen] = useState(false);
   const [thoughtOpen, setThoughtOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [pinOpen, setPinOpen] = useState(false);
   // id завершающихся напоминаний — набор, а не одно значение: mutation.variables
   // хранит только последний вызов mutate(), и при быстром клике A → B кнопка A
   // разблокировалась бы, пока её запрос ещё летит
@@ -139,8 +137,6 @@ export function HomePage() {
 
           <FocusCard
             focus={data.focus}
-            pinnedProject={data.pinnedProject}
-            onOpenPinned={() => setPinOpen(true)}
             onComplete={() =>
               data.focus.activeTaskId &&
               askComplete(data.focus.activeTaskId, data.focus.activeTask?.title)
@@ -297,16 +293,6 @@ export function HomePage() {
           </div>
         </div>
       </Modal>
-
-      {data.focus.direction ? (
-        <PickPinnedProjectModal
-          open={pinOpen}
-          onOpenChange={setPinOpen}
-          directionId={data.focus.direction.id}
-          directionName={data.focus.direction.name}
-          pinnedProjectId={data.pinnedProject?.id ?? null}
-        />
-      ) : null}
 
       {conflictModal}
 

@@ -38,17 +38,6 @@ vi.mock('../api/client.js', async () => {
           weekTotal: 1,
         }),
       },
-      projects: {
-        pinned: async () => [
-          {
-            id: 'project-9',
-            directionId: 'dir-act',
-            title: 'Показ отрывка',
-            deadline: null,
-            pinned: true,
-          },
-        ],
-      },
     },
   };
 });
@@ -95,13 +84,4 @@ describe('список направлений: куда ведёт клик', ()
     expect(await screen.findByText('страница направления')).toBeInTheDocument();
   });
 
-  it('закреплённый проект внутри плашки ведёт к себе, а не к направлению', async () => {
-    renderList();
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole('button', { name: /Показ отрывка/ }));
-
-    expect(await screen.findByText('страница проекта')).toBeInTheDocument();
-    expect(screen.queryByText('страница направления')).not.toBeInTheDocument();
-  });
 });

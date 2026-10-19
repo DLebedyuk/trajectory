@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -128,14 +128,17 @@ export function Shell({ children }: { children: ReactNode }) {
    * созданное пользователем направление красит интерфейс так же, как исходные.
    */
   const accentColor = focus.data?.direction?.color;
-  const shellStyle = accentColor
-    ? ({ '--accent-base': `var(${accentColor})` } as CSSProperties)
-    : undefined;
+  // на корне документа, а не на оболочке: модалки живут в портале вне неё
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (accentColor) root.setProperty('--accent-base', `var(${accentColor})`);
+    else root.removeProperty('--accent-base');
+  }, [accentColor]);
 
   const initial = (me.data?.displayName ?? '?').trim().charAt(0).toUpperCase();
 
   return (
-    <div className="app-shell" style={shellStyle}>
+    <div className="app-shell">
       <aside className="app-sidebar">
         <div className="brand">
           <div className="logo" aria-hidden="true" />

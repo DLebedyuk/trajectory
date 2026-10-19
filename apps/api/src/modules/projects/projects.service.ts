@@ -23,7 +23,6 @@ const toProject = (r: Row): Project => ({
   deadline: dateOnly(r.deadline),
   sortOrder: r.sortOrder,
   notes: r.notes ?? [],
-  pinned: r.pinned,
   createdAt: isoRequired(r.createdAt),
   completedAt: iso(r.completedAt),
   updatedAt: isoRequired(r.updatedAt),
@@ -148,59 +147,6 @@ export class ProjectsService {
     return toProject(row as Row);
   }
 
-  /**
-   * Закрепить проект направления. Закреплённый проект в направлении один:
-   * старое закрепление снимается в той же транзакции, иначе частичный
-   * уникальный индекс справедливо не даст записать второй.
-   *
-   * Архивный проект закрепить нельзя: закрепление — это «вот чем я сейчас
-   * занимаюсь», а завершённый проект таким быть не может.
-   */
-  async setPinned(userId: string, id: string, pinned: boolean): Promise<Project> {
-    const project = await this.get(userId, id);
-    if (pinned && project.status === 'archived') {
-      throw ApiException.validation(
-        'Завершённый проект нельзя закрепить. Сначала верните его из архива.',
-      );
-    }
-
-    await this.db.transaction(async (tx) => {
-      if (pinned) {
-        await tx
-          .update(projects)
-          .set({ pinned: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(projects.userId, userId),
-              eq(projects.directionId, project.directionId),
-              eq(projects.pinned, true),
-            ),
-          );
-      }
-      await tx
-        .update(projects)
-        .set({ pinned, updatedAt: new Date() })
-        .where(and(eq(projects.userId, userId), eq(projects.id, id)));
-    });
-
-    return this.get(userId, id);
-  }
-
-  /**
-   * Закреплённые проекты пользователя — по одному на направление.
-   * Список направлений берёт их одним запросом вместо запроса на каждую плашку.
-   */
-  async listPinned(userId: string): Promise<Project[]> {
-    const rows = await this.db
-      .select()
-      .from(projects)
-      .where(
-        and(eq(projects.userId, userId), eq(projects.pinned, true), isNull(projects.deletedAt)),
-      )
-      .orderBy(asc(projects.sortOrder));
-    return rows.map(toProject);
-  }
-
   private async setStatus(userId: string, id: string, status: Project['status']): Promise<Project> {
     await this.get(userId, id);
     const [row] = await this.db
@@ -208,9 +154,6 @@ export class ProjectsService {
       .set({
         status,
         completedAt: status === 'archived' ? new Date() : null,
-        // завершённый проект перестаёт быть закреплённым: иначе на главной
-        // висел бы архив, а закрепить живой проект было бы уже нельзя
-        ...(status === 'archived' ? { pinned: false } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(projects.userId, userId), eq(projects.id, id)))
@@ -257,7 +200,7 @@ export class ProjectsService {
 
       await tx
         .update(projects)
-        .set({ status: 'archived', completedAt: new Date(), pinned: false, updatedAt: new Date() })
+        .set({ status: 'archived', completedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(projects.userId, userId), eq(projects.id, id)));
     });
     return this.get(userId, id);
@@ -279,7 +222,7 @@ export class ProjectsService {
 
       await tx
         .update(projects)
-        .set({ deletedAt: now, pinned: false, updatedAt: now })
+        .set({ deletedAt: now, updatedAt: now })
         .where(and(eq(projects.userId, userId), eq(projects.id, id)));
 
       const [focus] = await tx.select().from(userFocus).where(eq(userFocus.userId, userId));

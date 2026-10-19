@@ -14,9 +14,9 @@ import {
   PageHeader,
   useToast,
 } from '@planner/ui';
-import { formatLongDate, plural, todayInTimezone } from '@planner/shared';
+import { plural, todayInTimezone } from '@planner/shared';
 import { api } from '../api/client.js';
-import { qk, useDashboard, useDirections, usePinnedProjects } from '../api/queries.js';
+import { qk, useDashboard, useDirections } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 
 /**
@@ -44,7 +44,6 @@ export function DirectionsPage() {
       queryFn: () => api.touches.heatmap(26, d.id),
     })),
   });
-  const pinnedProjects = usePinnedProjects();
 
   const create = useMutation({
     mutationFn: () =>
@@ -91,7 +90,6 @@ export function DirectionsPage() {
         const heat = heatmaps[index]?.data as
           | { days: never[]; total?: number; weekTotal?: number }
           | undefined;
-        const pinned = (pinnedProjects.data ?? []).find((p) => p.directionId === d.id) ?? null;
         const isFocus = dashboard.data?.focus.focusDirectionId === d.id;
         const total = heat?.total ?? 0;
 
@@ -148,32 +146,6 @@ export function DirectionsPage() {
               />
             </div>
 
-            {/* закреплённый проект направления — он же показывается на главной,
-                когда это направление в фокусе */}
-            <div className="pinned-cell">
-              <span className="lbl">Закреплённый проект</span>
-              {pinned ? (
-                <button
-                  type="button"
-                  className="pt"
-                  onClick={(e) => {
-                    // иначе клик уйдёт наверх и вместо проекта откроется направление
-                    e.stopPropagation();
-                    navigate(`/projects/${pinned.id}`);
-                  }}
-                >
-                  <i className="dir-dot" style={{ ['--c' as string]: `var(${d.color})` }} />
-                  <span>
-                    {pinned.title}
-                    {pinned.deadline ? (
-                      <small> · до {formatLongDate(pinned.deadline)}</small>
-                    ) : null}
-                  </span>
-                </button>
-              ) : (
-                <span className="more">Ничего не закреплено.</span>
-              )}
-            </div>
           </div>
         );
       })}
