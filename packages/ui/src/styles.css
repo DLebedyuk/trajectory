@@ -562,14 +562,6 @@ select {
 .task-row .tmeta .deadline-soon {
   color: var(--warn);
 }
-.task-row .pin {
-  font-size: 13px;
-  color: var(--text-3);
-  cursor: pointer;
-}
-.task-row .pin.is-pinned {
-  color: var(--accent);
-}
 .task-row .dir-dot {
   width: 8px;
   height: 8px;
@@ -1016,8 +1008,7 @@ select {
 }
 /* строка задачи: кнопки внутри не должны выглядеть кнопками */
 .task-row .check,
-.task-row .tname,
-.task-row .pin {
+.task-row .tname {
   background: none;
   border-radius: 0;
   padding: 0;

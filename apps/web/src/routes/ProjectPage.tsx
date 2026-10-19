@@ -6,6 +6,8 @@ import {
   ConfirmModal,
   FormField,
   IconPause,
+  IconPin,
+  IconPinFilled,
   IconPlus,
   IconTrash,
   Modal,
@@ -15,10 +17,10 @@ import {
 
 /** Фильтр по примерному времени — те же значения, что у задачи. */
 const DURATIONS = [
-  { value: 'all', label: 'любое' },
+  { value: 'all', label: 'Любое время' },
   { value: 'short', label: '15 минут' },
-  { value: 'medium', label: 'около часа' },
-  { value: 'long', label: 'несколько часов' },
+  { value: 'medium', label: 'Около часа' },
+  { value: 'long', label: 'Несколько часов' },
 ];
 import { formatLongDate } from '@planner/shared';
 import type { TaskFilter } from '@planner/contracts';
@@ -32,7 +34,9 @@ import {
   useProject,
   useTasks,
   useTogglePin,
+  useUpdateProjectMeta,
 } from '../api/queries.js';
+import { PriorityPicker } from '../features/ProjectMeta.js';
 import { useCompleteTaskDialog } from '../features/CompleteTaskDialog.js';
 import { TaskLine } from '../features/TaskLine.js';
 import { ProjectSettingsModal } from '../features/ProjectSettingsModal.js';
@@ -62,6 +66,7 @@ export function ProjectPage() {
 
   const { askComplete, dialog: completeDialog } = useCompleteTaskDialog();
   const togglePin = useTogglePin();
+  const updateMeta = useUpdateProjectMeta();
   const [taskOpen, setTaskOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -167,11 +172,35 @@ export function ProjectPage() {
             <span className="proj-meta">
               {p.deadline ? <span className="mono">срок {formatLongDate(p.deadline)}</span> : null}
               {statusBadge ? <span className="badge">{statusBadge}</span> : null}
+              {p.status !== 'archived' ? (
+                <PriorityPicker projectId={p.id} title={p.title} priority={p.priority} />
+              ) : null}
             </span>
           </>
         }
         actions={
           <>
+            {/* закрепление = «видеть в обзоре»; с фокусом на главной не связано */}
+            {p.status !== 'archived' ? (
+              <Button
+                size="sm"
+                variant={p.pinned ? 'current' : 'default'}
+                aria-pressed={p.pinned}
+                title={p.pinned ? 'Убрать из обзора' : 'Показывать проект в обзоре'}
+                onClick={() =>
+                  updateMeta.mutate(
+                    { id: p.id, pinned: !p.pinned },
+                    {
+                      onSuccess: () => toast.show(p.pinned ? 'Убран из обзора' : 'Проект в обзоре'),
+                      onError: () => toast.show('Не удалось изменить закрепление'),
+                    },
+                  )
+                }
+              >
+                {p.pinned ? <IconPinFilled /> : <IconPin />}
+                {p.pinned ? 'В обзоре' : 'Закрепить'}
+              </Button>
+            ) : null}
             <Button size="sm" onClick={() => setSettingsOpen(true)}>
               Настройки
             </Button>
@@ -208,18 +237,19 @@ export function ProjectPage() {
               </Button>
             </h4>
 
-            <div className="proj-filters">
-              <select
-                aria-label="Фильтр по времени"
-                value={filterState.estimatedDuration}
-                onChange={(e) => setFilter({ estimatedDuration: e.target.value })}
-              >
-                {DURATIONS.map((d) => (
-                  <option key={d.value} value={d.value}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
+            {/* чипы, а не системный select: варианта четыре, и все видны сразу */}
+            <div className="chips proj-filters" role="group" aria-label="Фильтр по времени">
+              {DURATIONS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  className={`chip${filterState.estimatedDuration === d.value ? ' is-active' : ''}`}
+                  aria-pressed={filterState.estimatedDuration === d.value}
+                  onClick={() => setFilter({ estimatedDuration: d.value })}
+                >
+                  {d.label}
+                </button>
+              ))}
             </div>
 
             {openTasks.length > 0 ? (

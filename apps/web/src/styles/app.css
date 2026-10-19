@@ -2196,6 +2196,21 @@ body {
 .proj-filters {
   margin-bottom: 12px;
 }
+.proj-filters .chip {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+/* в шапке проекта приоритет — постоянный элемент, не подсказка по наведению */
+.proj-meta .prio-btn {
+  border-color: var(--line);
+  font-size: 11.5px;
+}
+.proj-meta .prio-btn.is-empty {
+  opacity: 1;
+}
+.proj-meta .prio-btn.is-empty::after {
+  content: ' ▾';
+}
 .proj-filters .sort select {
   background: none;
   border: 1px solid var(--line);
