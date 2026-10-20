@@ -71,6 +71,10 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
       AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
       AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-20000}
+      # голосовые в боте; пусто — берутся AI_API_KEY / AI_BASE_URL
+      STT_API_KEY: ${STT_API_KEY:-}
+      STT_BASE_URL: ${STT_BASE_URL:-}
+      STT_MODEL: ${STT_MODEL:-whisper-1}
 
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Moscow}
 
