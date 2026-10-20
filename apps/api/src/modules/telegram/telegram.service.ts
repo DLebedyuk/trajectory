@@ -15,6 +15,7 @@ import { env, isDevAuthEnabled } from '../../config/env.js';
 import { RemindersService } from '../reminders/reminders.service.js';
 import { InboxService } from '../inbox/inbox.service.js';
 import { TelegramLinkService } from './telegram-link.service.js';
+import { SpeechToTextService, SpeechUnavailableError } from './speech-to-text.service.js';
 import { NotificationRouter } from '../reminders/providers/notification.router.js';
 import type {
   NotificationProvider,
@@ -73,6 +74,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     @Inject(InboxService) private readonly inbox: InboxService,
     @Inject(NotificationRouter) private readonly router: NotificationRouter,
     @Inject(TelegramLinkService) private readonly link: TelegramLinkService,
+    @Inject(SpeechToTextService) private readonly speech: SpeechToTextService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -518,8 +520,8 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       await reply(ctx, result);
     });
 
-    bot.on('message:text', async (ctx) => {
-      const chatId = String(ctx.chat.id);
+    const linkedUser = async (ctx: Context): Promise<string | null> => {
+      const chatId = String(ctx.chat?.id ?? '');
       const userId =
         (await this.resolveUser(String(ctx.from?.id))) ??
         (await this.devAutoLink(String(ctx.from?.id), chatId));
@@ -528,10 +530,51 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
           'Этот чат не связан с аккаунтом. Откройте «Настройки» в «Траектории», ' +
             'нажмите «Подключить Telegram» и пришлите сюда код.',
         );
+      }
+      return userId;
+    };
+
+    bot.on('message:text', async (ctx) => {
+      const userId = await linkedUser(ctx);
+      if (!userId) return;
+      const today = todayInTimezone(await this.timezoneOf(userId));
+      await reply(ctx, await this.handleText(userId, String(ctx.chat.id), ctx.message.text, today));
+    });
+
+    /*
+      Голосовое — то же сообщение, только надиктованное: расшифровываем и
+      отдаём в handleText без изменений. Распознанный текст показываем в ответе,
+      чтобы ошибку распознавания было видно сразу, а не в списке напоминаний.
+    */
+    bot.on('message:voice', async (ctx) => {
+      const userId = await linkedUser(ctx);
+      if (!userId) return;
+      if (!this.speech.isConfigured) {
+        await ctx.reply('Голосовые пока не распознаю — напишите, пожалуйста, текстом.');
+        return;
+      }
+      let text: string;
+      try {
+        const file = await ctx.getFile();
+        const res = await fetch(
+          `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`,
+        );
+        if (!res.ok) throw new SpeechUnavailableError(`файл из Telegram: HTTP ${res.status}`);
+        text = await this.speech.transcribe(await res.arrayBuffer(), 'voice.ogg');
+      } catch (e) {
+        this.logger.warn(`Голосовое не распознано: ${e instanceof Error ? e.message : String(e)}`);
+        await ctx.reply(
+          'Не получилось распознать голосовое. Попробуйте ещё раз или напишите текстом.',
+        );
+        return;
+      }
+      if (!text) {
+        await ctx.reply('В голосовом не расслышал слов. Попробуйте ещё раз.');
         return;
       }
       const today = todayInTimezone(await this.timezoneOf(userId));
-      await reply(ctx, await this.handleText(userId, chatId, ctx.message.text, today));
+      const result = await this.handleText(userId, String(ctx.chat.id), text, today);
+      await reply(ctx, { ...result, text: `🎙 «${text}»\n\n${result.text}` });
     });
   }
 

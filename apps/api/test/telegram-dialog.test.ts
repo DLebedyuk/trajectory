@@ -65,6 +65,7 @@ function makeService() {
     inbox as never,
     router as never,
     link as never,
+    {} as never,
   );
 }
 
@@ -208,6 +209,14 @@ describe('телеграм: подтверждение неоднозначно�
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0]?.[1].scheduledDate).toBe(TODAY);
     expect(reply.text).toContain('Напомню');
+  });
+
+  it('«напомни мне …» — напоминание без «мне» в тексте', async () => {
+    const service = makeService();
+    await service.handleText(USER_ID, CHAT_ID, 'Напомни мне купить молоко', TODAY);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[1].text).toBe('Купить молоко');
   });
 
   it('обычную мысль кладёт во входящие', async () => {

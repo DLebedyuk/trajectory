@@ -124,6 +124,16 @@ describe('parseRelativePhrase', () => {
     expect(r.text).toBe('');
   });
 
+  it('«напомни мне» разбирается так же, как «напомни»', () => {
+    const r = parseRelativePhrase('Напомни мне завтра в 10 позвонить маме', TODAY);
+    expect(r.isReminder).toBe(true);
+    expect(r.date).toBe('2026-08-27');
+    expect(r.time).toBe('10:00');
+    expect(r.text).toBe('Позвонить маме');
+    expect(parseRelativePhrase('напомни мне', TODAY).text).toBe('');
+    expect(parseRelativePhrase('напомните мне купить хлеб', TODAY).text).toBe('Купить хлеб');
+  });
+
   it('то же самое для голого «напомни»', () => {
     const r = parseRelativePhrase('напомни', TODAY);
     expect(r.isReminder).toBe(true);

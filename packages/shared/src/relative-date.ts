@@ -23,7 +23,11 @@ export interface ParsedPhrase {
   ambiguousWeekday: string | null;
 }
 
-const REMINDER_RE = /(^|\s)(напомни|напомнить|напомните)(\s|$)/i;
+/*
+  «мне» сразу после глагола — часть просьбы, а не текста напоминания:
+  «напомни мне купить молоко» должно дать «Купить молоко», а не «Мне купить молоко».
+*/
+const REMINDER_RE = /(^|\s)(напомни|напомнить|напомните)(\s+мне)?(\s|$)/i;
 
 const WEEKDAYS: Record<string, number> = {
   понедельник: 1,

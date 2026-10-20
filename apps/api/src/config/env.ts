@@ -56,6 +56,15 @@ const envSchema = z.object({
   AI_BASE_URL: z.string().default('https://api.openai.com/v1'),
   AI_MODEL: z.string().default('gpt-4o-mini'),
   AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+
+  // --- распознавание голосовых в боте ---
+  /**
+   * Любой OpenAI-совместимый /audio/transcriptions. Пустые ключ и адрес берутся
+   * из AI_API_KEY / AI_BASE_URL: есть ключ OpenAI — голосовые уже работают.
+   */
+  STT_API_KEY: z.string().optional().default(''),
+  STT_BASE_URL: z.string().optional().default(''),
+  STT_MODEL: z.string().default('whisper-1'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -64,6 +64,7 @@ beforeAll(async () => {
     inbox as never,
     { deliver: async () => undefined } as never,
     link as never,
+    {} as never,
   );
 }, 60_000);
 
