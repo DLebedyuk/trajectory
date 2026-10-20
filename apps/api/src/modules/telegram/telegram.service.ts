@@ -22,6 +22,9 @@ import type {
   OutgoingNotification,
 } from '../reminders/providers/notification.provider.js';
 
+/** Дольше — не отправляем на распознавание. */
+const MAX_VOICE_SECONDS = 15;
+
 const SLOT_LABEL: Record<TimeSlot, string> = { morning: 'утром', day: 'днём', evening: 'вечером' };
 
 interface PendingPhrase {
@@ -570,6 +573,13 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       if (!userId) return;
       if (!this.speech.isConfigured) {
         await ctx.reply('Голосовые пока не распознаю — напишите, пожалуйста, текстом.');
+        return;
+      }
+      // напоминание — одна фраза; длинное голосовое скорее случайное и стоит денег
+      if (ctx.message.voice.duration > MAX_VOICE_SECONDS) {
+        await ctx.reply(
+          `Голосовое длиннее ${MAX_VOICE_SECONDS} секунд — не распознаю. Скажите короче или напишите текстом.`,
+        );
         return;
       }
       let text: string;
