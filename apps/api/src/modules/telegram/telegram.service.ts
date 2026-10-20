@@ -213,6 +213,20 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
    */
   async handleText(userId: string, chatId: string, raw: string, today: string): Promise<BotReply> {
     // ответ на «Изменить»: свободный текст в том же формате, что и «напомни …»
+    /*
+      Полноценное новое «напомни <что-то>» — это новое напоминание, а не ответ
+      на «Изменить»: иначе надиктованное следом «напомни помыть посуду» молча
+      переставляло время старого напоминания, а новое не создавалось.
+    */
+    const looksNew = (() => {
+      const p = parseRelativePhrase(raw, today);
+      return p.isReminder && p.text.trim().length > 0;
+    })();
+    if (looksNew) {
+      this.pendingEdit.delete(chatId);
+      this.pending.delete(chatId);
+    }
+
     const editing = this.pendingEdit.get(chatId);
     if (editing) {
       this.pendingEdit.delete(chatId);
@@ -374,6 +388,7 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
     // остаётся только сказать об этом. Никаких кнопок следом: «Готово» тут
     // читалось как «настроила» и молча отправляло напоминание в архив
     if (action === 'remindyes') {
+      this.pendingEdit.delete(chatId);
       return { text: 'Записал.' };
     }
 
@@ -382,6 +397,10 @@ export class TelegramService implements NotificationProvider, OnModuleInit, OnMo
       this.pendingEdit.set(chatId, { reminderId: value });
       return { text: 'Когда напомнить?' };
     }
+
+    // «Изменить», а потом «Удалить» — правка больше не ждёт ответа: следующее
+    // сообщение иначе ушло бы в удалённое напоминание
+    if (this.pendingEdit.get(chatId)?.reminderId === value) this.pendingEdit.delete(chatId);
 
     try {
       if (action === 'done') await this.reminders.complete(userId, value);

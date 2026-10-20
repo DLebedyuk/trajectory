@@ -134,6 +134,23 @@ describe('parseRelativePhrase', () => {
     expect(parseRelativePhrase('напомните мне купить хлеб', TODAY).text).toBe('Купить хлеб');
   });
 
+  it('«в 10 утра», «в 7 вечера», «в 3 часа дня» — время целиком, без хвоста в тексте', () => {
+    const morning = parseRelativePhrase('Напомни мне завтра в 10 утра написать маме.', TODAY);
+    expect(morning.time).toBe('10:00');
+    expect(morning.text).toBe('Написать маме');
+    expect(parseRelativePhrase('напомни в 7 вечера позвонить', TODAY).time).toBe('19:00');
+    expect(parseRelativePhrase('напомни в 3 часа дня позвонить', TODAY).time).toBe('15:00');
+    expect(parseRelativePhrase('напомни в 12 ночи выключить', TODAY).time).toBe('00:00');
+  });
+
+  it('пунктуация из голосовых: «Напомни, завтра помыть посуду.»', () => {
+    const r = parseRelativePhrase('Напомни, завтра помыть посуду.', TODAY);
+    expect(r.isReminder).toBe(true);
+    expect(r.date).toBe('2026-08-27');
+    expect(r.text).toBe('Помыть посуду');
+    expect(parseRelativePhrase('Напомни мне, в 10. Купить хлеб', TODAY).time).toBe('10:00');
+  });
+
   it('то же самое для голого «напомни»', () => {
     const r = parseRelativePhrase('напомни', TODAY);
     expect(r.isReminder).toBe(true);

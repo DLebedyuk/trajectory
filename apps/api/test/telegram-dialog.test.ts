@@ -153,6 +153,25 @@ describe('телеграм: подтверждение неоднозначно�
     expect(reply.text).toContain('верно?');
   });
 
+  it('«Изменить» → «Удалить» → новое «напомни …» создаёт новое, старое не трогает', async () => {
+    const service = makeService();
+    await service.handleAction(USER_ID, CHAT_ID, 'remindedit:reminder-1', TODAY);
+    await service.handleAction(USER_ID, CHAT_ID, 'delete:reminder-1', TODAY);
+    await service.handleText(USER_ID, CHAT_ID, 'в 18:00', TODAY);
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('новое «напомни …» вместо ответа на «Изменить» — новое напоминание', async () => {
+    const service = makeService();
+    await service.handleAction(USER_ID, CHAT_ID, 'remindedit:reminder-1', TODAY);
+    await service.handleText(USER_ID, CHAT_ID, 'Напомни, завтра помыть посуду.', TODAY);
+
+    expect(update).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0]?.[1].text).toBe('Помыть посуду');
+  });
+
   it('«Изменить» без понятного времени переспрашивает ещё раз, не выдумывая', async () => {
     const service = makeService();
     await service.handleAction(USER_ID, CHAT_ID, 'remindedit:reminder-1', TODAY);
