@@ -75,8 +75,17 @@ function useBrowserLogin(): { state: BrowserLoginState; start: () => void; cance
         unlisten();
         return;
       }
-      await openUrl(api.auth.desktopLoginUrl());
-    })();
+      /*
+        Окно открывает сайт с сервера, а серверная сборка идёт без VITE_API_URL —
+        ссылка входа получается относительной («/api/auth/google…»). Системный
+        браузер такую открыть не может, opener её молча отклонял, и кнопка
+        «Войти» просто ничего не делала. Достраиваем до полного адреса.
+      */
+      await openUrl(new URL(api.auth.desktopLoginUrl(), window.location.origin).toString());
+    })().catch(() => {
+      // без этого любая ошибка тут оставляла вечное «ждём браузер»
+      if (!cancelledRef.current) setState('error');
+    });
   };
 
   const cancel = () => {
