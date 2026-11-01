@@ -16,6 +16,8 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   timeSlot: null,
   timezone: 'Europe/Moscow',
   repeatRule: null,
+  notify: true,
+  sortOrder: 0,
   deliveryMode: 'alert',
   source: 'web',
   comment: null,
@@ -37,7 +39,12 @@ vi.mock('../api/client.js', async () => {
         makeDashboard({
           todayReminders: [
             reminder(),
-            reminder({ id: 'rem-2', text: 'Полить цветы', scheduledTime: null, deliveryMode: 'digest' }),
+            reminder({
+              id: 'rem-2',
+              text: 'Полить цветы',
+              scheduledTime: null,
+              deliveryMode: 'digest',
+            }),
           ],
         }),
       directions: { list: async () => [] },
@@ -65,7 +72,9 @@ describe('главная: сообщение и блокировка при за
     renderWithProviders(<HomePage />, '/');
     await screen.findByText('Позвонить педагогу');
 
-    await user.click(screen.getByRole('button', { name: 'Выполнить напоминание: Позвонить педагогу' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Выполнить напоминание: Позвонить педагогу' }),
+    );
 
     expect(await screen.findByText('Готово. Напоминание ушло в архив.')).toBeInTheDocument();
   });

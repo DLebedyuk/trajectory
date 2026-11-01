@@ -17,6 +17,8 @@ const reminder: Reminder = {
   timeSlot: null,
   timezone: 'Europe/Moscow',
   repeatRule: null,
+  notify: true,
+  sortOrder: 0,
   deliveryMode: 'alert',
   source: 'web',
   comment: null,
@@ -79,9 +81,6 @@ describe('отложить напоминание с точным времене
 
     await user.click(screen.getByRole('button', { name: 'Перенести' }));
 
-    expect(update).toHaveBeenCalledWith(
-      'rem-1',
-      expect.objectContaining({ scheduledTime: null }),
-    );
+    expect(update).toHaveBeenCalledWith('rem-1', expect.objectContaining({ scheduledTime: null }));
   });
 });

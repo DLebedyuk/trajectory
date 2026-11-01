@@ -15,6 +15,8 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   timeSlot: null,
   timezone: 'Europe/Moscow',
   repeatRule: null,
+  notify: true,
+  sortOrder: 0,
   deliveryMode: 'digest',
   source: 'web',
   comment: null,
@@ -86,7 +88,9 @@ describe('главная: раскладка блоков', () => {
     const deadlines = await screen.findByRole('region', { name: 'Дедлайны' });
     const focus = screen.getByRole('region', { name: 'Фокус' });
 
-    expect(deadlines.compareDocumentPosition(focus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      deadlines.compareDocumentPosition(focus) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('напоминания — справа: со временем и без, со ссылкой на общий список', async () => {

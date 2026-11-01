@@ -15,6 +15,8 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   timeSlot: null,
   timezone: 'Europe/Moscow',
   repeatRule: null,
+  notify: true,
+  sortOrder: 0,
   deliveryMode: 'digest',
   source: 'web',
   comment: null,
@@ -117,8 +119,7 @@ describe('разделы напоминаний не пересекаются', 
 
     const counted = ['Сегодня', 'Ближайшие', 'Регулярные']
       .map(
-        (title) =>
-          within(section(title)).queryAllByRole('button', { name: /^Выполнить:/ }).length,
+        (title) => within(section(title)).queryAllByRole('button', { name: /^Выполнить:/ }).length,
       )
       .reduce((a, b) => a + b, 0);
     expect(counted).toBe(LIST.length);

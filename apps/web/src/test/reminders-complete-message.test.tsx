@@ -16,6 +16,8 @@ const reminder = (over: Partial<Reminder> = {}): Reminder => ({
   timeSlot: 'evening',
   timezone: 'Europe/Moscow',
   repeatRule: null,
+  notify: true,
+  sortOrder: 0,
   deliveryMode: 'digest',
   source: 'web',
   comment: null,
@@ -85,7 +87,9 @@ describe('напоминания: сообщение и блокировка п�
   });
 
   it('повторяющееся напоминание — сообщение про перенос, не про архив', async () => {
-    completeApi.mockResolvedValueOnce(reminder({ repeatRule: 'daily', scheduledDate: '2026-08-28' }));
+    completeApi.mockResolvedValueOnce(
+      reminder({ repeatRule: 'daily', scheduledDate: '2026-08-28' }),
+    );
     const user = userEvent.setup();
     renderWithProviders(<RemindersPage />, '/reminders');
     await screen.findByText('Полить орхидею');

@@ -5,6 +5,7 @@ import { formatLongDate } from '@planner/shared';
 import type { Reminder, TimeSlot } from '@planner/contracts';
 import { api } from '../api/client.js';
 import { qk } from '../api/queries.js';
+import { CheckRow } from '../components/CheckRow.js';
 
 const SLOTS: { value: TimeSlot; label: string }[] = [
   { value: 'morning', label: 'Утро' },
@@ -32,6 +33,8 @@ export function ReminderModal({
   const [timeSlot, setTimeSlot] = useState<TimeSlot | ''>('');
   const [repeat, setRepeat] = useState<'' | 'daily' | 'weekly' | 'monthly'>('');
   const [comment, setComment] = useState('');
+  // новое из кнопки «Напомнить» — с уведомлением; у пункта списка — как было
+  const [notify, setNotify] = useState(true);
 
   useEffect(() => {
     if (!open) return;
@@ -41,6 +44,7 @@ export function ReminderModal({
     setTimeSlot(editing?.timeSlot ?? '');
     setRepeat((editing?.repeatRule as '' | 'daily' | 'weekly' | 'monthly') ?? '');
     setComment(editing?.comment ?? '');
+    setNotify(editing?.notify ?? true);
   }, [open, editing, today]);
 
   const save = useMutation({
@@ -48,8 +52,9 @@ export function ReminderModal({
       const payload = {
         text,
         scheduledDate: date,
-        scheduledTime: time || null,
-        timeSlot: time ? null : timeSlot || null,
+        notify,
+        scheduledTime: notify ? time || null : null,
+        timeSlot: notify && !time ? timeSlot || null : null,
         repeatRule: repeat || null,
         comment: comment || null,
       };
@@ -63,11 +68,13 @@ export function ReminderModal({
       // текст строим из того, что реально сохранил сервер: прошедший слот он
       // мог перенести на другую дату, а форма об этом ничего не знает
       toast.show(
-        saved.scheduledTime
-          ? `Напомню ${formatLongDate(saved.scheduledDate)} в ${saved.scheduledTime}`
-          : saved.timeSlot
-            ? `Напомню ${formatLongDate(saved.scheduledDate)} ${SLOT_LABEL[saved.timeSlot]}`
-            : `Напомню ${formatLongDate(saved.scheduledDate)} — подберу ближайшее время`,
+        !saved.notify
+          ? `Записано на ${formatLongDate(saved.scheduledDate)}, без уведомления`
+          : saved.scheduledTime
+            ? `Напомню ${formatLongDate(saved.scheduledDate)} в ${saved.scheduledTime}`
+            : saved.timeSlot
+              ? `Напомню ${formatLongDate(saved.scheduledDate)} ${SLOT_LABEL[saved.timeSlot]}`
+              : `Напомню ${formatLongDate(saved.scheduledDate)} — подберу ближайшее время`,
       );
       onOpenChange(false);
     },
@@ -102,41 +109,45 @@ export function ReminderModal({
           placeholder="Поставить стирку"
         />
       </FormField>
-      <div className="cols2">
-        <FormField label="Дата">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </FormField>
-        <FormField label="Точное время" hint="Без времени — один из слотов слева">
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => {
-              setTime(e.target.value);
-              if (e.target.value) setTimeSlot('');
-            }}
-          />
-        </FormField>
-      </div>
-      <FormField
-        label="Когда напомнить, если без точного времени"
-        hint="Ничего не выбрано — возьмём ближайшее подходящее"
-      >
-        <div className="seg">
-          {SLOTS.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              data-on={timeSlot === s.value}
-              onClick={() => {
-                setTimeSlot(timeSlot === s.value ? '' : s.value);
-                setTime('');
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
+      <FormField label="День" hint="В этот день дело появится в списке «Сегодня»">
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </FormField>
+      {/* день в списке и уведомление — разные вещи: дата ещё не значит «напомни» */}
+      <CheckRow checked={notify} onChange={() => setNotify((v) => !v)} label="Напомнить" />
+      {notify ? (
+        <>
+          <FormField label="Точное время" hint="Без времени — один из слотов ниже">
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => {
+                setTime(e.target.value);
+                if (e.target.value) setTimeSlot('');
+              }}
+            />
+          </FormField>
+          <FormField
+            label="Когда напомнить, если без точного времени"
+            hint="Ничего не выбрано — возьмём ближайшее подходящее"
+          >
+            <div className="seg">
+              {SLOTS.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  data-on={timeSlot === s.value}
+                  onClick={() => {
+                    setTimeSlot(timeSlot === s.value ? '' : s.value);
+                    setTime('');
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </FormField>
+        </>
+      ) : null}
       <FormField label="Повторять">
         <select value={repeat} onChange={(e) => setRepeat(e.target.value as typeof repeat)}>
           <option value="">не повторять</option>

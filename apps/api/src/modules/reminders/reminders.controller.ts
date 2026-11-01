@@ -13,6 +13,7 @@ import { ApiTags } from '@nestjs/swagger';
 import {
   createReminderSchema,
   reminderToTaskSchema,
+  reorderSchema,
   snoozeReminderSchema,
   updateReminderSchema,
 } from '@planner/contracts';
@@ -41,6 +42,11 @@ export class RemindersController {
     return this.service.archive(userId);
   }
 
+  @Patch('reorder')
+  reorder(@CurrentUser() userId: string, @Body(zodBody(reorderSchema)) body: unknown) {
+    return this.service.reorder(userId, (body as { ids: string[] }).ids);
+  }
+
   @Get(':id')
   get(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.service.get(userId, id);
@@ -63,6 +69,11 @@ export class RemindersController {
   @Post(':id/complete')
   complete(@CurrentUser() userId: string, @Param('id') id: string) {
     return this.service.complete(userId, id);
+  }
+
+  @Post(':id/reopen')
+  reopen(@CurrentUser() userId: string, @Param('id') id: string) {
+    return this.service.reopen(userId, id);
   }
 
   @Post(':id/snooze')

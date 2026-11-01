@@ -14,6 +14,8 @@ const reminder: Reminder = {
   timeSlot: null,
   timezone: 'Europe/Moscow',
   repeatRule: null,
+  notify: true,
+  sortOrder: 0,
   deliveryMode: 'digest',
   // источник хранится и приезжает с сервера — но в интерфейсе его быть не должно
   source: 'telegram',

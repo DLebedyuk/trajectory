@@ -1,7 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { and, eq, gte, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
-import { addDaysToDateOnly, todayInTimezone, toDateOnly, zonedDateTimeToUtc } from '@planner/shared';
+import {
+  addDaysToDateOnly,
+  todayInTimezone,
+  toDateOnly,
+  zonedDateTimeToUtc,
+} from '@planner/shared';
 import type { TimeSlot } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import {
@@ -238,7 +243,14 @@ export class ReminderSchedulerService {
       .from(reminders)
       .innerJoin(users, eq(users.id, reminders.userId))
       .leftJoin(userSettings, eq(userSettings.userId, reminders.userId))
-      .where(and(eq(reminders.status, 'active'), lte(reminders.scheduledDate, cutoffDate)));
+      .where(
+        and(
+          eq(reminders.status, 'active'),
+          // пункт списка без уведомления: ни сводки, ни алерта, ни догонялки
+          eq(reminders.notify, true),
+          lte(reminders.scheduledDate, cutoffDate),
+        ),
+      );
 
     for (const row of reminderRows) {
       const r = row.reminder;
@@ -313,11 +325,7 @@ export class ReminderSchedulerService {
       .innerJoin(users, eq(users.id, tasks.userId))
       .leftJoin(userSettings, eq(userSettings.userId, tasks.userId))
       .where(
-        and(
-          eq(tasks.status, 'open'),
-          isNotNull(tasks.remindAt),
-          lte(tasks.remindAt, cutoffDate),
-        ),
+        and(eq(tasks.status, 'open'), isNotNull(tasks.remindAt), lte(tasks.remindAt, cutoffDate)),
       );
 
     for (const t of taskRows) {
@@ -455,7 +463,9 @@ export class ReminderSchedulerService {
     for (const bucket of buckets.morning.values()) {
       const parts: string[] = [];
       if (bucket.digestLines.length > 0) {
-        parts.push(`${MORNING_DIGEST_HEADER}\n${bucket.digestLines.map((l) => `— ${l}`).join('\n')}`);
+        parts.push(
+          `${MORNING_DIGEST_HEADER}\n${bucket.digestLines.map((l) => `— ${l}`).join('\n')}`,
+        );
       }
       if (bucket.lines.length > 0) {
         parts.push(`${MORNING_REMINDERS_HEADER}\n${bucket.lines.map((l) => `— ${l}`).join('\n')}`);

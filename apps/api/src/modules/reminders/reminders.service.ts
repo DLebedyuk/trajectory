@@ -31,7 +31,11 @@ export interface SlotTimes {
 export const SLOT_ORDER: TimeSlot[] = ['morning', 'day', 'evening'];
 
 export function timeForSlot(slot: TimeSlot, times: SlotTimes): string {
-  return slot === 'morning' ? times.morningTime : slot === 'day' ? times.dayTime : times.eveningTime;
+  return slot === 'morning'
+    ? times.morningTime
+    : slot === 'day'
+      ? times.dayTime
+      : times.eveningTime;
 }
 
 const toReminder = (r: Row): Reminder => ({
@@ -44,6 +48,8 @@ const toReminder = (r: Row): Reminder => ({
   timezone: r.timezone,
   deliveryMode: r.deliveryMode as Reminder['deliveryMode'],
   repeatRule: r.repeatRule as Reminder['repeatRule'],
+  notify: r.notify,
+  sortOrder: r.sortOrder,
   source: r.source as Reminder['source'],
   comment: r.comment,
   status: r.status as Reminder['status'],
@@ -110,7 +116,11 @@ export class RemindersService {
       .select()
       .from(reminders)
       .where(and(eq(reminders.userId, userId), eq(reminders.status, 'active')))
-      .orderBy(asc(reminders.scheduledDate), asc(reminders.scheduledTime));
+      .orderBy(
+        asc(reminders.scheduledDate),
+        asc(reminders.sortOrder),
+        asc(reminders.scheduledTime),
+      );
     return rows.map(toReminder);
   }
 
@@ -127,7 +137,7 @@ export class RemindersService {
           sql`${reminders.scheduledDate} <= ${today}`,
         ),
       )
-      .orderBy(asc(reminders.scheduledTime));
+      .orderBy(asc(reminders.sortOrder), asc(reminders.scheduledTime));
     return rows.map(toReminder);
   }
 
@@ -164,13 +174,20 @@ export class RemindersService {
     now: Date = new Date(),
   ): Promise<Reminder> {
     const ctx = await this.userContext(userId);
-    const scheduledTime = input.scheduledTime ?? null;
+    const notify = input.notify ?? true;
+    // без уведомления время и слот не имеют смысла: их не хранить, а не игнорировать
+    const scheduledTime = notify ? (input.scheduledTime ?? null) : null;
     // deliveryMode всегда выводится из scheduledTime — его нельзя прислать в противоречии
     const deliveryMode = scheduledTime ? 'alert' : 'digest';
 
     let scheduledDate = input.scheduledDate;
     let timeSlot: TimeSlot | null = null;
-    if (deliveryMode === 'digest') {
+    /*
+      Пункт без уведомления стоит ровно в тот день, который выбран: подбор
+      ближайшего слота нужен только для доставки и мог бы молча увезти
+      вечерний пункт «на завтра».
+    */
+    if (notify && deliveryMode === 'digest') {
       timeSlot = (input.timeSlot as TimeSlot | null | undefined) ?? null;
       if (!timeSlot) {
         /*
@@ -202,11 +219,21 @@ export class RemindersService {
         timezone: ctx.timezone,
         deliveryMode,
         repeatRule: input.repeatRule ?? null,
+        notify,
+        sortOrder: await this.nextSortOrder(userId),
         source: input.source,
         comment: input.comment ?? null,
       })
       .returning();
     return toReminder(row as Row);
+  }
+
+  private async nextSortOrder(userId: string): Promise<number> {
+    const [{ value } = { value: 0 }] = await this.db
+      .select({ value: sql<number>`coalesce(max(${reminders.sortOrder}), -1) + 1` })
+      .from(reminders)
+      .where(and(eq(reminders.userId, userId), eq(reminders.status, 'active')));
+    return Number(value);
   }
 
   async update(
@@ -216,10 +243,12 @@ export class RemindersService {
     now: Date = new Date(),
   ): Promise<Reminder> {
     const current = await this.get(userId, id);
+    const notify = input.notify ?? current.notify;
     const touchesTime =
       input.scheduledDate !== undefined ||
       input.scheduledTime !== undefined ||
-      input.timeSlot !== undefined;
+      input.timeSlot !== undefined ||
+      input.notify !== undefined;
 
     let timePatch: {
       scheduledDate?: string;
@@ -230,7 +259,16 @@ export class RemindersService {
       missedNotified?: boolean;
     } = {};
 
-    if (touchesTime) {
+    if (touchesTime && !notify) {
+      // уведомление выключено: остаётся только день в списке, время и слот снимаются
+      timePatch = {
+        scheduledDate: input.scheduledDate ?? current.scheduledDate,
+        scheduledTime: null,
+        timeSlot: null,
+        deliveryMode: 'digest',
+        missedNotified: false,
+      };
+    } else if (touchesTime) {
       const ctx = await this.userContext(userId);
       const scheduledTime =
         input.scheduledTime !== undefined ? (input.scheduledTime ?? null) : current.scheduledTime;
@@ -266,6 +304,7 @@ export class RemindersService {
         ...timePatch,
         ...(input.repeatRule !== undefined ? { repeatRule: input.repeatRule ?? null } : {}),
         ...(input.comment !== undefined ? { comment: input.comment ?? null } : {}),
+        ...(input.notify !== undefined ? { notify: input.notify } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(reminders.userId, userId), eq(reminders.id, id)))
@@ -307,6 +346,42 @@ export class RemindersService {
       .where(and(eq(reminders.userId, userId), eq(reminders.id, id)))
       .returning();
     return toReminder(row as Row);
+  }
+
+  /**
+   * Снять отметку «готово» — промахнулся по чекбоксу. Возвращается только
+   * выполненное: удалённое через этот путь не воскрешается. Дата остаётся
+   * прежней — если день уже прошёл, пункт честно окажется просроченным.
+   */
+  async reopen(userId: string, id: string): Promise<Reminder> {
+    const current = await this.get(userId, id);
+    if (current.status !== 'done') {
+      throw ApiException.conflict('not_done', 'Вернуть можно только выполненное');
+    }
+    const [row] = await this.db
+      .update(reminders)
+      .set({
+        status: 'active',
+        closedAt: null,
+        sortOrder: await this.nextSortOrder(userId),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(reminders.userId, userId), eq(reminders.id, id)))
+      .returning();
+    return toReminder(row as Row);
+  }
+
+  /** Ручной порядок: позиция в массиве и есть sortOrder. Чужие id молча не трогаются. */
+  async reorder(userId: string, ids: string[]): Promise<{ ok: true }> {
+    await this.db.transaction(async (tx) => {
+      for (const [index, id] of ids.entries()) {
+        await tx
+          .update(reminders)
+          .set({ sortOrder: index })
+          .where(and(eq(reminders.userId, userId), eq(reminders.id, id)));
+      }
+    });
+    return { ok: true };
   }
 
   /**

@@ -25,6 +25,9 @@ export const reminderSchema = z.object({
   timezone: z.string().min(1),
   deliveryMode,
   repeatRule: repeatRuleSchema.nullable(),
+  /** false — пункт ежедневного списка без уведомления: дата есть, сообщения нет. */
+  notify: z.boolean(),
+  sortOrder: z.number().int(),
   source: reminderSource,
   comment: z.string().max(2000).nullable(),
   status: reminderStatus,
@@ -46,6 +49,11 @@ export const createReminderSchema = z.object({
    */
   timeSlot: timeSlot.nullish(),
   repeatRule: repeatRuleSchema.nullish(),
+  /**
+   * Не передано — true: бот, разбор входящих и старая форма продолжают
+   * создавать именно напоминания. Быстрое добавление в списке шлёт false.
+   */
+  notify: z.boolean().optional(),
   source: reminderSource.default('web'),
   comment: z.string().max(2000).nullish(),
 });
