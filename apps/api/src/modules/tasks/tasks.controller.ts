@@ -52,6 +52,12 @@ export class TasksController {
     return this.service.listPinned(userId, directionId);
   }
 
+  @Get('board')
+  board(@CurrentUser() userId: string, @Query('directionId') directionId?: string) {
+    if (!directionId) throw ApiException.validation('Нужен параметр directionId');
+    return this.service.listBoard(userId, directionId);
+  }
+
   @Get('due')
   due(@CurrentUser() userId: string, @Query('date') date: string) {
     return this.service.listDue(userId, date);

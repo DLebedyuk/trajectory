@@ -3,9 +3,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, FormField, Modal, useToast } from '@planner/ui';
 import type { Project } from '@planner/contracts';
 import { api } from '../api/client.js';
+import { CheckRow } from '../components/CheckRow.js';
 import { qk } from '../api/queries.js';
 
-/** Редактирование проекта: название, желаемый результат, срок, направление. */
+/** Редактирование проекта: название, желаемый результат, срок, направление, доска. */
 export function ProjectSettingsModal({
   project,
   directions,
@@ -23,6 +24,7 @@ export function ProjectSettingsModal({
   const [outcome, setOutcome] = useState(project.desiredOutcome ?? '');
   const [deadline, setDeadline] = useState(project.deadline ?? '');
   const [directionId, setDirectionId] = useState(project.directionId);
+  const [showOnBoard, setShowOnBoard] = useState(project.showOnBoard);
 
   // при повторном открытии показываем актуальные значения, а не прошлый черновик
   useEffect(() => {
@@ -31,6 +33,7 @@ export function ProjectSettingsModal({
     setOutcome(project.desiredOutcome ?? '');
     setDeadline(project.deadline ?? '');
     setDirectionId(project.directionId);
+    setShowOnBoard(project.showOnBoard);
   }, [open, project]);
 
   const save = useMutation({
@@ -40,11 +43,13 @@ export function ProjectSettingsModal({
         desiredOutcome: outcome.trim() || null,
         deadline: deadline || null,
         directionId,
+        showOnBoard,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: qk.project(project.id) });
       void qc.invalidateQueries({ queryKey: qk.projects(project.directionId) });
       void qc.invalidateQueries({ queryKey: qk.projects(directionId) });
+      void qc.invalidateQueries({ queryKey: ['board'] });
       toast.show('Проект обновлён');
       onOpenChange(false);
     },
@@ -85,6 +90,11 @@ export function ProjectSettingsModal({
           ))}
         </select>
       </FormField>
+      <CheckRow
+        checked={showOnBoard}
+        onChange={() => setShowOnBoard((v) => !v)}
+        label="Показывать задачи проекта на канбан-доске направления"
+      />
     </Modal>
   );
 }

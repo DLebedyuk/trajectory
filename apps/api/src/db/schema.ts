@@ -190,6 +190,9 @@ export const projects = pgTable(
     // ручной приоритет: high | normal | low, NULL — без приоритета.
     // Ничем не вычисляется — ни сроками, ни количеством задач
     priority: varchar('priority', { length: 10 }),
+    // задачи проекта видны на общей доске направления. Это только витрина:
+    // ни задачи, ни их статусы переключатель не трогает
+    showOnBoard: boolean('show_on_board').notNull().default(false),
     createdAt: now(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
@@ -327,6 +330,14 @@ export const reminders = pgTable(
      * настройках) — сбрасывается на false при любой смене даты/времени/слота.
      */
     missedNotified: boolean('missed_notified').notNull().default(false),
+    /*
+      Присылать ли уведомление. false — просто пункт ежедневного списка:
+      дата у него есть (день, в который он стоит в списке), но ни сводка,
+      ни алерт, ни догонялка его не трогают. Дата ≠ уведомление.
+    */
+    notify: boolean('notify').notNull().default(true),
+    /** Ручной порядок в списке дня. Новые пункты встают в конец. */
+    sortOrder: integer('sort_order').notNull().default(0),
     source: varchar('source', { length: 10 }).notNull().default('web'),
     comment: text('comment'),
     status: varchar('status', { length: 10 }).notNull().default('active'),

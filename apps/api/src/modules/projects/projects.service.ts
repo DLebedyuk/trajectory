@@ -28,6 +28,7 @@ const toProject = (r: Row): Project => ({
   notes: r.notes ?? [],
   pinned: r.pinned,
   priority: (r.priority ?? null) as Project['priority'],
+  showOnBoard: r.showOnBoard,
   createdAt: isoRequired(r.createdAt),
   completedAt: iso(r.completedAt),
   updatedAt: isoRequired(r.updatedAt),
@@ -125,6 +126,7 @@ export class ProjectsService {
         notes: input.notes,
         pinned: input.pinned ?? false,
         priority: input.priority ?? null,
+        showOnBoard: input.showOnBoard ?? false,
         sortOrder: Number(value),
       })
       .returning();
@@ -156,6 +158,7 @@ export class ProjectsService {
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.priority !== undefined ? { priority: input.priority ?? null } : {}),
+        ...(input.showOnBoard !== undefined ? { showOnBoard: input.showOnBoard } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(projects.userId, userId), eq(projects.id, id)))

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -29,11 +29,17 @@ import { useFocusDirection } from '../features/useFocusDirection.js';
 import { DirectionSettingsModal } from '../features/DirectionSettingsModal.js';
 import { DayTouchesModal } from '../features/DayTouchesModal.js';
 import { PinButton, PriorityMark, PriorityPicker } from '../features/ProjectMeta.js';
+import { DirectionBoard } from '../features/DirectionBoard.js';
 
-/** Страница направления. Задачи здесь не показываются — только проекты. */
+/**
+ * Страница направления. В виде «Проекты» задачи не показываются — только
+ * проекты. Вид «Канбан» (/directions/:id/board) собирает задачи проектов,
+ * включённых в доску.
+ */
 export function DirectionPage() {
   const { directionId = '' } = useParams();
   const navigate = useNavigate();
+  const isBoard = useLocation().pathname.endsWith('/board');
   const qc = useQueryClient();
   const toast = useToast();
 
@@ -235,199 +241,224 @@ export function DirectionPage() {
         }
       />
 
-      <div className="card">
-        <div className="dir-split">
-          <div>
-            <h4>Карта касаний</h4>
-            <div className="scroll-x">
-              <Heatmap
-                days={heat.data?.days ?? []}
-                today={today}
-                onDayClick={(date) => {
-                  const hasTouches = (heat.data?.days ?? []).some(
-                    (d) => d.date === date && d.total > 0,
-                  );
-                  if (hasTouches) setDay(date);
-                  else setTouchDate(date);
-                }}
-              />
-            </div>
-            <p className="hint" style={{ marginTop: 12 }}>
-              {total} {plural(total, 'касание', 'касания', 'касаний')} всего ·{' '}
-              {heat.data?.weekTotal ?? 0} на этой неделе
-            </p>
-          </div>
-
-          <div>
-            <h4>
-              Последние касания
-              <span className="today-links">
-                <button type="button" onClick={() => setTouchDate(today)}>
-                  Записать
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/directions/${directionId}/touches`)}
-                >
-                  Все
-                </button>
-              </span>
-            </h4>
-            {(touches.data ?? []).map((t) => (
-              <div className="touch-item" key={t.id}>
-                <span
-                  className="dir-glyph sm"
-                  style={{ ['--c' as string]: `var(${t.directionColor})` }}
-                  aria-hidden="true"
-                >
-                  {t.directionName.charAt(0)}
-                </span>
-                <div className="info">
-                  <div className="ttl">{t.title}</div>
-                  <div className="meta">
-                    {humanDate(t.date, today)}
-                    {t.projectTitle ? ` · ${t.projectTitle}` : ''}
-                  </div>
-                  {t.comment ? <p className="hint">{t.comment}</p> : null}
-                </div>
-              </div>
-            ))}
-            {touches.data?.length === 0 ? <p className="hint">Пока ни одного.</p> : null}
-          </div>
-        </div>
+      <div className="seg dir-view" role="group" aria-label="Вид направления">
+        <button
+          type="button"
+          data-on={!isBoard}
+          aria-pressed={!isBoard}
+          onClick={() => navigate(`/directions/${directionId}`)}
+        >
+          Проекты
+        </button>
+        <button
+          type="button"
+          data-on={isBoard}
+          aria-pressed={isBoard}
+          onClick={() => navigate(`/directions/${directionId}/board`)}
+        >
+          Канбан
+        </button>
       </div>
 
-      {/* Проекты — отдельная секция, а не продолжение карточки с картой касаний */}
-      <div className="two-col">
-        <section className="dir-projects-section" aria-label="Проекты направления">
-          <div className="section-title">
-            Проекты
-            <Button size="sm" onClick={() => setProjectOpen(true)}>
-              <IconPlus />
-              Новый проект
-            </Button>
-          </div>
-
-          {active.map((p) => projectCard(p))}
-
-          {list.length === 0 ? (
-            <div className="card">
-              <p className="hint">Проектов пока нет. Направление живёт и без них.</p>
-            </div>
-          ) : null}
-
-          {paused.length > 0 ? (
-            <>
-              <button
-                type="button"
-                className="dir-collapsed"
-                aria-expanded={showPaused}
-                onClick={() => setShowPaused((v) => !v)}
-              >
-                <span className="lbl">На паузе</span>
-                <span className="ct">
-                  {paused.length} · {showPaused ? 'свернуть' : 'показать'}
-                </span>
-              </button>
-              {showPaused ? paused.map((p) => projectCard(p, 'is-paused')) : null}
-            </>
-          ) : null}
-
-          {archived.length > 0 ? (
-            <>
-              <button
-                type="button"
-                className="dir-collapsed"
-                aria-expanded={showArchive}
-                onClick={() => setShowArchive((v) => !v)}
-              >
-                <span className="lbl">Завершённые проекты</span>
-                <span className="ct">
-                  {archived.length} · {showArchive ? 'свернуть' : 'показать'}
-                </span>
-              </button>
-              {showArchive ? archived.map((p) => projectCard(p, 'is-completed')) : null}
-            </>
-          ) : null}
-        </section>
-
-        {/* Заметки направления — тот же блок, что внутри проекта, только уровнем выше */}
-        <aside className="right-col">
-          {/* Привычки — «чем заняться, когда есть время». Без сроков и статуса;
-              клик записывает касание, а на главной они собраны со всех направлений */}
+      {isBoard ? (
+        <DirectionBoard directionId={directionId} directionColor={d.color} projects={list} />
+      ) : (
+        <>
           <div className="card">
-            <h4>
-              Привычки
-              <Button size="sm" variant="ghost" onClick={() => setHabitOpen(true)}>
-                <IconPlus />
-                Привычка
-              </Button>
-            </h4>
-            {(habits.data ?? []).length > 0 ? (
-              (habits.data ?? []).map((h) => (
-                <div className="note-row" key={h.id}>
-                  <button
-                    type="button"
-                    className="habit-row"
-                    title={`Записать касание: ${h.title}`}
-                    onClick={() => {
-                      setTouchTitle(h.title);
-                      setTouchDate(today);
+            <div className="dir-split">
+              <div>
+                <h4>Карта касаний</h4>
+                <div className="scroll-x">
+                  <Heatmap
+                    days={heat.data?.days ?? []}
+                    today={today}
+                    onDayClick={(date) => {
+                      const hasTouches = (heat.data?.days ?? []).some(
+                        (d) => d.date === date && d.total > 0,
+                      );
+                      if (hasTouches) setDay(date);
+                      else setTouchDate(date);
                     }}
-                  >
-                    <span className="ttl">{h.title}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="row-del"
-                    aria-label={`Удалить привычку: ${h.title}`}
-                    title="Удалить"
-                    onClick={() => removeHabit.mutate(h.id)}
-                  >
-                    <IconTrash />
-                  </button>
+                  />
                 </div>
-              ))
-            ) : (
-              <p className="hint">
-                То, чем приятно заняться, когда выдалось время, — без расписания и обязательств.
-                Например: «попеть за пианино», «почитать».
-              </p>
-            )}
+                <p className="hint" style={{ marginTop: 12 }}>
+                  {total} {plural(total, 'касание', 'касания', 'касаний')} всего ·{' '}
+                  {heat.data?.weekTotal ?? 0} на этой неделе
+                </p>
+              </div>
+
+              <div>
+                <h4>
+                  Последние касания
+                  <span className="today-links">
+                    <button type="button" onClick={() => setTouchDate(today)}>
+                      Записать
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/directions/${directionId}/touches`)}
+                    >
+                      Все
+                    </button>
+                  </span>
+                </h4>
+                {(touches.data ?? []).map((t) => (
+                  <div className="touch-item" key={t.id}>
+                    <span
+                      className="dir-glyph sm"
+                      style={{ ['--c' as string]: `var(${t.directionColor})` }}
+                      aria-hidden="true"
+                    >
+                      {t.directionName.charAt(0)}
+                    </span>
+                    <div className="info">
+                      <div className="ttl">{t.title}</div>
+                      <div className="meta">
+                        {humanDate(t.date, today)}
+                        {t.projectTitle ? ` · ${t.projectTitle}` : ''}
+                      </div>
+                      {t.comment ? <p className="hint">{t.comment}</p> : null}
+                    </div>
+                  </div>
+                ))}
+                {touches.data?.length === 0 ? <p className="hint">Пока ни одного.</p> : null}
+              </div>
+            </div>
           </div>
 
-          <div className="card">
-            <h4>
-              Заметки
-              <Button size="sm" variant="ghost" onClick={() => setNoteOpen(true)}>
-                <IconPlus />
-                Заметка
-              </Button>
-            </h4>
-            {(d.notes ?? []).length > 0 ? (
-              (d.notes ?? []).map((n, i) => (
-                <div className="note-row" key={`${n}-${i}`}>
-                  <span>{n}</span>
+          {/* Проекты — отдельная секция, а не продолжение карточки с картой касаний */}
+          <div className="two-col">
+            <section className="dir-projects-section" aria-label="Проекты направления">
+              <div className="section-title">
+                Проекты
+                <Button size="sm" onClick={() => setProjectOpen(true)}>
+                  <IconPlus />
+                  Новый проект
+                </Button>
+              </div>
+
+              {active.map((p) => projectCard(p))}
+
+              {list.length === 0 ? (
+                <div className="card">
+                  <p className="hint">Проектов пока нет. Направление живёт и без них.</p>
+                </div>
+              ) : null}
+
+              {paused.length > 0 ? (
+                <>
                   <button
                     type="button"
-                    className="row-del"
-                    aria-label={`Удалить заметку: ${n}`}
-                    title="Удалить"
-                    onClick={() => removeNote.mutate(i)}
+                    className="dir-collapsed"
+                    aria-expanded={showPaused}
+                    onClick={() => setShowPaused((v) => !v)}
                   >
-                    <IconTrash />
+                    <span className="lbl">На паузе</span>
+                    <span className="ct">
+                      {paused.length} · {showPaused ? 'свернуть' : 'показать'}
+                    </span>
                   </button>
-                </div>
-              ))
-            ) : (
-              <p className="hint">
-                Заметок нет. Сюда удобно складывать то, что относится ко всему направлению, а не к
-                одному проекту.
-              </p>
-            )}
+                  {showPaused ? paused.map((p) => projectCard(p, 'is-paused')) : null}
+                </>
+              ) : null}
+
+              {archived.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    className="dir-collapsed"
+                    aria-expanded={showArchive}
+                    onClick={() => setShowArchive((v) => !v)}
+                  >
+                    <span className="lbl">Завершённые проекты</span>
+                    <span className="ct">
+                      {archived.length} · {showArchive ? 'свернуть' : 'показать'}
+                    </span>
+                  </button>
+                  {showArchive ? archived.map((p) => projectCard(p, 'is-completed')) : null}
+                </>
+              ) : null}
+            </section>
+
+            {/* Заметки направления — тот же блок, что внутри проекта, только уровнем выше */}
+            <aside className="right-col">
+              {/* Привычки — «чем заняться, когда есть время». Без сроков и статуса;
+              клик записывает касание, а на главной они собраны со всех направлений */}
+              <div className="card">
+                <h4>
+                  Привычки
+                  <Button size="sm" variant="ghost" onClick={() => setHabitOpen(true)}>
+                    <IconPlus />
+                    Привычка
+                  </Button>
+                </h4>
+                {(habits.data ?? []).length > 0 ? (
+                  (habits.data ?? []).map((h) => (
+                    <div className="note-row" key={h.id}>
+                      <button
+                        type="button"
+                        className="habit-row"
+                        title={`Записать касание: ${h.title}`}
+                        onClick={() => {
+                          setTouchTitle(h.title);
+                          setTouchDate(today);
+                        }}
+                      >
+                        <span className="ttl">{h.title}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="row-del"
+                        aria-label={`Удалить привычку: ${h.title}`}
+                        title="Удалить"
+                        onClick={() => removeHabit.mutate(h.id)}
+                      >
+                        <IconTrash />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="hint">
+                    То, чем приятно заняться, когда выдалось время, — без расписания и обязательств.
+                    Например: «попеть за пианино», «почитать».
+                  </p>
+                )}
+              </div>
+
+              <div className="card">
+                <h4>
+                  Заметки
+                  <Button size="sm" variant="ghost" onClick={() => setNoteOpen(true)}>
+                    <IconPlus />
+                    Заметка
+                  </Button>
+                </h4>
+                {(d.notes ?? []).length > 0 ? (
+                  (d.notes ?? []).map((n, i) => (
+                    <div className="note-row" key={`${n}-${i}`}>
+                      <span>{n}</span>
+                      <button
+                        type="button"
+                        className="row-del"
+                        aria-label={`Удалить заметку: ${n}`}
+                        title="Удалить"
+                        onClick={() => removeNote.mutate(i)}
+                      >
+                        <IconTrash />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="hint">
+                    Заметок нет. Сюда удобно складывать то, что относится ко всему направлению, а не
+                    к одному проекту.
+                  </p>
+                )}
+              </div>
+            </aside>
           </div>
-        </aside>
-      </div>
+        </>
+      )}
 
       <TouchModal
         open={touchDate !== null}

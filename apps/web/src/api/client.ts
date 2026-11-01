@@ -33,6 +33,7 @@ import type {
   CreateTravelItemInput,
   CreateTripChecklistItemInput,
   CreateTripInput,
+  Board,
   Task,
   TaskFilter,
   TaskWithContext,
@@ -266,6 +267,8 @@ export const api = {
     /** Завершённые задачи всех проектов направления — архив направления. */
     doneByDirection: (directionId: string) =>
       get<TaskWithContext[]>('/api/tasks/done', { directionId }),
+    /** Канбан направления: задачи всех проектов, включённых в доску. */
+    board: (directionId: string) => get<Board>('/api/tasks/board', { directionId }),
     create: (input: CreateTaskInput) => post<Task>('/api/tasks', input),
     update: (id: string, input: UpdateTaskInput) => patch<Task>(`/api/tasks/${id}`, input),
     remove: (id: string) => del<{ ok: true }>(`/api/tasks/${id}`),
@@ -322,6 +325,8 @@ export const api = {
     update: (id: string, input: UpdateReminderInput) =>
       patch<Reminder>(`/api/reminders/${id}`, input),
     complete: (id: string) => post<Reminder>(`/api/reminders/${id}/complete`),
+    reopen: (id: string) => post<Reminder>(`/api/reminders/${id}/reopen`),
+    reorder: (ids: string[]) => patch<{ ok: true }>('/api/reminders/reorder', { ids }),
     snooze: (id: string, input: SnoozeReminderInput) =>
       post<Reminder>(`/api/reminders/${id}/snooze`, input),
     toTask: (id: string, input: ReminderToTaskInput) =>

@@ -148,6 +148,13 @@
       "when": 1792434700111,
       "tag": "0020_project_pinned_priority",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793561473024,
+      "tag": "0021_board_and_checklist",
+      "breakpoints": true
     }
   ]
 }

@@ -46,6 +46,7 @@ export function App() {
         <Route path="/directions" element={<DirectionsPage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/directions/:directionId" element={<DirectionPage />} />
+        <Route path="/directions/:directionId/board" element={<DirectionPage />} />
         <Route path="/directions/:directionId/touches" element={<TouchesPage />} />
         <Route path="/directions/:directionId/archive" element={<DirectionArchivePage />} />
         <Route path="/projects/:projectId/archive" element={<ProjectArchivePage />} />

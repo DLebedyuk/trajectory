@@ -27,6 +27,7 @@ export const qk = {
   task: (id: string) => ['task', id] as const,
   pinnedTasks: (directionId?: string) => ['pinnedTasks', directionId ?? 'all'] as const,
   doneTasks: (directionId: string) => ['doneTasks', directionId] as const,
+  board: (directionId: string) => ['board', directionId] as const,
   touches: (query: unknown) => ['touches', query] as const,
   habits: (directionId?: string) => ['habits', directionId ?? 'all'] as const,
   heatmap: (weeks: number, directionId?: string) =>
@@ -57,6 +58,8 @@ export function invalidateFocusScope(qc: QueryClient, projectId?: string): void 
     void qc.invalidateQueries({ queryKey: ['tasks'] });
   }
   void qc.invalidateQueries({ queryKey: ['projects'] });
+  // доска — то же самое, только витрина: статус задачи меняется везде сразу
+  void qc.invalidateQueries({ queryKey: ['board'] });
 }
 
 /**
@@ -222,6 +225,12 @@ export const useMediaItem = (id: string) =>
   useQuery({ queryKey: qk.mediaItem(id), queryFn: () => api.media.get(id), enabled: Boolean(id) });
 export const useMediaCategories = () =>
   useQuery({ queryKey: qk.mediaCategories, queryFn: api.media.categories });
+export const useBoard = (directionId: string) =>
+  useQuery({
+    queryKey: qk.board(directionId),
+    queryFn: () => api.tasks.board(directionId),
+    enabled: Boolean(directionId),
+  });
 export const useSettings = () =>
   useQuery({ queryKey: qk.settings, queryFn: () => api.settings.get() });
 export const useTravelCategories = () =>

@@ -61,6 +61,7 @@ export const makeProject = (over: Partial<Project> = {}): Project => ({
   notes: [],
   pinned: false,
   priority: null,
+  showOnBoard: false,
   createdAt: iso,
   completedAt: null,
   updatedAt: iso,

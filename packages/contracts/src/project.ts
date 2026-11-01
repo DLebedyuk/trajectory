@@ -17,6 +17,8 @@ export const projectSchema = z.object({
    */
   pinned: z.boolean(),
   priority: projectPriority.nullable(),
+  /** Задачи проекта видны на канбан-доске направления. Только витрина, задачи не меняются. */
+  showOnBoard: z.boolean(),
   createdAt: z.string().datetime(),
   completedAt: z.string().datetime().nullable(),
   updatedAt: z.string().datetime(),
@@ -32,6 +34,7 @@ export const createProjectSchema = z.object({
   notes: z.array(z.string()).default([]),
   pinned: z.boolean().optional(),
   priority: projectPriority.nullish(),
+  showOnBoard: z.boolean().optional(),
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 

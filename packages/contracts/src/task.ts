@@ -78,3 +78,29 @@ export const taskFilterSchema = z.object({
   sort: z.enum(['manual', 'deadline', 'pinned']).optional(),
 });
 export type TaskFilter = z.infer<typeof taskFilterSchema>;
+
+/**
+ * Карточка канбан-доски направления: обычная задача плюс то, что нужно
+ * карточке без отдельного запроса. Это представление, а не копия задачи.
+ */
+export const boardTaskSchema = taskSchema.extend({
+  projectTitle: z.string(),
+  /** Та самая единственная активная задача приложения. */
+  isActive: z.boolean(),
+});
+export type BoardTask = z.infer<typeof boardTaskSchema>;
+
+export const boardProjectSchema = z.object({
+  id: uuid,
+  title: z.string(),
+  status: z.string(),
+  sortOrder: z.number().int(),
+});
+export type BoardProject = z.infer<typeof boardProjectSchema>;
+
+/** Доска направления: проекты, включённые в неё, и все их задачи — открытые и готовые. */
+export const boardSchema = z.object({
+  projects: z.array(boardProjectSchema),
+  tasks: z.array(boardTaskSchema),
+});
+export type Board = z.infer<typeof boardSchema>;

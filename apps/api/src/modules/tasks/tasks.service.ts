@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import type {
+  Board,
   CreateTaskInput,
   Task,
   TaskFilter,
@@ -8,7 +9,15 @@ import type {
   UpdateTaskInput,
 } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
-import { directions, projects, taskChecklistItems, tasks, userSettings, users } from '../../db/schema.js';
+import {
+  directions,
+  projects,
+  taskChecklistItems,
+  tasks,
+  userFocus,
+  userSettings,
+  users,
+} from '../../db/schema.js';
 import { ApiException } from '../../common/api-error.js';
 import { dateOnly, iso, isoRequired } from '../../common/mappers.js';
 import { FocusService } from '../focus/focus.service.js';
@@ -187,6 +196,76 @@ export class TasksService {
   }
 
   /**
+   * Канбан-доска направления — живой запрос, а не копия: проект выключили,
+   * удалили или завершили — его карточки пропадают сами, задачи остаются в
+   * проекте. Завершённые (archived) проекты не показываются: их задачи все
+   * закрыты, и доска превращалась бы в склад. Один запрос с join, без
+   * поштучной загрузки контекста: серий в озвучке десятки.
+   */
+  async listBoard(userId: string, directionId: string): Promise<Board> {
+    const [direction] = await this.db
+      .select({ id: directions.id })
+      .from(directions)
+      .where(
+        and(
+          eq(directions.userId, userId),
+          eq(directions.id, directionId),
+          isNull(directions.deletedAt),
+        ),
+      );
+    if (!direction) throw ApiException.notFound('Направление');
+
+    const boardProjects = await this.db
+      .select({
+        id: projects.id,
+        title: projects.title,
+        status: projects.status,
+        sortOrder: projects.sortOrder,
+      })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.userId, userId),
+          eq(projects.directionId, directionId),
+          eq(projects.showOnBoard, true),
+          isNull(projects.deletedAt),
+          sql`${projects.status} <> 'archived'`,
+        ),
+      )
+      .orderBy(asc(projects.sortOrder), asc(projects.createdAt));
+    if (boardProjects.length === 0) return { projects: [], tasks: [] };
+
+    const rows = await this.db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.userId, userId),
+          inArray(
+            tasks.projectId,
+            boardProjects.map((p) => p.id),
+          ),
+          isNull(tasks.deletedAt),
+        ),
+      )
+      .orderBy(asc(tasks.sortOrder), asc(tasks.createdAt));
+    const [focus] = await this.db
+      .select({ activeTaskId: userFocus.activeTaskId })
+      .from(userFocus)
+      .where(eq(userFocus.userId, userId));
+    const titles = new Map(boardProjects.map((p) => [p.id, p.title]));
+    const withChecklists = await this.attachChecklists(rows);
+    return {
+      projects: boardProjects,
+      tasks: withChecklists.map((t) => ({
+        ...t,
+        projectTitle: titles.get(t.projectId) ?? '',
+        isActive: t.id === focus?.activeTaskId,
+      })),
+    };
+  }
+
+  /**
    * Задачи всегда напоминают утром (см. reminder-scheduler.service.ts). Утренний слот на
    * сегодня формируется один раз (idempotency key планировщика) — remindAt=сегодня,
    * поставленный уже после того, как этот слот ушёл, физически не попадёт в уже
@@ -301,12 +380,7 @@ export class TasksService {
    * «позвонить в поликлинику». Массовое закрытие задач при завершении проекта
    * идёт мимо этого метода и касаний не создаёт — это уборка, а не занятие.
    */
-  async complete(
-    userId: string,
-    id: string,
-    withTouch = false,
-    touchDate?: string,
-  ): Promise<Task> {
+  async complete(userId: string, id: string, withTouch = false, touchDate?: string): Promise<Task> {
     await this.assertExists(userId, id);
     const today = await this.todayFor(userId);
     // касание — факт сделанного, будущего факта не бывает
