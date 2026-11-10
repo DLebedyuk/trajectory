@@ -16,6 +16,7 @@ import {
   completeTaskSchema,
   createChecklistItemSchema,
   createTaskSchema,
+  moveTaskSchema,
   reorderSchema,
   taskFilterSchema,
   updateChecklistItemSchema,
@@ -110,6 +111,16 @@ export class TasksController {
   ) {
     const { withTouch, touchDate } = body as CompleteTaskInput;
     return this.service.complete(userId, id, withTouch, touchDate);
+  }
+
+  /** Перенос карточки между столбцами доски; из «Готово» — заодно возврат задачи. */
+  @Post(':id/move')
+  move(
+    @CurrentUser() userId: string,
+    @Param('id') id: string,
+    @Body(zodBody(moveTaskSchema)) body: unknown,
+  ) {
+    return this.service.move(userId, id, (body as { boardColumnId: string | null }).boardColumnId);
   }
 
   @Post(':id/reopen')

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import type {
   Board,
+  BoardColumn,
   CreateTaskInput,
   Task,
   TaskFilter,
@@ -10,6 +11,7 @@ import type {
 } from '@planner/contracts';
 import { DB, type Database } from '../../db/db.module.js';
 import {
+  boardColumns,
   directions,
   projects,
   taskChecklistItems,
@@ -25,6 +27,16 @@ import { TouchesService } from '../touches/touches.service.js';
 import { addDaysToDateOnly, timeInTimezone, todayInTimezone } from '@planner/shared';
 
 type Row = typeof tasks.$inferSelect;
+
+/** Больше столбцов на телефоне уже не читается, а на компьютере не помещается. */
+export const MAX_BOARD_COLUMNS = 8;
+
+const toColumn = (r: typeof boardColumns.$inferSelect): BoardColumn => ({
+  id: r.id,
+  directionId: r.directionId,
+  title: r.title,
+  sortOrder: r.sortOrder,
+});
 
 const toTask = (r: Row, checklist: Task['checklist'] = []): Task => ({
   id: r.id,
@@ -215,6 +227,7 @@ export class TasksService {
       );
     if (!direction) throw ApiException.notFound('Направление');
 
+    const columns = await this.listColumns(userId, directionId);
     const boardProjects = await this.db
       .select({
         id: projects.id,
@@ -233,7 +246,7 @@ export class TasksService {
         ),
       )
       .orderBy(asc(projects.sortOrder), asc(projects.createdAt));
-    if (boardProjects.length === 0) return { projects: [], tasks: [] };
+    if (boardProjects.length === 0) return { columns, projects: [], tasks: [] };
 
     const rows = await this.db
       .select()
@@ -254,15 +267,142 @@ export class TasksService {
       .from(userFocus)
       .where(eq(userFocus.userId, userId));
     const titles = new Map(boardProjects.map((p) => [p.id, p.title]));
+    // столбец из другого направления (проект перенесли) — значит первый столбец
+    const known = new Set(columns.map((c) => c.id));
+    const columnOf = new Map(rows.map((r) => [r.id, r.boardColumnId]));
     const withChecklists = await this.attachChecklists(rows);
     return {
+      columns,
       projects: boardProjects,
-      tasks: withChecklists.map((t) => ({
-        ...t,
-        projectTitle: titles.get(t.projectId) ?? '',
-        isActive: t.id === focus?.activeTaskId,
-      })),
+      tasks: withChecklists.map((t) => {
+        const columnId = columnOf.get(t.id) ?? null;
+        return {
+          ...t,
+          projectTitle: titles.get(t.projectId) ?? '',
+          isActive: t.id === focus?.activeTaskId,
+          boardColumnId: columnId && known.has(columnId) ? columnId : null,
+        };
+      }),
     };
+  }
+
+  // ─── столбцы доски ──────────────────────────────────────────────────────
+
+  async listColumns(userId: string, directionId: string): Promise<BoardColumn[]> {
+    const rows = await this.db
+      .select()
+      .from(boardColumns)
+      .where(and(eq(boardColumns.userId, userId), eq(boardColumns.directionId, directionId)))
+      .orderBy(asc(boardColumns.sortOrder), asc(boardColumns.createdAt));
+    return rows.map(toColumn);
+  }
+
+  async createColumn(userId: string, directionId: string, title: string): Promise<BoardColumn> {
+    const [direction] = await this.db
+      .select({ id: directions.id })
+      .from(directions)
+      .where(
+        and(
+          eq(directions.userId, userId),
+          eq(directions.id, directionId),
+          isNull(directions.deletedAt),
+        ),
+      );
+    if (!direction) throw ApiException.notFound('Направление');
+    const existing = await this.listColumns(userId, directionId);
+    if (existing.length >= MAX_BOARD_COLUMNS) {
+      throw ApiException.conflict(
+        'too_many_columns',
+        `На доске уже ${MAX_BOARD_COLUMNS} столбцов — больше не поместится.`,
+      );
+    }
+    const sortOrder = existing.reduce((max, c) => Math.max(max, c.sortOrder), -1) + 1;
+    const [row] = await this.db
+      .insert(boardColumns)
+      .values({ userId, directionId, title, sortOrder })
+      .returning();
+    return toColumn(row!);
+  }
+
+  private async assertColumn(userId: string, id: string) {
+    const [row] = await this.db
+      .select()
+      .from(boardColumns)
+      .where(and(eq(boardColumns.userId, userId), eq(boardColumns.id, id)));
+    if (!row) throw ApiException.notFound('Столбец');
+    return row;
+  }
+
+  async renameColumn(userId: string, id: string, title: string): Promise<BoardColumn> {
+    await this.assertColumn(userId, id);
+    const [row] = await this.db
+      .update(boardColumns)
+      .set({ title })
+      .where(and(eq(boardColumns.userId, userId), eq(boardColumns.id, id)))
+      .returning();
+    return toColumn(row!);
+  }
+
+  /**
+   * Удаление столбца не трогает задачи: их ссылка обнуляется внешним ключом,
+   * и карточки оказываются в первом столбце. Задача не может пропасть с доски
+   * из-за того, что убрали её стадию.
+   */
+  async removeColumn(userId: string, id: string): Promise<{ ok: true }> {
+    await this.assertColumn(userId, id);
+    await this.db
+      .delete(boardColumns)
+      .where(and(eq(boardColumns.userId, userId), eq(boardColumns.id, id)));
+    return { ok: true };
+  }
+
+  async reorderColumns(userId: string, ids: string[]): Promise<{ ok: true }> {
+    await Promise.all(
+      ids.map((id, index) =>
+        this.db
+          .update(boardColumns)
+          .set({ sortOrder: index })
+          .where(and(eq(boardColumns.userId, userId), eq(boardColumns.id, id))),
+      ),
+    );
+    return { ok: true };
+  }
+
+  /** Столбец обязан быть из направления проекта задачи — иначе карточка «потеряется». */
+  private async assertColumnFitsProject(
+    userId: string,
+    columnId: string,
+    projectId: string,
+  ): Promise<void> {
+    const [row] = await this.db
+      .select({ id: boardColumns.id })
+      .from(boardColumns)
+      .innerJoin(projects, eq(projects.directionId, boardColumns.directionId))
+      .where(
+        and(
+          eq(boardColumns.userId, userId),
+          eq(boardColumns.id, columnId),
+          eq(projects.id, projectId),
+        ),
+      );
+    if (!row) throw ApiException.validation('Столбец не с доски этого направления');
+  }
+
+  /**
+   * Перенос карточки между столбцами. Из «Готово» задача заодно возвращается
+   * в работу (как reopen — с откатом касания): иначе пришлось бы делать два
+   * запроса, и между ними карточка висела бы закрытой в открытом столбце.
+   */
+  async move(userId: string, id: string, columnId: string | null): Promise<Task> {
+    const existing = await this.assertExists(userId, id);
+    if (columnId) await this.assertColumnFitsProject(userId, columnId, existing.projectId);
+    if (existing.status === 'done') await this.reopen(userId, id);
+    const [row] = await this.db
+      .update(tasks)
+      .set({ boardColumnId: columnId, updatedAt: new Date() })
+      .where(and(eq(tasks.userId, userId), eq(tasks.id, id)))
+      .returning();
+    return toTask(row as Row);
   }
 
   /**
@@ -312,6 +452,9 @@ export class TasksService {
       .where(and(eq(tasks.userId, userId), eq(tasks.projectId, input.projectId)));
 
     const remindAt = await this.rollPastMorning(input.remindAt ?? null, userId, now);
+    if (input.boardColumnId) {
+      await this.assertColumnFitsProject(userId, input.boardColumnId, input.projectId);
+    }
 
     const [row] = await this.db
       .insert(tasks)
@@ -326,6 +469,7 @@ export class TasksService {
         comment: input.comment ?? null,
         pinned: input.pinned,
         sortOrder: Number(value),
+        boardColumnId: input.boardColumnId ?? null,
       })
       .returning();
     return toTask(row as Row);

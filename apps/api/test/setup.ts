@@ -59,7 +59,7 @@ export async function prepareDatabase(): Promise<void> {
   await migrate(db, { migrationsFolder: path.resolve(__dirname, '../drizzle') });
   await client.unsafe(`
     truncate table
-      reminder_deliveries, reminders, task_checklist_items, tasks, touches, projects,
+      reminder_deliveries, reminders, task_checklist_items, tasks, board_columns, touches, projects,
       directions, menu_items, media_items, media_categories, inbox_items,
       telegram_accounts, seed_markers, user_focus, user_settings, users
     restart identity cascade;

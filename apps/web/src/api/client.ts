@@ -34,6 +34,7 @@ import type {
   CreateTripChecklistItemInput,
   CreateTripInput,
   Board,
+  BoardColumn,
   Task,
   TaskFilter,
   TaskWithContext,
@@ -259,6 +260,15 @@ export const api = {
     reorder: (ids: string[]) => patch<{ ok: true }>('/api/projects/reorder', { ids }),
   },
 
+  boardColumns: {
+    create: (directionId: string, title: string) =>
+      post<BoardColumn>('/api/board-columns', { directionId, title }),
+    rename: (id: string, title: string) =>
+      patch<BoardColumn>(`/api/board-columns/${id}`, { title }),
+    remove: (id: string) => del<{ ok: true }>(`/api/board-columns/${id}`),
+    reorder: (ids: string[]) => patch<{ ok: true }>('/api/board-columns/reorder', { ids }),
+  },
+
   tasks: {
     listByProject: (projectId: string, filter?: TaskFilter) =>
       get<Task[]>('/api/tasks', { projectId, ...(filter as Query) }),
@@ -275,6 +285,9 @@ export const api = {
     complete: (id: string, withTouch = false, touchDate?: string) =>
       post<Task>(`/api/tasks/${id}/complete`, { withTouch, touchDate }),
     reopen: (id: string) => post<Task>(`/api/tasks/${id}/reopen`),
+    /** Перенос карточки в столбец доски (null — первый). Из «Готово» — заодно возврат. */
+    move: (id: string, boardColumnId: string | null) =>
+      post<Task>(`/api/tasks/${id}/move`, { boardColumnId }),
     pin: (id: string) => post<Task>(`/api/tasks/${id}/pin`),
     unpin: (id: string) => post<Task>(`/api/tasks/${id}/unpin`),
     activate: (id: string) => post<Focus>(`/api/tasks/${id}/activate`),

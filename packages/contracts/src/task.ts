@@ -48,10 +48,16 @@ export const createTaskSchema = z.object({
   remindAt: dateOnly.nullish(),
   comment: z.string().max(4000).nullish(),
   pinned: z.boolean().default(false),
+  /** Столбец доски. Нет — первый столбец направления. */
+  boardColumnId: uuid.nullish(),
 });
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 
-export const updateTaskSchema = createTaskSchema.omit({ projectId: true }).partial();
+// столбец меняется отдельной ручкой /move: перенос из «Готово» — это ещё и
+// возврат задачи, общий PATCH этого не умеет
+export const updateTaskSchema = createTaskSchema
+  .omit({ projectId: true, boardColumnId: true })
+  .partial();
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 
 /**
@@ -87,6 +93,11 @@ export const boardTaskSchema = taskSchema.extend({
   projectTitle: z.string(),
   /** Та самая единственная активная задача приложения. */
   isActive: z.boolean(),
+  /**
+   * Столбец доски. NULL — первый столбец. Сервер отдаёт NULL и тогда, когда
+   * сохранённый столбец не из этого направления (проект перенесли).
+   */
+  boardColumnId: uuid.nullable(),
 });
 export type BoardTask = z.infer<typeof boardTaskSchema>;
 
@@ -98,8 +109,32 @@ export const boardProjectSchema = z.object({
 });
 export type BoardProject = z.infer<typeof boardProjectSchema>;
 
+/**
+ * Столбец доски — стадия открытой задачи. «Готово» в список не входит: это
+ * статус done, он есть на любой доске.
+ */
+export const boardColumnSchema = z.object({
+  id: uuid,
+  directionId: uuid,
+  title: z.string(),
+  sortOrder: z.number().int(),
+});
+export type BoardColumn = z.infer<typeof boardColumnSchema>;
+
+export const boardColumnTitle = z.string().trim().min(1).max(40);
+export const createBoardColumnSchema = z.object({ directionId: uuid, title: boardColumnTitle });
+export type CreateBoardColumnInput = z.infer<typeof createBoardColumnSchema>;
+export const updateBoardColumnSchema = z.object({ title: boardColumnTitle });
+export type UpdateBoardColumnInput = z.infer<typeof updateBoardColumnSchema>;
+
+/** Перенос карточки. null — в первый столбец. Из «Готово» задача заодно возвращается. */
+export const moveTaskSchema = z.object({ boardColumnId: uuid.nullable() });
+export type MoveTaskInput = z.infer<typeof moveTaskSchema>;
+
 /** Доска направления: проекты, включённые в неё, и все их задачи — открытые и готовые. */
 export const boardSchema = z.object({
+  /** Пусто — у доски один столбец открытых задач, как раньше. */
+  columns: z.array(boardColumnSchema),
   projects: z.array(boardProjectSchema),
   tasks: z.array(boardTaskSchema),
 });

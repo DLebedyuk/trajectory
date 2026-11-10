@@ -3,3 +3,4 @@ export * from './relative-date.js';
 export * from './recurrence.js';
 export * from './format.js';
 export * from './travelChecklist.js';
+export * from './quickCard.js';

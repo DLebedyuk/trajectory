@@ -56,7 +56,7 @@ afterAll(async () => {
 describe('канбан-доска направления', () => {
   it('новый проект на доску не попадает: переключатель выключен по умолчанию', async () => {
     expect((await api.get(`/api/projects/${cartoonA}`)).body.showOnBoard).toBe(false);
-    expect(await board()).toEqual({ projects: [], tasks: [] });
+    expect(await board()).toEqual({ columns: [], projects: [], tasks: [] });
   });
 
   it('включённые проекты дают свои задачи с названием проекта', async () => {
@@ -109,10 +109,141 @@ describe('канбан-доска направления', () => {
     await api.post(`/api/projects/${book}/complete`).expect(201);
     expect((await board()).projects.map((p: { id: string }) => p.id)).toEqual([cartoonA]);
     await api.del(`/api/projects/${cartoonA}`).expect(200);
-    expect(await board()).toEqual({ projects: [], tasks: [] });
+    expect(await board()).toEqual({ columns: [], projects: [], tasks: [] });
   });
 
   it('чужое направление — 404', async () => {
     await as(STRANGER).get(`/api/tasks/board?directionId=${voice}`).expect(404);
+  });
+});
+
+describe('столбцы доски', () => {
+  let dir = '';
+  let proj = '';
+  let other = '';
+  let foreignColumn = '';
+  const boardOf = async () =>
+    (await api.get(`/api/tasks/board?directionId=${dir}`).expect(200)).body;
+  const addColumn = async (title: string) =>
+    (await api.post('/api/board-columns').send({ directionId: dir, title }).expect(201)).body;
+  const cardOf = async (id: string) =>
+    (await boardOf()).tasks.find((t: { id: string }) => t.id === id);
+
+  beforeAll(async () => {
+    dir = (await api.post('/api/directions').send({ name: 'Озвучка 2' })).body.id;
+    proj = await createProject(dir, 'Кот в сапогах');
+    await api.patch(`/api/projects/${proj}`).send({ showOnBoard: true }).expect(200);
+    const otherDir = (await api.post('/api/directions').send({ name: 'Другое' })).body.id;
+    other = await createProject(otherDir, 'Чужой');
+    foreignColumn = (
+      await api.post('/api/board-columns').send({ directionId: otherDir, title: 'Там' })
+    ).body.id;
+  });
+
+  it('у новой доски столбцов нет, задачи без столбца', async () => {
+    const id = await createTask(proj, 'Серия 1');
+    const b = await boardOf();
+    expect(b.columns).toEqual([]);
+    expect(b.tasks.find((t: { id: string }) => t.id === id).boardColumnId).toBeNull();
+  });
+
+  it('столбцы свои у направления и идут по порядку', async () => {
+    const debts = await addColumn('  Долги ');
+    await addColumn('Сегодня');
+    await addColumn('На фиксах');
+    const b = await boardOf();
+    expect(b.columns.map((c: { title: string }) => c.title)).toEqual([
+      'Долги',
+      'Сегодня',
+      'На фиксах',
+    ]);
+    expect(b.columns[0].id).toBe(debts.id);
+  });
+
+  it('задачу можно сразу создать в нужном столбце', async () => {
+    const [, today] = (await boardOf()).columns;
+    const task = (
+      await api
+        .post('/api/tasks')
+        .send({ projectId: proj, title: 'Серия 2', boardColumnId: today.id })
+        .expect(201)
+    ).body;
+    expect((await cardOf(task.id)).boardColumnId).toBe(today.id);
+  });
+
+  it('столбец чужого направления не принимается', async () => {
+    await api
+      .post('/api/tasks')
+      .send({ projectId: proj, title: 'Серия 3', boardColumnId: foreignColumn })
+      .expect(400);
+    const id = await createTask(proj, 'Серия 4');
+    await api.post(`/api/tasks/${id}/move`).send({ boardColumnId: foreignColumn }).expect(400);
+    expect(other).toBeTruthy();
+  });
+
+  it('перенос между столбцами и обратно в первый', async () => {
+    const [, , fixes] = (await boardOf()).columns;
+    const id = await createTask(proj, 'Серия 5');
+    await api.post(`/api/tasks/${id}/move`).send({ boardColumnId: fixes.id }).expect(201);
+    expect((await cardOf(id)).boardColumnId).toBe(fixes.id);
+    await api.post(`/api/tasks/${id}/move`).send({ boardColumnId: null }).expect(201);
+    expect((await cardOf(id)).boardColumnId).toBeNull();
+  });
+
+  it('перенос из «Готово» возвращает задачу в работу', async () => {
+    const [, today] = (await boardOf()).columns;
+    const id = await createTask(proj, 'Серия 6');
+    await api.post(`/api/tasks/${id}/complete`).send({ withTouch: true }).expect(201);
+    expect((await cardOf(id)).status).toBe('done');
+    await api.post(`/api/tasks/${id}/move`).send({ boardColumnId: today.id }).expect(201);
+    const card = await cardOf(id);
+    expect(card.status).toBe('open');
+    expect(card.boardColumnId).toBe(today.id);
+  });
+
+  it('переименование и порядок', async () => {
+    const [debts, today, fixes] = (await boardOf()).columns;
+    await api.patch(`/api/board-columns/${fixes.id}`).send({ title: 'Правки' }).expect(200);
+    await api
+      .patch('/api/board-columns/reorder')
+      .send({ ids: [today.id, debts.id, fixes.id] })
+      .expect(200);
+    expect((await boardOf()).columns.map((c: { title: string }) => c.title)).toEqual([
+      'Сегодня',
+      'Долги',
+      'Правки',
+    ]);
+    await api.patch(`/api/board-columns/${fixes.id}`).send({ title: '   ' }).expect(400);
+  });
+
+  it('удалённый столбец отдаёт карточки в первый, задачи не пропадают', async () => {
+    const cols = (await boardOf()).columns;
+    const fixes = cols[2];
+    const id = (
+      await api
+        .post('/api/tasks')
+        .send({ projectId: proj, title: 'Серия 7', boardColumnId: fixes.id })
+        .expect(201)
+    ).body.id;
+    await api.del(`/api/board-columns/${fixes.id}`).expect(200);
+    const b = await boardOf();
+    expect(b.columns).toHaveLength(2);
+    expect(b.tasks.find((t: { id: string }) => t.id === id).boardColumnId).toBeNull();
+  });
+
+  it('больше восьми столбцов нельзя', async () => {
+    const have = (await boardOf()).columns.length;
+    for (let i = have; i < 8; i += 1) await addColumn(`Столбец ${i}`);
+    await api.post('/api/board-columns').send({ directionId: dir, title: 'Лишний' }).expect(409);
+  });
+
+  it('чужие столбцы не видны и не правятся', async () => {
+    const [col] = (await boardOf()).columns;
+    await as(STRANGER).patch(`/api/board-columns/${col.id}`).send({ title: 'x' }).expect(404);
+    await as(STRANGER).del(`/api/board-columns/${col.id}`).expect(404);
+    await as(STRANGER)
+      .post('/api/board-columns')
+      .send({ directionId: dir, title: 'x' })
+      .expect(404);
   });
 });

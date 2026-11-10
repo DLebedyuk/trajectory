@@ -5,9 +5,7 @@ import {
   Button,
   DIRECTION_COLORS,
   EmptyState,
-  FormField,
   IconPinFilled,
-  IconPlus,
   Modal,
   OverflowMenu,
   useToast,
@@ -19,8 +17,34 @@ import { CheckRow } from '../components/CheckRow.js';
 import { invalidateFocusScope, qk, useBoard, useSettings } from '../api/queries.js';
 import { ErrorBox, Loading } from '../components/Loading.js';
 import { useCompleteTaskDialog } from './CompleteTaskDialog.js';
+import { BoardQuickAdd } from './BoardQuickAdd.js';
+import { BoardColumnsEditor } from './BoardColumnsEditor.js';
 
 type Sort = 'project' | 'deadline';
+
+/**
+ * Столбец открытых задач на экране. id — что уходит на сервер при переносе:
+ * null только у единственного столбца доски без своих столбцов.
+ */
+type Lane = { key: string; id: string | null; title: string };
+const DONE = 'done';
+
+/** Проект, в который упала последняя быстрая карточка, — для ввода без тега. */
+const lastProjectKey = (directionId: string) => `board:last-project:${directionId}`;
+function readLastProject(directionId: string): string | null {
+  try {
+    return localStorage.getItem(lastProjectKey(directionId));
+  } catch {
+    return null;
+  }
+}
+function writeLastProject(directionId: string, projectId: string): void {
+  try {
+    localStorage.setItem(lastProjectKey(directionId), projectId);
+  } catch {
+    // нет хранилища — просто не запомним
+  }
+}
 
 /*
   Цвет проекта на доске. Своего цвета у проекта нет, поэтому он выводится из
@@ -47,9 +71,12 @@ function projectColors(projectIds: string[], directionColor: string): Map<string
 
 /**
  * Канбан направления. Карточки — это сами задачи проектов, включённых в
- * доску: никаких копий и отдельного хранилища. Колонки повторяют статусы
- * задачи (open / done), поэтому перенос — это обычное закрытие или возврат,
- * с тем же окном касания, что и в проекте.
+ * доску: никаких копий и отдельного хранилища. Открытые задачи разложены по
+ * своим столбцам направления («Долги / Сегодня / На фиксах»), последний
+ * столбец — «Готово», статус done: перенос туда — обычное закрытие с окном
+ * касания, оттуда — возврат.
+ *
+ * Карточка добавляется прямо в столбце: «текст #проект» и Enter.
  *
  * На телефоне перетаскивание не работает (HTML5 drag-and-drop там не
  * поддерживается) — вместо него кружок-чекбокс на карточке и пункт меню.
@@ -89,11 +116,10 @@ export function DirectionBoard({
     );
 
   const [setupOpen, setSetupOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newProjectId, setNewProjectId] = useState('');
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [lastProject, setLastProject] = useState(() => readLastProject(directionId));
   const [dragId, setDragId] = useState<string | null>(null);
-  const [overColumn, setOverColumn] = useState<'open' | 'done' | null>(null);
+  const [overColumn, setOverColumn] = useState<string | null>(null);
 
   const toggleProject = useMutation({
     mutationFn: (vars: { id: string; on: boolean }) =>
@@ -135,16 +161,52 @@ export function DirectionBoard({
     },
   });
 
+  // перенос между столбцами — сразу на экране; из «Готово» сервер заодно возвращает задачу
+  const moveTask = useMutation({
+    mutationFn: (vars: { taskId: string; columnId: string | null; wasDone: boolean }) =>
+      api.tasks.move(vars.taskId, vars.columnId),
+    onMutate: async ({ taskId, columnId }) => {
+      await qc.cancelQueries({ queryKey: qk.board(directionId) });
+      const previous = qc.getQueryData<Board>(qk.board(directionId));
+      if (previous) {
+        qc.setQueryData<Board>(qk.board(directionId), {
+          ...previous,
+          tasks: previous.tasks.map((t) =>
+            t.id === taskId
+              ? { ...t, status: 'open', completedAt: null, boardColumnId: columnId }
+              : t,
+          ),
+        });
+      }
+      return { previous };
+    },
+    onError: (_e, _vars, context) => {
+      if (context?.previous) qc.setQueryData(qk.board(directionId), context.previous);
+      toast.show('Не удалось перенести карточку');
+    },
+    onSuccess: (_data, { taskId, wasDone }) => {
+      if (!wasDone) return;
+      invalidateFocusScope(qc);
+      void qc.invalidateQueries({ queryKey: qk.task(taskId) });
+      void qc.invalidateQueries({ queryKey: ['heatmap'] });
+      void qc.invalidateQueries({ queryKey: ['touches'] });
+    },
+  });
+
   const createTask = useMutation({
-    mutationFn: () =>
-      api.tasks.create({ projectId: newProjectId, title: newTitle.trim(), pinned: false }),
+    mutationFn: (vars: { title: string; projectId: string; columnId: string | null }) =>
+      api.tasks.create({
+        projectId: vars.projectId,
+        title: vars.title,
+        pinned: false,
+        ...(vars.columnId ? { boardColumnId: vars.columnId } : {}),
+      }),
     onSuccess: (task) => {
       invalidateFocusScope(qc, task.projectId);
-      toast.show('Задача добавлена');
-      setNewTitle('');
-      setCreateOpen(false);
+      writeLastProject(directionId, task.projectId);
+      setLastProject(task.projectId);
     },
-    onError: () => toast.show('Не удалось добавить задачу'),
+    onError: () => toast.show('Не удалось добавить карточку'),
   });
 
   const data = board.data;
@@ -209,6 +271,13 @@ export function DirectionBoard({
     if (Boolean(a.deadline) !== Boolean(b.deadline)) return a.deadline ? -1 : 1;
     return byProject(a, b);
   };
+  const lanes: Lane[] =
+    data.columns.length > 0
+      ? data.columns.map((c) => ({ key: c.id, id: c.id, title: c.title }))
+      : [{ key: 'open', id: null, title: 'К выполнению' }];
+  // без столбца или со столбцом, которого нет, — в первый
+  const laneOf = (t: BoardTask): string =>
+    lanes.find((l) => l.id !== null && l.id === t.boardColumnId)?.key ?? lanes[0]!.key;
   const openTasks = visible
     .filter((t) => t.status === 'open')
     .sort(sort === 'deadline' ? byDeadline : byProject);
@@ -224,13 +293,32 @@ export function DirectionBoard({
     setParam('p', next.join(','));
   };
 
-  const moveTo = (task: BoardTask, column: 'open' | 'done') => {
-    if (task.status === column) return;
-    if (column === 'done') askComplete(task.id, task.title);
-    else reopen.mutate(task.id);
+  const moveTo = (task: BoardTask, key: string) => {
+    const done = task.status === 'done';
+    if (key === DONE) {
+      if (!done) askComplete(task.id, task.title);
+      return;
+    }
+    if (!done && laneOf(task) === key) return;
+    const lane = lanes.find((l) => l.key === key);
+    if (!lane) return;
+    // единственный столбец без своих столбцов — это просто возврат
+    if (lane.id === null) {
+      if (done) reopen.mutate(task.id);
+      return;
+    }
+    moveTask.mutate({ taskId: task.id, columnId: lane.id, wasDone: done });
   };
 
-  const dropHandlers = (column: 'open' | 'done') => ({
+  // проект для карточки без тега: выбранный фильтром, иначе последний, иначе первый
+  const onBoard = (id: string | null) => (id && projectOrder.has(id) ? id : null);
+  const defaultProjectId =
+    (onlyProjects.length === 1 ? onBoard(onlyProjects[0]!) : null) ??
+    onBoard(lastProject) ??
+    data.projects[0]?.id ??
+    null;
+
+  const dropHandlers = (column: string) => ({
     onDragOver: (e: DragEvent) => {
       if (!dragId) return;
       e.preventDefault();
@@ -274,7 +362,9 @@ export function DirectionBoard({
             aria-label={done ? `Вернуть в работу: ${t.title}` : `Готово: ${t.title}`}
             onClick={(e) => {
               e.stopPropagation();
-              moveTo(t, done ? 'open' : 'done');
+              // возврат — в тот столбец, где задача была до закрытия
+              if (done) reopen.mutate(t.id);
+              else moveTo(t, DONE);
             }}
           />
           <span className="ttl">{t.title}</span>
@@ -284,9 +374,15 @@ export function DirectionBoard({
               label={`Действия: ${t.title}`}
               items={[
                 { label: 'Открыть', onSelect: () => navigate(`/tasks/${t.id}`) },
-                done
-                  ? { label: 'Вернуть в «К выполнению»', onSelect: () => moveTo(t, 'open') }
-                  : { label: 'Перенести в «Готово»', onSelect: () => moveTo(t, 'done') },
+                ...lanes
+                  .filter((l) => done || l.key !== laneOf(t))
+                  .map((l) => ({
+                    label: `${done ? 'Вернуть' : 'Перенести'} в «${l.title}»`,
+                    onSelect: () => moveTo(t, l.key),
+                  })),
+                ...(done
+                  ? []
+                  : [{ label: 'Перенести в «Готово»', onSelect: () => moveTo(t, DONE) }]),
               ]}
             />
           </span>
@@ -318,37 +414,37 @@ export function DirectionBoard({
     );
   };
 
-  const column = (key: 'open' | 'done', title: string, list: BoardTask[], empty: string) => (
-    <section
-      className={`board-col${overColumn === key ? ' is-over' : ''}`}
-      aria-label={title}
-      {...dropHandlers(key)}
-    >
-      <div className="board-col-head">
-        <span className="lbl">{title}</span>
-        <span className="ct">{list.length}</span>
-        {key === 'open' ? (
-          <button
-            type="button"
-            className="board-add"
-            aria-label="Новая задача"
-            title="Новая задача"
-            onClick={() => {
-              setNewProjectId(
-                onlyProjects.length === 1 ? onlyProjects[0]! : (data.projects[0]?.id ?? ''),
-              );
-              setCreateOpen(true);
-            }}
-          >
-            <IconPlus />
-          </button>
-        ) : null}
-      </div>
-      <div className="board-col-body">
-        {list.length > 0 ? list.map(card) : <p className="hint">{empty}</p>}
-      </div>
-    </section>
-  );
+  const column = (lane: Lane | null, list: BoardTask[], empty: string) => {
+    const key = lane?.key ?? DONE;
+    const title = lane?.title ?? 'Готово';
+    return (
+      <section
+        key={key}
+        className={`board-col${overColumn === key ? ' is-over' : ''}`}
+        aria-label={title}
+        {...dropHandlers(key)}
+      >
+        <div className="board-col-head">
+          <span className="lbl">{title}</span>
+          <span className="ct">{list.length}</span>
+        </div>
+        <div className="board-col-body">
+          {lane ? (
+            <BoardQuickAdd
+              label={title}
+              projects={data.projects}
+              defaultProjectId={defaultProjectId}
+              colors={colors}
+              onSubmit={(taskTitle, projectId) =>
+                createTask.mutateAsync({ title: taskTitle, projectId, columnId: lane.id })
+              }
+            />
+          ) : null}
+          {list.length > 0 ? list.map(card) : <p className="hint">{empty}</p>}
+        </div>
+      </section>
+    );
+  };
 
   const openCount = data.tasks.filter((t) => t.status === 'open').length;
 
@@ -412,6 +508,9 @@ export function DirectionBoard({
           <Button size="sm" variant="ghost" onClick={() => setSetupOpen(true)}>
             Проекты на доске
           </Button>
+          <Button size="sm" variant="ghost" onClick={() => setColumnsOpen(true)}>
+            Столбцы
+          </Button>
         </div>
         <p className="hint">
           {openCount} {plural(openCount, 'задача', 'задачи', 'задач')} к выполнению в{' '}
@@ -419,14 +518,24 @@ export function DirectionBoard({
         </p>
       </div>
 
-      <div className={`board-cols${hideDone ? ' is-single' : ''}`}>
-        {column(
-          'open',
-          'К выполнению',
-          openTasks,
-          needle || onlyProjects.length ? 'Ничего не нашлось.' : 'Всё сделано.',
+      <div
+        className={`board-cols${lanes.length + (hideDone ? 0 : 1) === 1 ? ' is-single' : ''}`}
+        style={{ ['--cols' as string]: lanes.length + (hideDone ? 0 : 1) }}
+      >
+        {lanes.map((lane, i) =>
+          column(
+            lane,
+            openTasks.filter((t) => laneOf(t) === lane.key),
+            needle || onlyProjects.length
+              ? 'Ничего не нашлось.'
+              : lanes.length === 1
+                ? 'Всё сделано.'
+                : i === 0
+                  ? 'Пусто.'
+                  : 'Перетащите сюда карточку.',
+          ),
         )}
-        {hideDone ? null : column('done', 'Готово', doneTasks, 'Пока ничего не закрыто.')}
+        {hideDone ? null : column(null, doneTasks, 'Пока ничего не закрыто.')}
       </div>
 
       {dialog}
@@ -446,45 +555,17 @@ export function DirectionBoard({
       </Modal>
 
       <Modal
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        title="Новая задача"
+        open={columnsOpen}
+        onOpenChange={setColumnsOpen}
+        title="Столбцы доски"
+        description="Свои стадии для открытых задач этого направления. «Готово» — всегда последний."
         footer={
-          <>
-            <Button variant="ghost" onClick={() => setCreateOpen(false)}>
-              Отмена
-            </Button>
-            <Button
-              variant="primary"
-              disabled={!newTitle.trim() || !newProjectId || createTask.isPending}
-              onClick={() => createTask.mutate()}
-            >
-              Добавить
-            </Button>
-          </>
+          <Button variant="primary" onClick={() => setColumnsOpen(false)}>
+            Готово
+          </Button>
         }
       >
-        <FormField label="Название">
-          <input
-            type="text"
-            value={newTitle}
-            autoFocus
-            placeholder="Серия 5"
-            onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && newTitle.trim() && newProjectId) createTask.mutate();
-            }}
-          />
-        </FormField>
-        <FormField label="Проект" hint="Задача всегда живёт в проекте — доска её только показывает">
-          <select value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)}>
-            {data.projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-              </option>
-            ))}
-          </select>
-        </FormField>
+        <BoardColumnsEditor directionId={directionId} columns={data.columns} />
       </Modal>
     </div>
   );

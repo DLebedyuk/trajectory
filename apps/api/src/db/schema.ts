@@ -207,6 +207,29 @@ export const projects = pgTable(
   }),
 );
 
+/**
+ * Столбцы канбан-доски направления — свои у каждого направления: у озвучки
+ * «Долги / Сегодня / На фиксах», у другого направления другие. Это стадии
+ * открытой задачи; «Готово» сюда не входит — это статус done, и он остаётся
+ * единственным способом закрыть задачу (с окном касания).
+ */
+export const boardColumns = pgTable(
+  'board_columns',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    directionId: uuid('direction_id')
+      .notNull()
+      .references(() => directions.id, { onDelete: 'cascade' }),
+    title: varchar('title', { length: 40 }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: now(),
+  },
+  (t) => ({ byDirection: index('board_columns_direction_idx').on(t.directionId, t.sortOrder) }),
+);
+
 export const tasks = pgTable(
   'tasks',
   {
@@ -228,6 +251,12 @@ export const tasks = pgTable(
     missedNotified: boolean('missed_notified').notNull().default(false),
     comment: text('comment'),
     sortOrder: integer('sort_order').notNull().default(0),
+    // столбец доски. NULL — первый столбец направления: так новые и старые
+    // задачи попадают в него без миграции данных, а удалённый столбец
+    // возвращает свои карточки туда же (ON DELETE SET NULL)
+    boardColumnId: uuid('board_column_id').references(() => boardColumns.id, {
+      onDelete: 'set null',
+    }),
     createdAt: now(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
     /** Мягкое удаление: строка остаётся в базе, но нигде не показывается. */
